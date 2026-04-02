@@ -1,0 +1,16 @@
+{
+  "manifest_version": 2,
+  "name": "Bluebook Signals",
+  "version": "3.0.0",
+  "description": "A menu activated with Ctrl+S in the prefix field of Zotero word processor plugins",
+  "author": "Frank Bennett",
+  "homepage_url": "https://github.com/danepps/zotero",
+  "applications": {
+    "zotero": {
+      "id": "bluebook-signals-for-zotero@mystery-lab.com",
+      "strict_min_version": "6.999",
+      "strict_max_version": "*",
+      "update_url": "https://danepps.github.io/zotero/update.json"
+    }
+  }
+}

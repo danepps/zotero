@@ -1,0 +1,12 @@
+{
+  "addons": {
+    "bluebook-signals-for-zotero@mystery-lab.com": {
+      "updates": [
+        {
+          "version": "3.0.0",
+          "update_link": "https://github.com/danepps/zotero/releases/download/v3.0.0/Bluebook_Signals_v3.0.0.xpi"
+        }
+      ]
+    }
+  }
+}
