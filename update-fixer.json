@@ -1,0 +1,17 @@
+{
+  "addons": {
+    "bluebook-fixer-for-zotero@danepps.com": {
+      "updates": [
+        {
+          "version": "1.0.0",
+          "update_link": "https://github.com/danepps/zotero/releases/download/fixer-v1.0.0/Bluebook_Fixer_v1.0.0.xpi",
+          "applications": {
+            "zotero": {
+              "strict_min_version": "6.999"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
