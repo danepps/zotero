@@ -1,0 +1,17 @@
+{
+  "manifest_version": 2,
+  "name": "Bluebook Citation Fixer",
+  "version": "1.0.0",
+  "description": "Post-processing fixes for Bluebook citations in Word documents",
+  "author": "Dan Epps",
+  "homepage_url": "https://github.com/danepps/zotero",
+  "applications": {
+    "zotero": {
+      "id": "bluebook-fixer-for-zotero@danepps.com",
+      "strict_min_version": "6.999",
+      "strict_max_version": "*",
+      "update_url": "https://danepps.github.io/zotero/update-fixer.json",
+      "loader": "bootstrap"
+    }
+  }
+}
