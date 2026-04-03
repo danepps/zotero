@@ -1,17 +1,23 @@
-# Bluebook Signals for Zotero
+# Zotero Plugins — Dan Epps
 
-A Zotero plugin that adds a Bluebook signal picker to the citation dialog prefix field. Press **Ctrl+S** while the prefix field is focused to open a menu of signals (*E.g.*, *Accord*, *See*, etc.).
+Zotero plugins designed to improve functionality for legal scholars. Maintained by Dan Epps, Washington University School of Law.
 
-## Installation
+## Bluebook Signals
 
-1. Download the latest `.xpi` from [Releases](https://github.com/danepps/zotero/releases)
-2. In Zotero: Tools → Plugins → gear icon → Install Plugin From File
-3. Select the downloaded `.xpi`
+A signal picker for the citation dialog prefix field. Press **Ctrl+S** 
+while the prefix field is focused to insert a Bluebook signal 
+(*See*, *E.g.*, *Accord*, etc.).
 
-## Usage
+**Install:** Download [Bluebook_Signals_v3.0.0.xpi](https://github.com/danepps/zotero/releases/tag/bluebook-signals-v3.0.0)
 
+**Usage:**
 1. Open the Add Citation dialog in your word processor
 2. Search for and select a citation
-3. Click into the **Prefix** field
-4. Press **Ctrl+S** to open the signal picker
-5. Click a signal to insert it
+3. Click into the Prefix field
+4. Press Ctrl+S to open the signal picker
+
+**Original author:** Frank Bennett. Updated for Zotero 9 by Dan Epps, 2026.
+
+---
+
+*More plugins coming soon.*
