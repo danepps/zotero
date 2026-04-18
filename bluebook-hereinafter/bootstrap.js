@@ -99,7 +99,7 @@ BH.readFieldsScript = function () {
         '        if fc contains "ZOTERO_ITEM" then',
         '            set ft to ""',
         '            try',
-        '                select result of f',
+        '                select f',
         '                set ftVal to content of selection',
         '                if ftVal is not missing value then set ft to ftVal as string',
         '            end try',
@@ -470,7 +470,7 @@ BH.buildWriterScript = function (fields, editsByField) {
         for (var i = 0; i < edits.length; i++) {
             var ed = edits[i];
             lines.push('    try');
-            lines.push('        select result of ' + ref);
+            lines.push('        select ' + ref);
             if (ed.pos >= textLen) {
                 lines.push('        collapse range selection direction collapse end');
             } else {
