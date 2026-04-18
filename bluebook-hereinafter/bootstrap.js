@@ -512,6 +512,7 @@ BH.buildWriterScript = function (fields, editsByField) {
 
     editsByField.forEach(function (edits, fi) {
         var field = fields[fi];
+        var ref = BH.fieldRef(field);
         var textLen = field.text.length;
 
         for (var i = 0; i < edits.length; i++) {
@@ -519,13 +520,55 @@ BH.buildWriterScript = function (fields, editsByField) {
             var tag = 'f' + fi + '.' + i + ' (' + field.loc + '#' +
                       field.fnIdx + '/' + field.fieldIdx +
                       ' pos=' + ed.pos + ' textLen=' + textLen + ')';
-            var vba = BH.buildVBAEdit(field, ed);
+            lines.push('    set step to "start"');
             lines.push('    try');
-            lines.push('        do Visual Basic "' + BH.asEscape(vba) + '"');
+            // Read the field's result range directly (no select round-trip
+            // for positioning).  text object of <field> is the result range.
+            lines.push('        set step to "get_field_range"');
+            lines.push('        set fldRange to text object of ' + ref);
+            // Build a sub-range whose end is at the desired insertion point,
+            // then collapse to end + select to get a zero-length insertion
+            // point at offset `pos` within the field, in the correct story.
+            if (ed.pos >= textLen && textLen > 0) {
+                lines.push('        set step to "collapse_field_end"');
+                lines.push('        collapse range fldRange direction collapse end');
+                lines.push('        set step to "select_field_end"');
+                lines.push('        select fldRange');
+            } else if (ed.pos === 0) {
+                lines.push('        set step to "collapse_field_start"');
+                lines.push('        collapse range fldRange direction collapse start');
+                lines.push('        set step to "select_field_start"');
+                lines.push('        select fldRange');
+            } else {
+                lines.push('        set step to "subrange"');
+                lines.push('        set subRange to characters 1 thru ' +
+                           ed.pos + ' of fldRange');
+                lines.push('        set step to "collapse_subrange_end"');
+                lines.push('        collapse range subRange direction collapse end');
+                lines.push('        set step to "select_subrange"');
+                lines.push('        select subRange');
+            }
+            lines.push('        set step to "typing"');
+            if (ed.plain) {
+                lines.push('        set italic of font object of selection to false');
+                lines.push('        type text selection text "' +
+                           BH.asEscape(ed.plain) + '"');
+            }
+            if (ed.italic) {
+                lines.push('        set italic of font object of selection to true');
+                lines.push('        type text selection text "' +
+                           BH.asEscape(ed.italic) + '"');
+                lines.push('        set italic of font object of selection to false');
+            }
+            if (ed.plain2) {
+                lines.push('        set italic of font object of selection to false');
+                lines.push('        type text selection text "' +
+                           BH.asEscape(ed.plain2) + '"');
+            }
             lines.push('        set editsApplied to editsApplied + 1');
             lines.push('    on error errMsg');
             lines.push('        set errLog to errLog & "' +
-                       BH.asEscape(tag) + ': " & errMsg & linefeed');
+                       BH.asEscape(tag) + ' [step=" & step & "]: " & errMsg & linefeed');
             lines.push('    end try');
         }
     });
@@ -533,48 +576,6 @@ BH.buildWriterScript = function (fields, editsByField) {
     lines.push('end tell');
     lines.push('return (editsApplied as string) & "|||" & errLog');
     return lines.join('\n');
-};
-
-// Build VBA source for a single edit.  VBA's Range.Start / Range.End are
-// reliably writable, story-aware, and don't suffer the "object does not
-// exist" / "can't set" issues we hit going through AppleScript directly.
-BH.buildVBAEdit = function (field, ed) {
-    var lines = [];
-    lines.push('Dim fld As Field');
-    lines.push('Dim rng As Range');
-    if (field.loc === 'fnote') {
-        lines.push(
-            'Set fld = ActiveDocument.Footnotes(' + field.fnIdx +
-            ').Range.Fields(' + field.fieldIdx + ')'
-        );
-    } else {
-        lines.push(
-            'Set fld = ActiveDocument.Fields(' + field.fieldIdx + ')'
-        );
-    }
-    lines.push('Set rng = fld.Result.Duplicate');
-    lines.push('rng.Start = rng.Start + ' + ed.pos);
-    lines.push('rng.End = rng.Start');
-    lines.push('rng.Select');
-    if (ed.plain) {
-        lines.push('Selection.Font.Italic = False');
-        lines.push('Selection.TypeText Text:="' + BH.vbaEscape(ed.plain) + '"');
-    }
-    if (ed.italic) {
-        lines.push('Selection.Font.Italic = True');
-        lines.push('Selection.TypeText Text:="' + BH.vbaEscape(ed.italic) + '"');
-        lines.push('Selection.Font.Italic = False');
-    }
-    if (ed.plain2) {
-        lines.push('Selection.Font.Italic = False');
-        lines.push('Selection.TypeText Text:="' + BH.vbaEscape(ed.plain2) + '"');
-    }
-    return lines.join('\n');
-};
-
-// Escape a string for embedding in a VBA double-quoted literal.
-BH.vbaEscape = function (s) {
-    return String(s).replace(/"/g, '""');
 };
 
 // ---- Diagnostics ----------------------------------------------------------
@@ -677,7 +678,7 @@ BH.fixHereinafters = function (win) {
         }
 
         BH.writeDiagFile(
-            'v0.1.20 | fields=' + fields.length +
+            'v0.1.21 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
