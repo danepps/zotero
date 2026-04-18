@@ -490,16 +490,16 @@ BH.buildWriterScript = function (fields, editsByField) {
             }
             lines.push('        select selRange');
             if (ed.plain) {
-                lines.push('        set italic of font of selection to false');
+                lines.push('        set italic of font object of selection to false');
                 lines.push('        type text selection text "' + BH.asEscape(ed.plain) + '"');
             }
             if (ed.italic) {
-                lines.push('        set italic of font of selection to true');
+                lines.push('        set italic of font object of selection to true');
                 lines.push('        type text selection text "' + BH.asEscape(ed.italic) + '"');
-                lines.push('        set italic of font of selection to false');
+                lines.push('        set italic of font object of selection to false');
             }
             if (ed.plain2) {
-                lines.push('        set italic of font of selection to false');
+                lines.push('        set italic of font object of selection to false');
                 lines.push('        type text selection text "' + BH.asEscape(ed.plain2) + '"');
             }
             lines.push('        set editsApplied to editsApplied + 1');
@@ -604,7 +604,7 @@ BH.fixHereinafters = function (win) {
         }
 
         BH.writeDiagFile(
-            'v0.1.7 | fields=' + fields.length +
+            'v0.1.8 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
