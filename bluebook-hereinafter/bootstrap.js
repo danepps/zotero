@@ -524,13 +524,16 @@ BH.buildWriterScript = function (fields, editsByField) {
                 lines.push('        collapse range selRange direction collapse start');
                 lines.push('        select selRange');
             } else {
-                lines.push('        collapse range selRange direction collapse start');
-                lines.push('        select selRange');
-                lines.push('        tell selection');
+                // mid-field: get the character AT position `pos` (1-indexed
+                // via pos+1), collapse to its start, select. Gives a zero-
+                // length insertion point exactly at offset `pos` within the
+                // field. Avoids 'move right' entirely.
                 lines.push(
-                    '            move right count ' + ed.pos + ' unit a character'
+                    '        set ptRange to character ' + (ed.pos + 1) +
+                    ' of selRange'
                 );
-                lines.push('        end tell');
+                lines.push('        collapse range ptRange direction collapse start');
+                lines.push('        select ptRange');
             }
             if (ed.plain) {
                 lines.push('        set italic of font object of selection to false');
@@ -662,7 +665,7 @@ BH.fixHereinafters = function (win) {
         }
 
         BH.writeDiagFile(
-            'v0.1.13 | fields=' + fields.length +
+            'v0.1.14 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
