@@ -631,6 +631,7 @@ BH.fixHereinafters = function (win) {
         }
 
         var writer = BH.buildWriterScript(fields, edits);
+        BH.writeFile('/tmp/bluebook-hereinafter-writer.applescript', writer);
         var appliedOut = BH.runAppleScript(writer);
         var applied = 0;
         var writerErrLog = '';
@@ -641,10 +642,24 @@ BH.fixHereinafters = function (win) {
         } else {
             writerErrLog = 'SCRIPT FAILED (no delimiter in output):\n' +
                 (appliedOut || '(empty)');
+            // Extract character offsets from osascript error if present
+            // (format "Script:startChar:endChar: message").
+            var m = /:(\d+):(\d+):/.exec(appliedOut || '');
+            if (m) {
+                var startChar = parseInt(m[1], 10);
+                var endChar = parseInt(m[2], 10);
+                var ctxStart = Math.max(0, startChar - 60);
+                var ctxEnd = Math.min(writer.length, endChar + 60);
+                writerErrLog += '\n\n--- writer script around offset ' +
+                    startChar + '-' + endChar + ' ---\n' +
+                    writer.slice(ctxStart, startChar) +
+                    '>>>' + writer.slice(startChar, endChar) + '<<<' +
+                    writer.slice(endChar, ctxEnd);
+            }
         }
 
         BH.writeDiagFile(
-            'v0.1.9 | fields=' + fields.length +
+            'v0.1.10 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
@@ -666,13 +681,13 @@ BH.fixHereinafters = function (win) {
     }
 };
 
-// Write a string to /tmp/bluebook-hereinafter-diag.txt for debugging.
-BH.writeDiagFile = function (text) {
+// Write a string to a file for debugging.
+BH.writeFile = function (path, text) {
     try {
         var Cc = Components.classes;
         var Ci = Components.interfaces;
         var f = Cc['@mozilla.org/file/local;1'].createInstance(Ci.nsIFile);
-        f.initWithPath('/tmp/bluebook-hereinafter-diag.txt');
+        f.initWithPath(path);
         var os = Cc['@mozilla.org/network/file-output-stream;1']
             .createInstance(Ci.nsIFileOutputStream);
         os.init(f, 0x02 | 0x08 | 0x20, 0o644, 0);
@@ -682,6 +697,10 @@ BH.writeDiagFile = function (text) {
         cos.writeString(text);
         cos.close();
     } catch (_) {}
+};
+
+BH.writeDiagFile = function (text) {
+    BH.writeFile('/tmp/bluebook-hereinafter-diag.txt', text);
 };
 
 // ---- Menu + integration hook ----------------------------------------------
