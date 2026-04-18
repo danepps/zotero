@@ -541,11 +541,14 @@ BH.buildWriterScript = function (fields, editsByField) {
             }
             lines.push('        set step to "compute_target"');
             lines.push('        set targetPos to ' + targetExpr);
-            lines.push('        set step to "create_range"');
-            lines.push('        set tgt to create range active document ' +
-                       'start targetPos end targetPos');
-            lines.push('        set step to "select_target"');
-            lines.push('        select tgt');
+            // Modify selRange in place — its start/end of content are
+            // writable and stay in the correct story (body vs footnote).
+            lines.push('        set step to "set_range_start"');
+            lines.push('        set start of content of selRange to targetPos');
+            lines.push('        set step to "set_range_end"');
+            lines.push('        set end of content of selRange to targetPos');
+            lines.push('        set step to "select_range"');
+            lines.push('        select selRange');
             lines.push('        set step to "typing"');
             if (ed.plain) {
                 lines.push('        set italic of font object of selection to false');
@@ -677,7 +680,7 @@ BH.fixHereinafters = function (win) {
         }
 
         BH.writeDiagFile(
-            'v0.1.18 | fields=' + fields.length +
+            'v0.1.19 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
