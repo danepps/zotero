@@ -526,9 +526,11 @@ BH.buildWriterScript = function (fields, editsByField) {
             lines.push('    try');
             lines.push('        set step to "select_field"');
             lines.push('        select ' + ref);
-            lines.push('        set step to "get_sel_bounds"');
-            lines.push('        set fldStart to start of selection');
-            lines.push('        set fldEnd to end of selection');
+            lines.push('        set step to "get_range"');
+            lines.push('        set selRange to text object of selection');
+            lines.push('        set step to "get_bounds"');
+            lines.push('        set fldStart to start of content of selRange');
+            lines.push('        set fldEnd to end of content of selRange');
             var targetExpr;
             if (ed.pos >= textLen && textLen > 0) {
                 targetExpr = 'fldEnd';
@@ -537,10 +539,13 @@ BH.buildWriterScript = function (fields, editsByField) {
             } else {
                 targetExpr = 'fldStart + ' + ed.pos;
             }
-            lines.push('        set step to "set_sel_start"');
-            lines.push('        set start of selection to ' + targetExpr);
-            lines.push('        set step to "set_sel_end"');
-            lines.push('        set end of selection to ' + targetExpr);
+            lines.push('        set step to "compute_target"');
+            lines.push('        set targetPos to ' + targetExpr);
+            lines.push('        set step to "create_range"');
+            lines.push('        set tgt to create range active document ' +
+                       'start targetPos end targetPos');
+            lines.push('        set step to "select_target"');
+            lines.push('        select tgt');
             lines.push('        set step to "typing"');
             if (ed.plain) {
                 lines.push('        set italic of font object of selection to false');
@@ -672,7 +677,7 @@ BH.fixHereinafters = function (win) {
         }
 
         BH.writeDiagFile(
-            'v0.1.17 | fields=' + fields.length +
+            'v0.1.18 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
