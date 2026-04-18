@@ -486,7 +486,40 @@ BH.buildWriterScript = function (fields, editsByField) {
     return lines.join('\n');
 };
 
-// ---- Top-level fixer ------------------------------------------------------
+// ---- Diagnostics ----------------------------------------------------------
+
+// Build a short human-readable summary of what the plugin saw in the doc.
+// Used by the menu alert to help debug why edits weren't applied.
+BH.diagnose = function (fields, analysis, edits) {
+    var out = [];
+    out.push('Fields: ' + fields.length);
+    out.push('Ambiguous items: ' + analysis.ambiguous.size);
+    out.push('Edits planned: ' + edits.size);
+    out.push('');
+    for (var fi = 0; fi < fields.length && fi < 8; fi++) {
+        var f = fields[fi];
+        var parsed = BH.parseFieldCode(f.code);
+        var items = (parsed && parsed.citationItems) || [];
+        var itemStrs = [];
+        for (var ci = 0; ci < items.length; ci++) {
+            var cit = items[ci];
+            var data = cit.itemData || {};
+            var key = BH.itemKey(cit);
+            var keyShort = key.length > 40 ? '…' + key.slice(-40) : key;
+            var amb = analysis.ambiguous.has(key) ? 'AMB' : 'uniq';
+            itemStrs.push(
+                '    ' + amb + ' key=' + keyShort +
+                ' author=' + JSON.stringify(BH.authorKeyOf(data)) +
+                ' short=' + JSON.stringify(BH.shortTitleOf(data))
+            );
+        }
+        out.push('[' + fi + '] ' + f.loc + '#' + f.fnIdx + ' field ' + f.fieldIdx);
+        out.push('  text: ' + JSON.stringify(f.text.slice(0, 80)));
+        out.push('  items: ' + items.length);
+        out.push(itemStrs.join('\n'));
+    }
+    return out.join('\n');
+};
 
 BH.fixHereinafters = function (win) {
     try {
@@ -500,20 +533,30 @@ BH.fixHereinafters = function (win) {
 
         var fields = BH.parseFieldRecords(rawOut);
         if (!fields.length) {
-            return { applied: 0, fieldsScanned: 0 };
+            return { applied: 0, fieldsScanned: 0, diagnostic: '(no Zotero fields found)' };
         }
 
         var analysis = BH.analyzeDocument(fields);
         var edits = BH.computeEdits(fields, analysis);
+        var diagnostic = BH.diagnose(fields, analysis, edits);
+
         if (edits.size === 0) {
-            return { applied: 0, fieldsScanned: fields.length };
+            return {
+                applied: 0,
+                fieldsScanned: fields.length,
+                diagnostic: diagnostic
+            };
         }
 
         var writer = BH.buildWriterScript(fields, edits);
         var appliedOut = BH.runAppleScript(writer);
         var applied = parseInt((appliedOut || '').trim(), 10) || 0;
 
-        return { applied: applied, fieldsScanned: fields.length };
+        return {
+            applied: applied,
+            fieldsScanned: fields.length,
+            diagnostic: diagnostic
+        };
     } catch (e) {
         Components.utils.reportError(
             'Bluebook Hereinafter fix error: ' + e + '\n' + (e.stack || '')
@@ -610,11 +653,11 @@ BH.addMenuItem = function (win) {
         if (res && res.error) {
             win.alert('Bluebook Hereinafter error:\n\n' + res.error);
         } else if (res) {
-            win.alert(
-                'Bluebook Hereinafter\n\n' +
+            var msg = 'Bluebook Hereinafter\n\n' +
                 'Fields scanned: ' + res.fieldsScanned + '\n' +
-                'Edits applied: ' + res.applied
-            );
+                'Edits applied: ' + res.applied;
+            if (res.diagnostic) msg += '\n\n--- diagnostic ---\n' + res.diagnostic;
+            win.alert(msg);
         }
     });
     toolsMenu.appendChild(item);
