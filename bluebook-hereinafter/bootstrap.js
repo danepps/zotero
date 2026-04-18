@@ -99,7 +99,8 @@ BH.readFieldsScript = function () {
         '        if fc contains "ZOTERO_ITEM" then',
         '            set ft to ""',
         '            try',
-        '                set ftVal to content of result of f',
+        '                select result of f',
+        '                set ftVal to content of selection',
         '                if ftVal is not missing value then set ft to ftVal as string',
         '            end try',
         '            set codeB64 to do shell script "printf %s " & quoted form of fc & " | base64 | tr -d \'\\n\'"',
@@ -121,7 +122,8 @@ BH.readFieldsScript = function () {
         '            if fc contains "ZOTERO_ITEM" then',
         '                set ft to ""',
         '                try',
-        '                    set ftVal to content of result of f',
+        '                    select result of f',
+        '                    set ftVal to content of selection',
         '                    if ftVal is not missing value then set ft to ftVal as string',
         '                end try',
         '                set codeB64 to do shell script "printf %s " & quoted form of fc & " | base64 | tr -d \'\\n\'"',
@@ -314,7 +316,6 @@ BH.analyzeDocument = function (fields) {
 // Returns a Map<fieldIdx, edit[]>.
 BH.computeEdits = function (fields, analysis) {
     var edits = new Map();
-    var seen = new Set();  // itemKeys for which we have emitted the first-cite
 
     for (var fi = 0; fi < fields.length; fi++) {
         var field = fields[fi];
@@ -331,9 +332,11 @@ BH.computeEdits = function (fields, analysis) {
             var meta = analysis.items.get(key);
             if (!meta || !meta.shortTitle) continue;
 
-            var isFirst = !seen.has(key);
-            if (isFirst) {
-                seen.add(key);
+            // cit.position: 0 = first cite, 1 = subsequent, 2 = ibid,
+            // 3 = ibid-with-locator.  Treat ibid as subsequent for our
+            // purposes; treat undefined/0 as first.
+            var pos = (cit.position !== undefined) ? cit.position : 0;
+            if (pos === 0) {
                 var edit = BH.computeFirstCiteEdit(field, cit, meta);
                 if (edit) fieldEdits.push(edit);
             } else {
@@ -373,30 +376,50 @@ BH.computeFirstCiteEdit = function (field, citItem, meta) {
 
 // Compute the edit for a subsequent (short-form) cite of an ambiguous item:
 // insert ", <i>ShortTitle</i>" between the author-short and "supra note".
-// Detects the `, supra note` split and inserts the title just before the
-// comma.  If no supra is found (e.g., this cite isn't short-form after all),
-// return null.
+//
+// Primary: search for ", supra note" in the display text and insert before it.
+// Fallback (text is empty / unreadable): insert after the computed author-short
+// string length, trusting citeproc produced "AuthorShort, supra note N".
 BH.computeSubsequentCiteEdit = function (field, citItem, meta) {
     var text = field.text;
     var shortTitle = meta.shortTitle;
+    var data = citItem.itemData || {};
 
     // Idempotency: skip if the short title already appears before "supra".
-    var titleBeforeSupra = new RegExp(
-        BH.escapeRegex(shortTitle) + '\\s*,?\\s*supra\\s+note',
-        'i'
-    );
-    if (titleBeforeSupra.test(text)) return null;
+    if (text) {
+        var titleBeforeSupra = new RegExp(
+            BH.escapeRegex(shortTitle) + '[^,]*,?\\s*supra\\s+note',
+            'i'
+        );
+        if (titleBeforeSupra.test(text)) return null;
+    }
 
-    // Find ", supra note" (possibly preceded by the author-short string).
-    var m = /,\s+supra\s+note\b/i.exec(text);
-    if (!m) return null;
+    // Primary: find ", supra note" in display text.
+    if (text) {
+        var m = /,\s+supra\s+note\b/i.exec(text);
+        if (m) {
+            return { pos: m.index, plain: ', ', italic: shortTitle, plain2: '' };
+        }
+    }
 
-    return {
-        pos: m.index,          // position of the comma before " supra"
-        plain: ', ',
-        italic: shortTitle,
-        plain2: ''
-    };
+    // Fallback: insert after author-short.  Handle volume prefix for books.
+    var authorShort = BH.renderedAuthorShort(data);
+    if (!authorShort) return null;
+    var volumePrefix = (data.type === 'book' && data.volume)
+        ? String(data.volume) + ' '
+        : '';
+    var insertPos = (volumePrefix + authorShort).length;
+
+    return { pos: insertPos, plain: ', ', italic: shortTitle, plain2: '' };
+};
+
+// Reintroduce renderedAuthorShort (needed for the fallback above).
+BH.renderedAuthorShort = function (itemData) {
+    var ss = BH.surnamesOf(itemData);
+    if (ss.length === 0) return '';
+    if (ss.length === 1) return ss[0];
+    if (ss.length === 2) return ss[0] + ' & ' + ss[1];
+    return ss[0] + ' et al.';
 };
 
 BH.escapeRegex = function (s) {
@@ -538,7 +561,16 @@ BH.fixHereinafters = function (win) {
 
         var analysis = BH.analyzeDocument(fields);
         var edits = BH.computeEdits(fields, analysis);
-        var diagnostic = BH.diagnose(fields, analysis, edits);
+
+        var diagnostic = '(diagnose not run)';
+        try { diagnostic = BH.diagnose(fields, analysis, edits); }
+        catch (de) { diagnostic = 'diagnose() threw: ' + de; }
+
+        BH.writeDiagFile(
+            'v0.1.3 | fields=' + fields.length +
+            ' ambig=' + analysis.ambiguous.size +
+            ' edits=' + edits.size + '\n\n' + diagnostic
+        );
 
         if (edits.size === 0) {
             return {
@@ -558,11 +590,29 @@ BH.fixHereinafters = function (win) {
             diagnostic: diagnostic
         };
     } catch (e) {
-        Components.utils.reportError(
-            'Bluebook Hereinafter fix error: ' + e + '\n' + (e.stack || '')
-        );
+        var errStr = String(e) + '\n' + (e.stack || '');
+        Components.utils.reportError('Bluebook Hereinafter fix error: ' + errStr);
+        BH.writeDiagFile('CAUGHT ERROR: ' + errStr);
         return { applied: 0, fieldsScanned: 0, error: String(e) };
     }
+};
+
+// Write a string to /tmp/bluebook-hereinafter-diag.txt for debugging.
+BH.writeDiagFile = function (text) {
+    try {
+        var Cc = Components.classes;
+        var Ci = Components.interfaces;
+        var f = Cc['@mozilla.org/file/local;1'].createInstance(Ci.nsIFile);
+        f.initWithPath('/tmp/bluebook-hereinafter-diag.txt');
+        var os = Cc['@mozilla.org/network/file-output-stream;1']
+            .createInstance(Ci.nsIFileOutputStream);
+        os.init(f, 0x02 | 0x08 | 0x20, 0o644, 0);
+        var cos = Cc['@mozilla.org/intl/converter-output-stream;1']
+            .createInstance(Ci.nsIConverterOutputStream);
+        cos.init(os, 'UTF-8', 0, 0);
+        cos.writeString(text);
+        cos.close();
+    } catch (_) {}
 };
 
 // ---- Menu + integration hook ----------------------------------------------
