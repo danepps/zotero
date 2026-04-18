@@ -516,19 +516,17 @@ BH.buildWriterScript = function (fields, editsByField) {
                       ' pos=' + ed.pos + ' textLen=' + textLen + ')';
             lines.push('    try');
             lines.push('        select ' + ref);
-            lines.push('        set selRange to text object of selection');
             if (ed.pos >= textLen && textLen > 0) {
-                lines.push('        collapse range selRange direction collapse end');
+                lines.push('        tell selection to collapse direction collapse end');
             } else if (ed.pos === 0) {
-                lines.push('        collapse range selRange direction collapse start');
+                lines.push('        tell selection to collapse direction collapse start');
             } else {
-                lines.push('        collapse range selRange direction collapse start');
+                lines.push('        tell selection to collapse direction collapse start');
                 lines.push(
-                    '        move right selRange count ' +
+                    '        tell selection to move right count ' +
                     ed.pos + ' unit a character'
                 );
             }
-            lines.push('        select selRange');
             if (ed.plain) {
                 lines.push('        set italic of font object of selection to false');
                 lines.push('        type text selection text "' + BH.asEscape(ed.plain) + '"');
@@ -659,7 +657,7 @@ BH.fixHereinafters = function (win) {
         }
 
         BH.writeDiagFile(
-            'v0.1.10 | fields=' + fields.length +
+            'v0.1.11 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
