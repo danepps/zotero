@@ -20,4 +20,30 @@ while the prefix field is focused to insert a Bluebook signal
 
 ---
 
+## Bluebook Hereinafter
+
+Auto-applies Bluebook Rule 4.2(b) "hereinafter" handling in Word documents.
+When the same author has two or more distinct works cited, the plugin:
+
+- Appends ` [hereinafter <i>Short Title</i>]` to each work's first full cite
+- Rewrites later short-form cites from `Reich, supra note 5` to
+  `Reich, <i>New Property</i>, supra note 5`
+
+Short titles come from each item's **Short Title** field in Zotero (with
+the full title as fallback). The plugin runs automatically after every
+Zotero insert/refresh and is also exposed as **Tools &rarr; Fix Hereinafters**
+for manual invocation.
+
+**Platform:** macOS + Microsoft Word only (AppleScript).
+
+**Status:** v0.1 (early). Known limitations:
+- Mac/Word only for now
+- Brief visual flicker during refresh (plugin re-writes after Zotero paints)
+- Italicizes short titles uniformly; book titles in Bluebook actually use
+  small caps
+- Ambiguity grouping is by surname list only (no handling of editor-as-author
+  or institutional authors yet)
+
+---
+
 *More plugins coming soon.*
