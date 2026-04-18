@@ -476,17 +476,19 @@ BH.buildWriterScript = function (fields, editsByField) {
                       ' pos=' + ed.pos + ' textLen=' + textLen + ')';
             lines.push('    try');
             lines.push('        select ' + ref);
+            lines.push('        set selRange to text object of selection');
             if (ed.pos >= textLen && textLen > 0) {
-                lines.push('        tell selection to collapse direction collapse end');
+                lines.push('        collapse range selRange direction collapse end');
             } else if (ed.pos === 0) {
-                lines.push('        tell selection to collapse direction collapse start');
+                lines.push('        collapse range selRange direction collapse start');
             } else {
-                lines.push('        tell selection to collapse direction collapse start');
+                lines.push('        collapse range selRange direction collapse start');
                 lines.push(
-                    '        tell selection to move right count ' +
+                    '        move right selRange count ' +
                     ed.pos + ' unit a character'
                 );
             }
+            lines.push('        select selRange');
             if (ed.plain) {
                 lines.push('        set italic of font of selection to false');
                 lines.push('        type text selection text "' + BH.asEscape(ed.plain) + '"');
@@ -590,12 +592,19 @@ BH.fixHereinafters = function (win) {
 
         var writer = BH.buildWriterScript(fields, edits);
         var appliedOut = BH.runAppleScript(writer);
-        var parts = (appliedOut || '').split('|||');
-        var applied = parseInt((parts[0] || '').trim(), 10) || 0;
-        var writerErrLog = parts.slice(1).join('|||').trim();
+        var applied = 0;
+        var writerErrLog = '';
+        if (appliedOut && appliedOut.indexOf('|||') !== -1) {
+            var parts = appliedOut.split('|||');
+            applied = parseInt((parts[0] || '').trim(), 10) || 0;
+            writerErrLog = parts.slice(1).join('|||').trim();
+        } else {
+            writerErrLog = 'SCRIPT FAILED (no delimiter in output):\n' +
+                (appliedOut || '(empty)');
+        }
 
         BH.writeDiagFile(
-            'v0.1.6 | fields=' + fields.length +
+            'v0.1.7 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
