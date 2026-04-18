@@ -526,34 +526,21 @@ BH.buildWriterScript = function (fields, editsByField) {
             lines.push('    try');
             lines.push('        set step to "select_field"');
             lines.push('        select ' + ref);
-            lines.push('        set step to "text_object"');
-            lines.push('        set selRange to text object of selection');
-            lines.push('        set step to "selRange_len=" & (count of characters of selRange)');
+            lines.push('        set step to "get_sel_bounds"');
+            lines.push('        set fldStart to start of selection');
+            lines.push('        set fldEnd to end of selection');
+            var targetExpr;
             if (ed.pos >= textLen && textLen > 0) {
-                lines.push('        set step to "collapse_end"');
-                lines.push('        collapse range selRange direction collapse end');
-                lines.push('        set step to "select_selRange_end"');
-                lines.push('        select selRange');
+                targetExpr = 'fldEnd';
             } else if (ed.pos === 0) {
-                lines.push('        set step to "collapse_start"');
-                lines.push('        collapse range selRange direction collapse start');
-                lines.push('        set step to "select_selRange_start"');
-                lines.push('        select selRange');
+                targetExpr = 'fldStart';
             } else {
-                // mid-field: get the character AT position `pos` (1-indexed
-                // via pos+1), collapse to its start, select. Gives a zero-
-                // length insertion point exactly at offset `pos` within the
-                // field. Avoids 'move right' entirely.
-                lines.push('        set step to "char_access"');
-                lines.push(
-                    '        set ptRange to character ' + (ed.pos + 1) +
-                    ' of selRange'
-                );
-                lines.push('        set step to "collapse_pt_start"');
-                lines.push('        collapse range ptRange direction collapse start');
-                lines.push('        set step to "select_ptRange"');
-                lines.push('        select ptRange');
+                targetExpr = 'fldStart + ' + ed.pos;
             }
+            lines.push('        set step to "set_sel_start"');
+            lines.push('        set start of selection to ' + targetExpr);
+            lines.push('        set step to "set_sel_end"');
+            lines.push('        set end of selection to ' + targetExpr);
             lines.push('        set step to "typing"');
             if (ed.plain) {
                 lines.push('        set italic of font object of selection to false');
@@ -685,7 +672,7 @@ BH.fixHereinafters = function (win) {
         }
 
         BH.writeDiagFile(
-            'v0.1.16 | fields=' + fields.length +
+            'v0.1.17 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
