@@ -517,17 +517,21 @@ BH.buildWriterScript = function (fields, editsByField) {
             lines.push('    try');
             lines.push('        select ' + ref);
             lines.push('        set selRange to text object of selection');
-            lines.push('        set fStart to start of selRange');
             if (ed.pos >= textLen && textLen > 0) {
-                lines.push('        set insertPos to end of selRange');
+                lines.push('        collapse range selRange direction collapse end');
+                lines.push('        select selRange');
             } else if (ed.pos === 0) {
-                lines.push('        set insertPos to fStart');
+                lines.push('        collapse range selRange direction collapse start');
+                lines.push('        select selRange');
             } else {
-                lines.push('        set insertPos to fStart + ' + ed.pos);
+                lines.push('        collapse range selRange direction collapse start');
+                lines.push('        select selRange');
+                lines.push('        tell selection');
+                lines.push(
+                    '            move right count ' + ed.pos + ' unit a character'
+                );
+                lines.push('        end tell');
             }
-            lines.push('        set start of selRange to insertPos');
-            lines.push('        set end of selRange to insertPos');
-            lines.push('        select selRange');
             if (ed.plain) {
                 lines.push('        set italic of font object of selection to false');
                 lines.push('        type text selection text "' + BH.asEscape(ed.plain) + '"');
@@ -658,7 +662,7 @@ BH.fixHereinafters = function (win) {
         }
 
         BH.writeDiagFile(
-            'v0.1.12 | fields=' + fields.length +
+            'v0.1.13 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
