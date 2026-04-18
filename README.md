@@ -29,6 +29,8 @@ When the same author has two or more distinct works cited, the plugin:
 - Rewrites later short-form cites from `Reich, supra note 5` to
   `Reich, <i>New Property</i>, supra note 5`
 
+**Install:** Download [Bluebook_Hereinafter_v0.1.8.xpi](https://github.com/danepps/zotero/releases/tag/hereinafter-v0.1.8)
+
 Short titles come from each item's **Short Title** field in Zotero (with
 the full title as fallback). The plugin runs automatically after every
 Zotero insert/refresh and is also exposed as **Tools &rarr; Fix Hereinafters**
@@ -36,8 +38,10 @@ for manual invocation.
 
 **Platform:** macOS + Microsoft Word only (AppleScript).
 
-**Status:** v0.1 (early). Known limitations:
+**Status:** v0.1.8 (early). Known limitations:
 - Mac/Word only for now
+- Multi-cite fields (two works in one citation) append both hereinafters
+  at the end of the combined field rather than inline per work
 - Brief visual flicker during refresh (plugin re-writes after Zotero paints)
 - Italicizes short titles uniformly; book titles in Bluebook actually use
   small caps
