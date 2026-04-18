@@ -509,12 +509,9 @@ BH.buildWriterScript = function (fields, editsByField) {
     lines.push('set errLog to ""');
     lines.push('set editsApplied to 0');
     lines.push('tell application "Microsoft Word"');
-    lines.push('    set origSel to selection');
 
-    var editNum = 0;
     editsByField.forEach(function (edits, fi) {
         var field = fields[fi];
-        var ref = BH.fieldRef(field);
         var textLen = field.text.length;
 
         for (var i = 0; i < edits.length; i++) {
@@ -522,62 +519,62 @@ BH.buildWriterScript = function (fields, editsByField) {
             var tag = 'f' + fi + '.' + i + ' (' + field.loc + '#' +
                       field.fnIdx + '/' + field.fieldIdx +
                       ' pos=' + ed.pos + ' textLen=' + textLen + ')';
-            lines.push('    set step to "start"');
+            var vba = BH.buildVBAEdit(field, ed);
             lines.push('    try');
-            lines.push('        set step to "select_field"');
-            lines.push('        select ' + ref);
-            lines.push('        set step to "get_range"');
-            lines.push('        set selRange to text object of selection');
-            lines.push('        set step to "get_bounds"');
-            lines.push('        set fldStart to start of content of selRange');
-            lines.push('        set fldEnd to end of content of selRange');
-            var targetExpr;
-            if (ed.pos >= textLen && textLen > 0) {
-                targetExpr = 'fldEnd';
-            } else if (ed.pos === 0) {
-                targetExpr = 'fldStart';
-            } else {
-                targetExpr = 'fldStart + ' + ed.pos;
-            }
-            lines.push('        set step to "compute_target"');
-            lines.push('        set targetPos to ' + targetExpr);
-            // Modify selRange in place — its start/end of content are
-            // writable and stay in the correct story (body vs footnote).
-            lines.push('        set step to "set_range_start"');
-            lines.push('        set start of content of selRange to targetPos');
-            lines.push('        set step to "set_range_end"');
-            lines.push('        set end of content of selRange to targetPos');
-            lines.push('        set step to "select_range"');
-            lines.push('        select selRange');
-            lines.push('        set step to "typing"');
-            if (ed.plain) {
-                lines.push('        set italic of font object of selection to false');
-                lines.push('        type text selection text "' + BH.asEscape(ed.plain) + '"');
-            }
-            if (ed.italic) {
-                lines.push('        set italic of font object of selection to true');
-                lines.push('        type text selection text "' + BH.asEscape(ed.italic) + '"');
-                lines.push('        set italic of font object of selection to false');
-            }
-            if (ed.plain2) {
-                lines.push('        set italic of font object of selection to false');
-                lines.push('        type text selection text "' + BH.asEscape(ed.plain2) + '"');
-            }
+            lines.push('        do Visual Basic "' + BH.asEscape(vba) + '"');
             lines.push('        set editsApplied to editsApplied + 1');
             lines.push('    on error errMsg');
             lines.push('        set errLog to errLog & "' +
-                       BH.asEscape(tag) + ' [step=" & step & "]: " & errMsg & linefeed');
+                       BH.asEscape(tag) + ': " & errMsg & linefeed');
             lines.push('    end try');
-            editNum++;
         }
     });
 
-    lines.push('    try');
-    lines.push('        select origSel');
-    lines.push('    end try');
     lines.push('end tell');
     lines.push('return (editsApplied as string) & "|||" & errLog');
     return lines.join('\n');
+};
+
+// Build VBA source for a single edit.  VBA's Range.Start / Range.End are
+// reliably writable, story-aware, and don't suffer the "object does not
+// exist" / "can't set" issues we hit going through AppleScript directly.
+BH.buildVBAEdit = function (field, ed) {
+    var lines = [];
+    lines.push('Dim fld As Field');
+    lines.push('Dim rng As Range');
+    if (field.loc === 'fnote') {
+        lines.push(
+            'Set fld = ActiveDocument.Footnotes(' + field.fnIdx +
+            ').Range.Fields(' + field.fieldIdx + ')'
+        );
+    } else {
+        lines.push(
+            'Set fld = ActiveDocument.Fields(' + field.fieldIdx + ')'
+        );
+    }
+    lines.push('Set rng = fld.Result.Duplicate');
+    lines.push('rng.Start = rng.Start + ' + ed.pos);
+    lines.push('rng.End = rng.Start');
+    lines.push('rng.Select');
+    if (ed.plain) {
+        lines.push('Selection.Font.Italic = False');
+        lines.push('Selection.TypeText Text:="' + BH.vbaEscape(ed.plain) + '"');
+    }
+    if (ed.italic) {
+        lines.push('Selection.Font.Italic = True');
+        lines.push('Selection.TypeText Text:="' + BH.vbaEscape(ed.italic) + '"');
+        lines.push('Selection.Font.Italic = False');
+    }
+    if (ed.plain2) {
+        lines.push('Selection.Font.Italic = False');
+        lines.push('Selection.TypeText Text:="' + BH.vbaEscape(ed.plain2) + '"');
+    }
+    return lines.join('\n');
+};
+
+// Escape a string for embedding in a VBA double-quoted literal.
+BH.vbaEscape = function (s) {
+    return String(s).replace(/"/g, '""');
 };
 
 // ---- Diagnostics ----------------------------------------------------------
@@ -680,7 +677,7 @@ BH.fixHereinafters = function (win) {
         }
 
         BH.writeDiagFile(
-            'v0.1.19 | fields=' + fields.length +
+            'v0.1.20 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
