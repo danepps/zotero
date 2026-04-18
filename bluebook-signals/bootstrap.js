@@ -43,7 +43,9 @@ function injectUI(doc) {
     if (doc.getElementById('bluebook-signals-popup')) return;
 
     var branch  = Services.prefs.getBranch('extensions.bluebook-signals.');
-    var signals = JSON.parse(getPref(branch, 'signals'));
+    var signals;
+    try { signals = JSON.parse(getPref(branch, 'signals')); } catch (e) { return; }
+    if (!Array.isArray(signals)) return;
 
     // Use a native XUL menupopup — renders above all CSS stacking contexts,
     // cannot be clipped by parent XUL panels, and participates in the XUL
@@ -60,7 +62,7 @@ function injectUI(doc) {
         '  font-size: 13px;',
         '}'
     ].join('\n');
-    doc.head.appendChild(style);
+    (doc.head || doc.documentElement).appendChild(style);
 
     function insertSignal(value) {
         var prefixField = doc.getElementById('prefix');
@@ -104,7 +106,7 @@ function injectUI(doc) {
     // Ctrl+S on the prefix field opens the menu anchored to that field
     doc.addEventListener('keydown', function (event) {
         if (event.key === 's' && event.ctrlKey) {
-            var target = event.target || event.srcElement;
+            var target = event.target;
             if (target && target.id === 'prefix') {
                 event.preventDefault();
                 event.stopPropagation();
@@ -140,7 +142,7 @@ var windowWatcher = {
 
 function startup({ id, version, rootURI }, reason) {
     Services.scriptloader.loadSubScript(
-        rootURI + 'chrome/content/defaultprefs.js',
+        rootURI + 'chrome/chrome/content/defaultprefs.js',
         { pref: setDefaultPref }
     );
     Services.ww.registerNotification(windowWatcher);

@@ -2,6 +2,7 @@
 # Usage: ./build.sh 3.0.1
 VERSION=${1:-3.0.0}
 cd "$(dirname "$0")"
+mkdir -p releases
 zip -r "releases/Bluebook_Signals_v${VERSION}.xpi" \
     manifest.json bootstrap.js chrome.manifest chrome/ version/
 echo "Built releases/Bluebook_Signals_v${VERSION}.xpi"
