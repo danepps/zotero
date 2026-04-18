@@ -122,7 +122,7 @@ BH.readFieldsScript = function () {
         '            if fc contains "ZOTERO_ITEM" then',
         '                set ft to ""',
         '                try',
-        '                    select result of f',
+        '                    select f',
         '                    set ftVal to content of selection',
         '                    if ftVal is not missing value then set ft to ftVal as string',
         '                end try',
@@ -458,10 +458,12 @@ BH.fieldRef = function (field) {
 //     the selection between them
 BH.buildWriterScript = function (fields, editsByField) {
     var lines = [];
+    lines.push('set errLog to ""');
+    lines.push('set editsApplied to 0');
     lines.push('tell application "Microsoft Word"');
     lines.push('    set origSel to selection');
-    lines.push('    set editsApplied to 0');
 
+    var editNum = 0;
     editsByField.forEach(function (edits, fi) {
         var field = fields[fi];
         var ref = BH.fieldRef(field);
@@ -469,18 +471,21 @@ BH.buildWriterScript = function (fields, editsByField) {
 
         for (var i = 0; i < edits.length; i++) {
             var ed = edits[i];
+            var tag = 'f' + fi + '.' + i + ' (' + field.loc + '#' +
+                      field.fnIdx + '/' + field.fieldIdx +
+                      ' pos=' + ed.pos + ' textLen=' + textLen + ')';
             lines.push('    try');
             lines.push('        select ' + ref);
-            if (ed.pos >= textLen) {
+            if (ed.pos >= textLen && textLen > 0) {
                 lines.push('        collapse range selection direction collapse end');
+            } else if (ed.pos === 0) {
+                lines.push('        collapse range selection direction collapse start');
             } else {
                 lines.push('        collapse range selection direction collapse start');
-                if (ed.pos > 0) {
-                    lines.push(
-                        '        move right selection count ' +
-                        ed.pos + ' unit a character'
-                    );
-                }
+                lines.push(
+                    '        move right selection count ' +
+                    ed.pos + ' unit a character'
+                );
             }
             if (ed.plain) {
                 lines.push('        set italic of font of selection to false');
@@ -496,16 +501,19 @@ BH.buildWriterScript = function (fields, editsByField) {
                 lines.push('        type text selection text "' + BH.asEscape(ed.plain2) + '"');
             }
             lines.push('        set editsApplied to editsApplied + 1');
+            lines.push('    on error errMsg');
+            lines.push('        set errLog to errLog & "' +
+                       BH.asEscape(tag) + ': " & errMsg & linefeed');
             lines.push('    end try');
+            editNum++;
         }
     });
 
-    // Best-effort selection restore.
     lines.push('    try');
     lines.push('        select origSel');
     lines.push('    end try');
-    lines.push('    return (editsApplied as string)');
     lines.push('end tell');
+    lines.push('return (editsApplied as string) & "|||" & errLog');
     return lines.join('\n');
 };
 
@@ -567,7 +575,7 @@ BH.fixHereinafters = function (win) {
         catch (de) { diagnostic = 'diagnose() threw: ' + de; }
 
         BH.writeDiagFile(
-            'v0.1.3 | fields=' + fields.length +
+            'v0.1.5 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size + '\n\n' + diagnostic
         );
@@ -582,12 +590,24 @@ BH.fixHereinafters = function (win) {
 
         var writer = BH.buildWriterScript(fields, edits);
         var appliedOut = BH.runAppleScript(writer);
-        var applied = parseInt((appliedOut || '').trim(), 10) || 0;
+        var parts = (appliedOut || '').split('|||');
+        var applied = parseInt((parts[0] || '').trim(), 10) || 0;
+        var writerErrLog = parts.slice(1).join('|||').trim();
+
+        BH.writeDiagFile(
+            'v0.1.5 | fields=' + fields.length +
+            ' ambig=' + analysis.ambiguous.size +
+            ' edits=' + edits.size +
+            ' applied=' + applied + '\n\n' + diagnostic +
+            '\n\n--- writer raw output ---\n' + (appliedOut || '(empty)') +
+            '\n\n--- writer errors ---\n' + (writerErrLog || '(none)')
+        );
 
         return {
             applied: applied,
             fieldsScanned: fields.length,
-            diagnostic: diagnostic
+            diagnostic: diagnostic +
+                (writerErrLog ? '\n\n--- writer errors ---\n' + writerErrLog : '')
         };
     } catch (e) {
         var errStr = String(e) + '\n' + (e.stack || '');
