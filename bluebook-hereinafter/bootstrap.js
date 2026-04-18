@@ -357,12 +357,16 @@ BH.computeEdits = function (fields, analysis) {
             }
 
             // cit.position: 0 = first cite, 1 = subsequent, 2 = ibid,
-            // 3 = ibid-with-locator.  Treat ibid as subsequent for our
-            // purposes; treat undefined/0 as first.
+            // 3 = ibid-with-locator.  Treat ibid as subsequent.
+            // Text-based override: citeproc sometimes reports position=0
+            // for short-form cites (after manual edits or refresh quirks).
+            // If the rendered text contains "supra note", trust the text.
             var pos = (cit.position !== undefined) ? cit.position : 0;
-            var edit = (pos === 0)
-                ? BH.computeFirstCiteEdit(subField, cit, meta)
-                : BH.computeSubsequentCiteEdit(subField, cit, meta);
+            var isSubsequent = (pos !== 0) ||
+                (subField.text && /\bsupra\s+note\b/i.test(subField.text));
+            var edit = isSubsequent
+                ? BH.computeSubsequentCiteEdit(subField, cit, meta)
+                : BH.computeFirstCiteEdit(subField, cit, meta);
             if (!edit) continue;
             edit.pos += offset;
             fieldEdits.push(edit);
@@ -405,6 +409,10 @@ BH.computeFirstCiteEdit = function (field, citItem, meta) {
     // Idempotency: if we already inserted a matching hereinafter, skip.
     var sentinel = '[hereinafter ' + shortTitle + ']';
     if (text.indexOf(sentinel) !== -1) return null;
+    // Safety: never append [hereinafter] to a short-form cite.  The dispatch
+    // in computeEdits should already have routed this to the subsequent-cite
+    // path, but guard here so a stray cit.position=0 can't corrupt the doc.
+    if (/\bsupra\s+note\b/i.test(text)) return null;
 
     return {
         pos: text.length,
@@ -677,7 +685,7 @@ BH.fixHereinafters = function (win) {
         }
 
         BH.writeDiagFile(
-            'v0.1.15 | fields=' + fields.length +
+            'v0.1.16 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
