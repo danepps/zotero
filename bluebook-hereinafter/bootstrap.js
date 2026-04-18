@@ -477,13 +477,13 @@ BH.buildWriterScript = function (fields, editsByField) {
             lines.push('    try');
             lines.push('        select ' + ref);
             if (ed.pos >= textLen && textLen > 0) {
-                lines.push('        collapse range selection direction collapse end');
+                lines.push('        tell selection to collapse direction collapse end');
             } else if (ed.pos === 0) {
-                lines.push('        collapse range selection direction collapse start');
+                lines.push('        tell selection to collapse direction collapse start');
             } else {
-                lines.push('        collapse range selection direction collapse start');
+                lines.push('        tell selection to collapse direction collapse start');
                 lines.push(
-                    '        move right selection count ' +
+                    '        tell selection to move right count ' +
                     ed.pos + ' unit a character'
                 );
             }
@@ -575,7 +575,7 @@ BH.fixHereinafters = function (win) {
         catch (de) { diagnostic = 'diagnose() threw: ' + de; }
 
         BH.writeDiagFile(
-            'v0.1.5 | fields=' + fields.length +
+            'v0.1.6 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size + '\n\n' + diagnostic
         );
@@ -595,7 +595,7 @@ BH.fixHereinafters = function (win) {
         var writerErrLog = parts.slice(1).join('|||').trim();
 
         BH.writeDiagFile(
-            'v0.1.5 | fields=' + fields.length +
+            'v0.1.6 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
