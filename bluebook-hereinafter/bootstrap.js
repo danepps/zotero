@@ -322,27 +322,50 @@ BH.computeEdits = function (fields, analysis) {
         var parsed = BH.parseFieldCode(field.code);
         if (!parsed || !parsed.citationItems) continue;
 
+        var items = parsed.citationItems;
         var fieldEdits = [];
 
-        for (var ci = 0; ci < parsed.citationItems.length; ci++) {
-            var cit = parsed.citationItems[ci];
+        // Multi-item fields: split display text on "; " so each hereinafter
+        // lands inline after its own sub-cite instead of stacked at the end
+        // of the combined field.  If the split doesn't produce the expected
+        // segment count, leave `segments` null and fall back to treating the
+        // whole field as one cite.
+        var segments = null;
+        if (items.length > 1 && field.text) {
+            segments = BH.splitMultiCite(field.text, items.length);
+        }
+
+        for (var ci = 0; ci < items.length; ci++) {
+            var cit = items[ci];
             var key = BH.itemKey(cit);
             if (!analysis.ambiguous.has(key)) continue;
 
             var meta = analysis.items.get(key);
             if (!meta || !meta.shortTitle) continue;
 
+            var subField = field;
+            var offset = 0;
+            if (segments) {
+                subField = {
+                    loc: field.loc,
+                    fnIdx: field.fnIdx,
+                    fieldIdx: field.fieldIdx,
+                    code: field.code,
+                    text: segments[ci].text
+                };
+                offset = segments[ci].start;
+            }
+
             // cit.position: 0 = first cite, 1 = subsequent, 2 = ibid,
             // 3 = ibid-with-locator.  Treat ibid as subsequent for our
             // purposes; treat undefined/0 as first.
             var pos = (cit.position !== undefined) ? cit.position : 0;
-            if (pos === 0) {
-                var edit = BH.computeFirstCiteEdit(field, cit, meta);
-                if (edit) fieldEdits.push(edit);
-            } else {
-                var edit2 = BH.computeSubsequentCiteEdit(field, cit, meta);
-                if (edit2) fieldEdits.push(edit2);
-            }
+            var edit = (pos === 0)
+                ? BH.computeFirstCiteEdit(subField, cit, meta)
+                : BH.computeSubsequentCiteEdit(subField, cit, meta);
+            if (!edit) continue;
+            edit.pos += offset;
+            fieldEdits.push(edit);
         }
 
         if (fieldEdits.length) {
@@ -354,6 +377,23 @@ BH.computeEdits = function (fields, analysis) {
     }
 
     return edits;
+};
+
+// Split a multi-cite field's display text into per-sub-cite segments.
+// Returns [{text, start, end}, ...] or null if the split doesn't match
+// expectedCount.  Uses "; " — citeproc's default cite-group-delimiter for
+// most legal styles including Bluebook.
+BH.splitMultiCite = function (text, expectedCount) {
+    var sep = '; ';
+    var segments = [];
+    var start = 0;
+    var idx;
+    while ((idx = text.indexOf(sep, start)) !== -1) {
+        segments.push({ text: text.slice(start, idx), start: start, end: idx });
+        start = idx + sep.length;
+    }
+    segments.push({ text: text.slice(start), start: start, end: text.length });
+    return segments.length === expectedCount ? segments : null;
 };
 
 // Compute the edit for a first (full) cite of an ambiguous item: append
@@ -604,7 +644,7 @@ BH.fixHereinafters = function (win) {
         }
 
         BH.writeDiagFile(
-            'v0.1.8 | fields=' + fields.length +
+            'v0.1.9 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
