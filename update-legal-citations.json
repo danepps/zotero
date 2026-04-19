@@ -1,0 +1,17 @@
+{
+  "addons": {
+    "legal-citations-fixer@danepps.com": {
+      "updates": [
+        {
+          "version": "0.1.0",
+          "update_link": "https://github.com/danepps/zotero/releases/download/legal-cite-v0.1.0/Legal_Citations_Fixer_v0.1.0.xpi",
+          "applications": {
+            "zotero": {
+              "strict_min_version": "6.999"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
