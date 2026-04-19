@@ -552,18 +552,20 @@ BH.buildWriterScript = function (fields, editsByField) {
                 lines.push('        set step to "select_start"');
                 lines.push('        select selRange');
             } else {
-                // Mid-field positioning: build a multi-char subrange covering
-                // characters 1..pos, then collapse it to its end.  That lands
-                // the cursor at 0-based offset pos within the field.
-                // Single-character references go stale on collapse; multi-char
-                // subranges survive it (per CLAUDE.md pitfall notes).
-                lines.push('        set step to "build_subrange"');
-                lines.push('        set subRange to characters 1 thru ' +
-                           ed.pos + ' of selRange');
-                lines.push('        set step to "collapse_subrange_end"');
-                lines.push('        collapse range subRange direction collapse end');
-                lines.push('        set step to "select_subrange"');
-                lines.push('        select subRange');
+                // Mid-field positioning: collapse to field start, then step
+                // right pos times via the zero-parameter form of move right.
+                // Parameterized forms (count, unit) vary by Word build and
+                // are unreliable; the bare form moves one character per call.
+                // characters-thru sub-ranges and find object approaches have
+                // both been tried and fail on this Word build.
+                lines.push('        set step to "collapse_field_start"');
+                lines.push('        collapse range selRange direction collapse start');
+                lines.push('        set step to "select_field_start"');
+                lines.push('        select selRange');
+                lines.push('        set step to "move_right"');
+                lines.push('        repeat ' + ed.pos + ' times');
+                lines.push('            move right selection');
+                lines.push('        end repeat');
             }
             lines.push('        set step to "typing"');
             if (ed.plain) {
@@ -653,7 +655,7 @@ BH.fixHereinafters = function (win) {
         catch (de) { diagnostic = 'diagnose() threw: ' + de; }
 
         BH.writeDiagFile(
-            'v0.1.27 | fields=' + fields.length +
+            'v0.1.28 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size + '\n\n' + diagnostic
         );
@@ -695,7 +697,7 @@ BH.fixHereinafters = function (win) {
         }
 
         BH.writeDiagFile(
-            'v0.1.27 | fields=' + fields.length +
+            'v0.1.28 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
