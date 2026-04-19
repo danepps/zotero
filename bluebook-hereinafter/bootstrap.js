@@ -568,13 +568,16 @@ BH.buildWriterScript = function (fields, editsByField) {
                 lines.push('        set step to "check_found"');
                 lines.push('        if foundIt is false then error ' +
                            '"anchor not found"');
-                // After execute find on a range's find object, the range is
-                // narrowed to the match.  Collapse start → cursor at start
-                // of match = the insertion point.
+                // execute find updates the selection to the found text but
+                // does NOT mutate selRange in-place.  Grab a fresh range
+                // from the current selection so the collapse lands at the
+                // match, not the original field start.
+                lines.push('        set step to "get_found_range"');
+                lines.push('        set foundRange to text object of selection');
                 lines.push('        set step to "collapse_match_start"');
-                lines.push('        collapse range selRange direction collapse start');
+                lines.push('        collapse range foundRange direction collapse start');
                 lines.push('        set step to "select_match_start"');
-                lines.push('        select selRange');
+                lines.push('        select foundRange');
             }
             lines.push('        set step to "typing"');
             if (ed.plain) {
@@ -664,7 +667,7 @@ BH.fixHereinafters = function (win) {
         catch (de) { diagnostic = 'diagnose() threw: ' + de; }
 
         BH.writeDiagFile(
-            'v0.1.6 | fields=' + fields.length +
+            'v0.1.25 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size + '\n\n' + diagnostic
         );
@@ -706,7 +709,7 @@ BH.fixHereinafters = function (win) {
         }
 
         BH.writeDiagFile(
-            'v0.1.24 | fields=' + fields.length +
+            'v0.1.25 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
