@@ -2,6 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Keeping this file current
+
+Update CLAUDE.md in the same change as the code whenever any of the following shifts:
+
+- A new plugin directory is added or an existing one is renamed/removed.
+- The build, release, or auto-update flow changes (e.g. a new `update-*.json`, a different branch-testing URL, a tagging convention change).
+- The auto-update invariant changes (today: a missing or 404ing update JSON causes Zotero to delete the plugin — if that's ever no longer true, fix the warning here).
+- `bluebook-hereinafter`'s data-flow stages, hook target, or diagnostic file paths change.
+- A new Word AppleScript pitfall is discovered and worked around, or a previously-documented pitfall turns out to be wrong. The "AppleScript pitfalls" section is the institutional memory for why the writer is shaped the way it is — keep it accurate.
+- Known limitations listed at the bottom get fixed (remove them) or new ones are discovered (add them).
+
+Do not let it drift. Stale guidance is worse than no guidance.
+
 ## Repository layout
 
 Each top-level directory is a separate Zotero 7/9 bootstrap plugin. They share no code — each has its own `manifest.json`, `bootstrap.js`, and `chrome.manifest`.
