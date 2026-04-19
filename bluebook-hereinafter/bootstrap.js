@@ -552,38 +552,18 @@ BH.buildWriterScript = function (fields, editsByField) {
                 lines.push('        set step to "select_start"');
                 lines.push('        select selRange');
             } else {
-                // Mid-field: collapse to field start, then use a document-level
-                // find from that cursor.  Range-scoped find (find object of
-                // selRange) does NOT update the selection, so we can't use
-                // text object of selection after it to get the match position.
-                // Document-level find DOES update the selection, so after it
-                // succeeds the selection is exactly the found anchor text.
-                var anchor = field.text.slice(ed.pos, ed.pos +
-                    Math.min(16, textLen - ed.pos));
-                lines.push('        set step to "collapse_field_start"');
-                lines.push('        collapse range selRange direction collapse start');
-                lines.push('        set step to "select_field_start"');
-                lines.push('        select selRange');
-                lines.push('        set step to "find_obj"');
-                lines.push('        set findObj to find object of active document');
-                lines.push('        set step to "find_config"');
-                lines.push('        tell findObj');
-                lines.push('            clear formatting');
-                lines.push('            set forward to true');
-                lines.push('            set wrap to find stop');
-                lines.push('        end tell');
-                lines.push('        set step to "execute_find"');
-                lines.push('        set foundIt to execute find findObj ' +
-                           'find text "' + BH.asEscape(anchor) + '"');
-                lines.push('        set step to "check_found"');
-                lines.push('        if foundIt is false then error ' +
-                           '"anchor not found"');
-                // selection is now the found anchor text
-                lines.push('        set step to "collapse_match_start"');
-                lines.push('        collapse range (text object of selection) ' +
-                           'direction collapse start');
-                lines.push('        set step to "select_match_start"');
-                lines.push('        select (text object of selection)');
+                // Mid-field positioning: build a multi-char subrange covering
+                // characters 1..pos, then collapse it to its end.  That lands
+                // the cursor at 0-based offset pos within the field.
+                // Single-character references go stale on collapse; multi-char
+                // subranges survive it (per CLAUDE.md pitfall notes).
+                lines.push('        set step to "build_subrange"');
+                lines.push('        set subRange to characters 1 thru ' +
+                           ed.pos + ' of selRange');
+                lines.push('        set step to "collapse_subrange_end"');
+                lines.push('        collapse range subRange direction collapse end');
+                lines.push('        set step to "select_subrange"');
+                lines.push('        select subRange');
             }
             lines.push('        set step to "typing"');
             if (ed.plain) {
@@ -673,7 +653,7 @@ BH.fixHereinafters = function (win) {
         catch (de) { diagnostic = 'diagnose() threw: ' + de; }
 
         BH.writeDiagFile(
-            'v0.1.26 | fields=' + fields.length +
+            'v0.1.27 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size + '\n\n' + diagnostic
         );
@@ -715,7 +695,7 @@ BH.fixHereinafters = function (win) {
         }
 
         BH.writeDiagFile(
-            'v0.1.26 | fields=' + fields.length +
+            'v0.1.27 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
