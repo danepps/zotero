@@ -1,7 +1,7 @@
 "use strict";
 
 // ===========================================================================
-// Legal Citations Fixer
+// Bluebook Citations Fixer
 //
 // Hooks Zotero.Integration.Field.prototype.setText so every citation cluster
 // Zotero is about to write to the document can be rewritten by a chain of
@@ -15,7 +15,7 @@
 // and register it in lib/features/registry.js.
 // ===========================================================================
 
-var LCF;          // shared namespace populated by each lib file
+var BCF;          // shared namespace populated by each lib file
 var Zotero;
 
 function install() {}
@@ -31,14 +31,14 @@ async function startup({ rootURI }) {
         .wrappedJSObject;
     await Zotero.initializationPromise;
 
-    LCF = {
+    BCF = {
         rootURI: rootURI,
         features: {}
     };
 
     var loadScope = {
         Zotero: Zotero,
-        LCF: LCF,
+        BCF: BCF,
         Services: Services,
         Components: Components,
         Cc: Components.classes,
@@ -57,13 +57,13 @@ async function startup({ rootURI }) {
     load("lib/features/registry.js");
     load("lib/patch.js");
 
-    LCF.diag.init();
-    LCF.patch.install();
+    BCF.diag.init();
+    BCF.patch.install();
 
-    Zotero.debug("[legal-citations-fixer] startup complete");
+    Zotero.debug("[bluebook-citations-fixer] startup complete");
 }
 
 function shutdown() {
-    try { if (LCF && LCF.patch) LCF.patch.uninstall(); } catch (_) {}
-    LCF = null;
+    try { if (BCF && BCF.patch) BCF.patch.uninstall(); } catch (_) {}
+    BCF = null;
 }

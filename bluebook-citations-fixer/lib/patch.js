@@ -8,20 +8,20 @@
 // so it works in Word (Mac + Win), LibreOffice, and Google Docs equally.
 // Hook seam established by the recon report — see CLAUDE.md.
 
-LCF.patch = {};
-LCF.patch._orig = null;
-LCF.patch._retryTimer = null;
+BCF.patch = {};
+BCF.patch._orig = null;
+BCF.patch._retryTimer = null;
 
-LCF.patch.install = function () {
-    if (LCF.patch._orig) return;
+BCF.patch.install = function () {
+    if (BCF.patch._orig) return;
     if (!Zotero.Integration || !Zotero.Integration.Field ||
             !Zotero.Integration.Field.prototype ||
             typeof Zotero.Integration.Field.prototype.setText !== "function") {
         // Zotero.Integration is lazily loaded; retry shortly.
-        LCF.patch._retryTimer = Components.classes["@mozilla.org/timer;1"]
+        BCF.patch._retryTimer = Components.classes["@mozilla.org/timer;1"]
             .createInstance(Components.interfaces.nsITimer);
-        LCF.patch._retryTimer.initWithCallback(
-            { notify: function () { LCF.patch.install(); } },
+        BCF.patch._retryTimer.initWithCallback(
+            { notify: function () { BCF.patch.install(); } },
             1000,
             Components.interfaces.nsITimer.TYPE_ONE_SHOT
         );
@@ -29,43 +29,43 @@ LCF.patch.install = function () {
     }
     var Field = Zotero.Integration.Field;
     if (Field.prototype.__lcfPatched) {
-        LCF.patch._orig = Field.prototype.setText;
+        BCF.patch._orig = Field.prototype.setText;
         return;
     }
-    LCF.patch._orig = Field.prototype.setText;
+    BCF.patch._orig = Field.prototype.setText;
     Field.prototype.setText = function (text) {
         var field = this;
-        var origCall = function (t) { return LCF.patch._orig.call(field, t); };
+        var origCall = function (t) { return BCF.patch._orig.call(field, t); };
         // Run our pipeline, then delegate. Always return the original's result
         // so the Integration Field interface contract (isRich) is preserved.
         return Promise.resolve()
-            .then(function () { return LCF.patch.run(field, text); })
-            .catch(function (e) { LCF.diag.err("patch.run", e); return text; })
+            .then(function () { return BCF.patch.run(field, text); })
+            .catch(function (e) { BCF.diag.err("patch.run", e); return text; })
             .then(function (rewritten) { return origCall(rewritten); });
     };
     Field.prototype.__lcfPatched = true;
-    LCF.diag.log("patch installed on Zotero.Integration.Field.prototype.setText");
+    BCF.diag.log("patch installed on Zotero.Integration.Field.prototype.setText");
 };
 
-LCF.patch.uninstall = function () {
+BCF.patch.uninstall = function () {
     try {
-        if (LCF.patch._retryTimer) {
-            LCF.patch._retryTimer.cancel();
-            LCF.patch._retryTimer = null;
+        if (BCF.patch._retryTimer) {
+            BCF.patch._retryTimer.cancel();
+            BCF.patch._retryTimer = null;
         }
     } catch (_) {}
-    if (!LCF.patch._orig) return;
+    if (!BCF.patch._orig) return;
     try {
         var Field = Zotero.Integration.Field;
-        Field.prototype.setText = LCF.patch._orig;
+        Field.prototype.setText = BCF.patch._orig;
         delete Field.prototype.__lcfPatched;
     } catch (_) {}
-    LCF.patch._orig = null;
+    BCF.patch._orig = null;
 };
 
 // Run the feature chain for a single setText call. Returns the (possibly
 // rewritten) RTF string.
-LCF.patch.run = async function (field, text) {
+BCF.patch.run = async function (field, text) {
     var session = Zotero.Integration.currentSession;
     if (!session) return text;
 
@@ -75,12 +75,12 @@ LCF.patch.run = async function (field, text) {
     try {
         code = await field.getCode();
     } catch (e) {
-        LCF.diag.err("getCode", e);
+        BCF.diag.err("getCode", e);
         return text;
     }
     if (!code || code.indexOf("CSL_CITATION") === -1) return text;
 
-    var codeJson = LCF.cite.parseFieldCode(code);
+    var codeJson = BCF.cite.parseFieldCode(code);
     if (!codeJson || !codeJson.citationItems || !codeJson.citationItems.length) {
         return text;
     }
@@ -89,19 +89,19 @@ LCF.patch.run = async function (field, text) {
         session: session,
         field: field,
         codeJson: codeJson,
-        run: LCF.run.forSession(session),
+        run: BCF.run.forSession(session),
         text: text,
-        rtf: LCF.rtf
+        rtf: BCF.rtf
     };
 
-    var list = (LCF.features && LCF.features.list) || [];
+    var list = (BCF.features && BCF.features.list) || [];
     for (var i = 0; i < list.length; i++) {
         var feat = list[i];
         try {
             var out = feat.rewrite(ctx);
             if (typeof out === "string") ctx.text = out;
         } catch (e) {
-            LCF.diag.err("feature:" + (feat && feat.id), e);
+            BCF.diag.err("feature:" + (feat && feat.id), e);
         }
     }
     return ctx.text;

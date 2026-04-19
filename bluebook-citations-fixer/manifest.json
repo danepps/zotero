@@ -1,0 +1,17 @@
+{
+  "manifest_version": 2,
+  "name": "Bluebook Citations Fixer",
+  "version": "0.1.0",
+  "description": "Rewrites Zotero's citation output to apply Bluebook citation rules (starting with Rule 4.2(b) hereinafter). Hooks Zotero.Integration.Field.setText so it works in Word, LibreOffice, and anywhere Zotero's word-processor bridge writes citations.",
+  "author": "Dan Epps",
+  "homepage_url": "https://github.com/danepps/zotero",
+  "applications": {
+    "zotero": {
+      "id": "bluebook-citations-fixer@danepps.com",
+      "strict_min_version": "6.999",
+      "strict_max_version": "*",
+      "update_url": "https://danepps.github.io/zotero/update-bluebook-citations.json",
+      "loader": "bootstrap"
+    }
+  }
+}

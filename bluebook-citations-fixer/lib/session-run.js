@@ -10,24 +10,24 @@
 // The "ambiguity map" (authorKey -> Set<itemKey>) only needs to be computed
 // once per run -- we stash it on the session under a private key.
 
-LCF.run = {};
-LCF.run.KEY = "__legalCitationsFixer";
+BCF.run = {};
+BCF.run.KEY = "__bluebookCitationsFixer";
 
-LCF.run.forSession = function (session) {
+BCF.run.forSession = function (session) {
     if (!session) return null;
-    if (session[LCF.run.KEY]) return session[LCF.run.KEY];
-    var ctx = LCF.run._build(session);
+    if (session[BCF.run.KEY]) return session[BCF.run.KEY];
+    var ctx = BCF.run._build(session);
     try {
-        Object.defineProperty(session, LCF.run.KEY, {
+        Object.defineProperty(session, BCF.run.KEY, {
             value: ctx, writable: true, configurable: true, enumerable: false
         });
     } catch (_) {
-        session[LCF.run.KEY] = ctx;
+        session[BCF.run.KEY] = ctx;
     }
     return ctx;
 };
 
-LCF.run._build = function (session) {
+BCF.run._build = function (session) {
     var items = new Map();          // itemKey -> itemData
     var authorBuckets = new Map();  // authorKey -> Set<itemKey>
 
@@ -35,12 +35,12 @@ LCF.run._build = function (session) {
     for (var i = 0; i < byIndex.length; i++) {
         var cit = byIndex[i];
         if (!cit) continue;
-        var itemsArr = LCF.cite.itemsOf(cit);
+        var itemsArr = BCF.cite.itemsOf(cit);
         for (var ci = 0; ci < itemsArr.length; ci++) {
             var ci_ = itemsArr[ci];
             var data = ci_.itemData || {};
-            var key = LCF.cite.itemKey(ci_);
-            var authorKey = LCF.cite.authorKey(data);
+            var key = BCF.cite.itemKey(ci_);
+            var authorKey = BCF.cite.authorKey(data);
             if (!key || !authorKey) continue;
             if (!items.has(key)) items.set(key, data);
             if (!authorBuckets.has(authorKey)) authorBuckets.set(authorKey, new Set());
@@ -64,14 +64,14 @@ LCF.run._build = function (session) {
 
 // Convenience: is this item one whose author is also used by some other
 // distinct item in the document?
-LCF.run.isAmbiguous = function (ctx, citItem) {
-    return ctx.ambiguousKeys.has(LCF.cite.itemKey(citItem));
+BCF.run.isAmbiguous = function (ctx, citItem) {
+    return ctx.ambiguousKeys.has(BCF.cite.itemKey(citItem));
 };
 
 // Pull itemData for an item from the session-wide cache (falls back to the
 // itemData embedded in the field's own CSL_CITATION JSON).
-LCF.run.itemData = function (ctx, citItem) {
-    var key = LCF.cite.itemKey(citItem);
+BCF.run.itemData = function (ctx, citItem) {
+    var key = BCF.cite.itemKey(citItem);
     if (ctx.items.has(key)) return ctx.items.get(key);
     return citItem.itemData || {};
 };

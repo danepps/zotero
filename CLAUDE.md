@@ -11,8 +11,8 @@ Update CLAUDE.md in the same change as the code whenever any of the following sh
 - The auto-update invariant changes (today: a missing or 404ing update JSON causes Zotero to delete the plugin — if that's ever no longer true, fix the warning here).
 - `bluebook-hereinafter`'s data-flow stages, hook target, or diagnostic file paths change.
 - A new Word AppleScript pitfall is discovered and worked around, or a previously-documented pitfall turns out to be wrong. The "AppleScript pitfalls" section is the institutional memory for why the writer is shaped the way it is — keep it accurate.
-- `legal-citations-fixer`'s hook point, feature contract, lib layout, or RTF conventions change. In particular: the patch target (`Zotero.Integration.Field.prototype.setText`) is the core design decision — if you move it, update this file and say why.
-- A new feature is added under `legal-citations-fixer/lib/features/`: list it in the architecture section with its rule.
+- `bluebook-citations-fixer`'s hook point, feature contract, lib layout, or RTF conventions change. In particular: the patch target (`Zotero.Integration.Field.prototype.setText`) is the core design decision — if you move it, update this file and say why.
+- A new feature is added under `bluebook-citations-fixer/lib/features/`: list it in the architecture section with its rule.
 - Known limitations listed at the bottom get fixed (remove them) or new ones are discovered (add them).
 
 Do not let it drift. Stale guidance is worse than no guidance.
@@ -22,18 +22,18 @@ Do not let it drift. Stale guidance is worse than no guidance.
 Each top-level directory is a separate Zotero 7/9 bootstrap plugin. They share no code — each has its own `manifest.json`, `bootstrap.js`, and `chrome.manifest`.
 
 - `bluebook-signals/` — Ctrl+S signal picker for the citation-dialog prefix field (fork of Frank Bennett's plugin, updated for Zotero 9).
-- `bluebook-hereinafter/` — Applies Bluebook Rule 4.2(b) "hereinafter" handling by post-processing the Word document after every Zotero integration call. **macOS + Microsoft Word only (AppleScript).** Being superseded by `legal-citations-fixer/`; kept running in parallel until the new plugin is validated.
-- `legal-citations-fixer/` — In-pipeline replacement for `bluebook-hereinafter`. Hooks `Zotero.Integration.Field.prototype.setText` so rewrites happen *inside* Zotero's citation pipeline instead of post-hoc in the word processor. RTF output only for now (Word + LibreOffice). Designed as a feature chain — each Bluebook rule is a file under `lib/features/`.
+- `bluebook-hereinafter/` — Applies Bluebook Rule 4.2(b) "hereinafter" handling by post-processing the Word document after every Zotero integration call. **macOS + Microsoft Word only (AppleScript).** Being superseded by `bluebook-citations-fixer/`; kept running in parallel until the new plugin is validated.
+- `bluebook-citations-fixer/` — In-pipeline replacement for `bluebook-hereinafter`. Hooks `Zotero.Integration.Field.prototype.setText` so rewrites happen *inside* Zotero's citation pipeline instead of post-hoc in the word processor. RTF output only for now (Word + LibreOffice). Designed as a feature chain — each Bluebook rule is a file under `lib/features/`.
 
 At the repo root, `update-*.json` files are the Zotero auto-update manifests, served from GitHub Pages at `https://danepps.github.io/zotero/<file>`. The `update_url` in each plugin's `manifest.json` points back to one of these. If the JSON is missing or 404s, Zotero periodically **deletes the plugin** — so any new version must have a matching entry here before release.
 
 ## Build / release
 
-Each plugin is a zip of its root files (`manifest.json`, `chrome.manifest`, `bootstrap.js`, and — for `legal-citations-fixer` — the `lib/` tree) with a `.xpi` extension. Plugins with a `build.sh` use it:
+Each plugin is a zip of its root files (`manifest.json`, `chrome.manifest`, `bootstrap.js`, and — for `bluebook-citations-fixer` — the `lib/` tree) with a `.xpi` extension. Plugins with a `build.sh` use it:
 
 ```
 ./bluebook-hereinafter/build.sh <version>
-./legal-citations-fixer/build.sh <version>
+./bluebook-citations-fixer/build.sh <version>
 ```
 
 Each writes `releases/<Name>_v<version>.xpi` inside the plugin dir. The `releases/` dirs are gitignored; built XPIs are force-added to the dev branch (`git add -f …`) so the user can side-load via the raw-branch URL for iterative testing.
@@ -41,11 +41,11 @@ Each writes `releases/<Name>_v<version>.xpi` inside the plugin dir. The `release
 Shipping a real release requires three things in lock-step:
 1. Create a GitHub release with the XPI attached. Tag conventions:
    - `bluebook-hereinafter` → `hereinafter-v<version>`
-   - `legal-citations-fixer` → `legal-cite-v<version>`
-2. Update the matching `update-*.json` at the repo root (`update-hereinafter.json`, `update-legal-citations.json`) with the new version + download link.
+   - `bluebook-citations-fixer` → `bluebook-cite-v<version>`
+2. Update the matching `update-*.json` at the repo root (`update-hereinafter.json`, `update-bluebook-citations.json`) with the new version + download link.
 3. Push to main so GitHub Pages serves the updated JSON.
 
-There is no test suite, linter, or CI. Validation is manual: install the XPI in Zotero, run the feature, read the diagnostic written to `/tmp/bluebook-hereinafter-diag.txt` or `/tmp/legal-citations-fixer-diag.txt` (the latter must be enabled via the `extensions.legal-citations-fixer.diag` pref in about:config).
+There is no test suite, linter, or CI. Validation is manual: install the XPI in Zotero, run the feature, read the diagnostic written to `/tmp/bluebook-hereinafter-diag.txt` or `/tmp/bluebook-citations-fixer-diag.txt` (the latter must be enabled via the `extensions.bluebook-citations-fixer.diag` pref in about:config).
 
 ## bluebook-hereinafter architecture
 
@@ -86,7 +86,7 @@ Every run writes `/tmp/bluebook-hereinafter-diag.txt` (version, field count, amb
 - Ambiguity grouping is by surname list only — no handling of editor-as-author or institutional authors.
 - Brief visual flicker during refresh (the plugin re-writes the doc after Zotero paints).
 
-## legal-citations-fixer architecture
+## bluebook-citations-fixer architecture
 
 The plugin rewrites Zotero's citation output *inside* the integration pipeline, so it works anywhere Zotero's word-processor bridge runs (Word, LibreOffice, Google Docs — though only RTF output is wired up today, meaning Word + LibreOffice).
 
@@ -104,7 +104,7 @@ Key facts that anchor the design:
 ### File layout
 
 ```
-legal-citations-fixer/
+bluebook-citations-fixer/
 ├── bootstrap.js                  # Zotero 7/9 bootstrap; loadSubScript each lib
 ├── manifest.json
 ├── chrome.manifest
@@ -112,7 +112,7 @@ legal-citations-fixer/
 └── lib/
     ├── rtf.js                    # escape, italic(), plainish projection, findPlainOffset
     ├── cite.js                   # CSL_CITATION parse, authorKey, shortTitle, position
-    ├── diag.js                   # /tmp log, gated on extensions.legal-citations-fixer.diag pref
+    ├── diag.js                   # /tmp log, gated on extensions.bluebook-citations-fixer.diag pref
     ├── session-run.js            # per-run context cached on currentSession (ambiguity map)
     ├── patch.js                  # monkey-patch Field.prototype.setText + run feature chain
     └── features/
@@ -120,7 +120,7 @@ legal-citations-fixer/
         └── hereinafter.js        # Rule 4.2(b): [hereinafter Short] + supra-cite rewrite
 ```
 
-All lib files attach to a single shared `LCF` namespace populated via `Services.scriptloader.loadSubScript`.
+All lib files attach to a single shared `BCF` namespace populated via `Services.scriptloader.loadSubScript`.
 
 ### Feature contract
 
@@ -133,7 +133,7 @@ ctx = {
   codeJson,  // parsed CSL_CITATION from field.getCode()
   run,       // per-session cache: { items, ambiguousKeys, firstCiteSeen, log }
   text,      // current RTF (output of the previous feature, or the original)
-  rtf        // LCF.rtf helpers
+  rtf        // BCF.rtf helpers
 }
 ```
 
@@ -141,7 +141,7 @@ Returning a string replaces `ctx.text`; returning undefined is a pass-through. F
 
 ### Per-run ambiguity map
 
-`LCF.run.forSession(session)` lazily walks `session.citationsByIndex` once per run and caches `{ ambiguousKeys, items, firstCiteSeen }` on the session object under a non-enumerable `__legalCitationsFixer` key. All features can read it without recomputing.
+`BCF.run.forSession(session)` lazily walks `session.citationsByIndex` once per run and caches `{ ambiguousKeys, items, firstCiteSeen }` on the session object under a non-enumerable `__bluebookCitationsFixer` key. All features can read it without recomputing.
 
 ### RTF conventions
 
@@ -150,7 +150,7 @@ Zotero hands RTF to the integration bridge using citeproc-js's RTF output format
 - escape `\` `{` `}` as `\\` `\{` `\}`
 - non-ASCII as `\uc0\uNNNN{}` (decimal codepoint)
 
-`LCF.rtf.italic(s)` and `LCF.rtf.escape(s)` produce the right fragments. `LCF.rtf.plainish(rtf)` collapses RTF to a plain-text projection for idempotency checks and anchor matching (e.g. finding `, supra note`). `LCF.rtf.findPlainOffset(rtf, re)` gives the RTF index corresponding to the first plainish-projection match, so injections land at the correct character even when there are `\uNNNN{}` escapes or italic groups before the match.
+`BCF.rtf.italic(s)` and `BCF.rtf.escape(s)` produce the right fragments. `BCF.rtf.plainish(rtf)` collapses RTF to a plain-text projection for idempotency checks and anchor matching (e.g. finding `, supra note`). `BCF.rtf.findPlainOffset(rtf, re)` gives the RTF index corresponding to the first plainish-projection match, so injections land at the correct character even when there are `\uNNNN{}` escapes or italic groups before the match.
 
 ### Idempotency
 
@@ -158,7 +158,7 @@ Every feature must be idempotent — `setText` fires on every refresh and we'll 
 
 ### Diagnostics
 
-Off by default. Set `extensions.legal-citations-fixer.diag = true` in about:config, restart Zotero, and lines appear in `/tmp/legal-citations-fixer-diag.txt`. Errors always surface via `Components.utils.reportError` regardless of the pref.
+Off by default. Set `extensions.bluebook-citations-fixer.diag = true` in about:config, restart Zotero, and lines appear in `/tmp/bluebook-citations-fixer-diag.txt`. Errors always surface via `Components.utils.reportError` regardless of the pref.
 
 ### Known limitations
 

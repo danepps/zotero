@@ -12,10 +12,10 @@
 // Integration.Field.setText auto-wraps the incoming string in {\rtf ...} if it
 // spots a backslash, so inline RTF fragments like "{\i{}Foo}" are fine.
 
-LCF.rtf = {};
+BCF.rtf = {};
 
 // Escape literal text for inclusion inside an RTF string.
-LCF.rtf.escape = function (s) {
+BCF.rtf.escape = function (s) {
     if (s == null) return "";
     s = String(s);
     var out = "";
@@ -36,20 +36,20 @@ LCF.rtf.escape = function (s) {
 };
 
 // Produce the RTF fragment for italicized text.
-LCF.rtf.italic = function (s) {
-    return "{\\i{}" + LCF.rtf.escape(s) + "}";
+BCF.rtf.italic = function (s) {
+    return "{\\i{}" + BCF.rtf.escape(s) + "}";
 };
 
 // Is the given string *likely* already RTF-wrapped?  Detects the outer
 // {\rtf ...} envelope that Zotero wraps around rich cluster text.
-LCF.rtf.isWrapped = function (s) {
+BCF.rtf.isWrapped = function (s) {
     return /^\s*\{\\rtf/i.test(s);
 };
 
 // Strip RTF control words / braces to get an approximation of the plain text.
 // Good enough for substring-style idempotency checks and for matching
 // literal ASCII anchors like "supra note".  Not a full RTF parser.
-LCF.rtf.plainish = function (s) {
+BCF.rtf.plainish = function (s) {
     if (s == null) return "";
     // Decode \uNNNN escapes back to real characters.
     s = String(s).replace(/\\u(-?\d+)\b\s*\{\}?/g, function (_, n) {
@@ -70,7 +70,7 @@ LCF.rtf.plainish = function (s) {
 // in the plainish projection.  Returns the RTF offset, or -1.
 // Walks the RTF once, tracking plainish-offset alongside, so we can insert
 // at the right spot without mangling control words.
-LCF.rtf.findPlainOffset = function (rtf, needleRe) {
+BCF.rtf.findPlainOffset = function (rtf, needleRe) {
     // Build a parallel array of [plainChar, rtfIndex] for each visible char.
     var map = [];
     var plain = "";
