@@ -495,6 +495,16 @@ BH.fieldRef = function (field) {
     return 'field ' + field.fieldIdx + ' of text object of active document';
 };
 
+// AppleScript reference to the story (text container) the field lives in.
+// Needed for character-level indexing, which doesn't work on the
+// selection-derived range.
+BH.storyRef = function (field) {
+    if (field.loc === 'fnote') {
+        return 'text object of footnote ' + field.fnIdx + ' of active document';
+    }
+    return 'text object of active document';
+};
+
 // ---- AppleScript edit writer ----------------------------------------------
 
 // Build an AppleScript program that applies every edit in `editsByField` to
@@ -513,6 +523,7 @@ BH.buildWriterScript = function (fields, editsByField) {
     editsByField.forEach(function (edits, fi) {
         var field = fields[fi];
         var ref = BH.fieldRef(field);
+        var story = BH.storyRef(field);
         var textLen = field.text.length;
 
         for (var i = 0; i < edits.length; i++) {
@@ -526,10 +537,11 @@ BH.buildWriterScript = function (fields, editsByField) {
             lines.push('        select ' + ref);
             lines.push('        set step to "get_range"');
             lines.push('        set selRange to text object of selection');
-            // Position within the field.  text object of <fieldRef> directly
-            // returns missing value — we must select the field first and read
-            // text object of selection.  Then collapse / subrange + collapse
-            // on that range lands us in the correct story (body or footnote).
+            // Position within the field.  Append/prepend collapse selRange
+            // directly (works).  Mid-field uses story-relative character
+            // indexing because 'characters N thru M of selRange' fails
+            // ("object does not exist") — Word only indexes characters on
+            // the story, not on selection-derived ranges.
             if (ed.pos >= textLen && textLen > 0) {
                 lines.push('        set step to "collapse_end"');
                 lines.push('        collapse range selRange direction collapse end');
@@ -541,9 +553,11 @@ BH.buildWriterScript = function (fields, editsByField) {
                 lines.push('        set step to "select_start"');
                 lines.push('        select selRange');
             } else {
+                lines.push('        set step to "get_bounds"');
+                lines.push('        set fldStart to start of content of selRange');
                 lines.push('        set step to "subrange"');
-                lines.push('        set subRange to characters 1 thru ' +
-                           ed.pos + ' of selRange');
+                lines.push('        set subRange to characters (fldStart + 1) thru ' +
+                           '(fldStart + ' + ed.pos + ') of ' + story);
                 lines.push('        set step to "collapse_subrange_end"');
                 lines.push('        collapse range subRange direction collapse end');
                 lines.push('        set step to "select_subrange"');
@@ -679,7 +693,7 @@ BH.fixHereinafters = function (win) {
         }
 
         BH.writeDiagFile(
-            'v0.1.22 | fields=' + fields.length +
+            'v0.1.23 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
