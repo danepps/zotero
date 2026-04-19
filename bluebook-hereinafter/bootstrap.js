@@ -564,7 +564,7 @@ BH.buildWriterScript = function (fields, editsByField) {
                 lines.push('        select selRange');
                 lines.push('        set step to "move_right"');
                 lines.push('        repeat ' + ed.pos + ' times');
-                lines.push('            move right selection');
+                lines.push('            move right');
                 lines.push('        end repeat');
             }
             lines.push('        set step to "typing"');
@@ -655,7 +655,7 @@ BH.fixHereinafters = function (win) {
         catch (de) { diagnostic = 'diagnose() threw: ' + de; }
 
         BH.writeDiagFile(
-            'v0.1.28 | fields=' + fields.length +
+            'v0.1.29 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size + '\n\n' + diagnostic
         );
@@ -697,7 +697,7 @@ BH.fixHereinafters = function (win) {
         }
 
         BH.writeDiagFile(
-            'v0.1.28 | fields=' + fields.length +
+            'v0.1.29 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +

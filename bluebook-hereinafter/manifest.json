@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Bluebook Hereinafter",
-  "version": "0.1.28",
+  "version": "0.1.29",
   "description": "Auto-inserts [hereinafter Short Title] on first cite and rewrites short-form cites to include the short title when multiple works by the same author appear in a document.",
   "author": "Dan Epps",
   "homepage_url": "https://github.com/danepps/zotero",
