@@ -5,6 +5,7 @@
 // ---------------------------------------------------------------------------
 
 var menuItem = null;
+var _rootURI = null;
 
 function addMenuItem(win) {
     var doc = win.document;
@@ -95,35 +96,18 @@ function runAppleScriptWithOutput(script) {
 // Core fix logic
 // ---------------------------------------------------------------------------
 
-function fixCitations(win) {
-    var script = [
-        'tell application "Microsoft Word"',
-        '    set fieldList to ""',
-        '    set doc to active document',
-        '    set bodyFieldCount to count fields of text object of doc',
-        '    repeat with i from 1 to bodyFieldCount',
-        '        set f to field i of text object of doc',
-        '        set fc to content of field code of f',
-        '        if fc contains "ZOTERO_ITEM" then',
-        '            set fieldList to fieldList & fc & "\n---\n"',
-        '        end if',
-        '    end repeat',
-        '    set fnoteCount to count footnotes of doc',
-        '    repeat with fi from 1 to fnoteCount',
-        '        set fn to footnote fi of doc',
-        '        set fnFieldCount to count fields of text object of fn',
-        '        repeat with i from 1 to fnFieldCount',
-        '            set f to field i of text object of fn',
-        '            set fc to content of field code of f',
-        '            if fc contains "ZOTERO_ITEM" then',
-        '                set fieldList to fieldList & fc & "\n---\n"',
-        '            end if',
-        '        end repeat',
-        '    end repeat',
-        '    return fieldList',
-        'end tell'
-    ].join('\n');
+function loadAppleScript() {
+    var req = new XMLHttpRequest();
+    req.open('GET', _rootURI + 'extract-citations.applescript', false);
+    req.send(null);
+    if (req.status !== 0 && req.status !== 200) {
+        throw new Error('Failed to load extract-citations.applescript: ' + req.status);
+    }
+    return req.responseText;
+}
 
+function fixCitations(win) {
+    var script = loadAppleScript();
     var result = runAppleScriptWithOutput(script);
 
     if (!result || result.trim() === '') {
@@ -158,6 +142,7 @@ var windowWatcher = {
 
 function startup({ id, version, rootURI }, reason) {
     try {
+        _rootURI = rootURI;
         var windows = Services.wm.getEnumerator('navigator:browser');
         while (windows.hasMoreElements()) {
             addMenuItem(windows.getNext());
