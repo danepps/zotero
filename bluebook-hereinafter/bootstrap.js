@@ -522,27 +522,28 @@ BH.buildWriterScript = function (fields, editsByField) {
                       ' pos=' + ed.pos + ' textLen=' + textLen + ')';
             lines.push('    set step to "start"');
             lines.push('    try');
-            // Read the field's result range directly (no select round-trip
-            // for positioning).  text object of <field> is the result range.
-            lines.push('        set step to "get_field_range"');
-            lines.push('        set fldRange to text object of ' + ref);
-            // Build a sub-range whose end is at the desired insertion point,
-            // then collapse to end + select to get a zero-length insertion
-            // point at offset `pos` within the field, in the correct story.
+            lines.push('        set step to "select_field"');
+            lines.push('        select ' + ref);
+            lines.push('        set step to "get_range"');
+            lines.push('        set selRange to text object of selection');
+            // Position within the field.  text object of <fieldRef> directly
+            // returns missing value — we must select the field first and read
+            // text object of selection.  Then collapse / subrange + collapse
+            // on that range lands us in the correct story (body or footnote).
             if (ed.pos >= textLen && textLen > 0) {
-                lines.push('        set step to "collapse_field_end"');
-                lines.push('        collapse range fldRange direction collapse end');
-                lines.push('        set step to "select_field_end"');
-                lines.push('        select fldRange');
+                lines.push('        set step to "collapse_end"');
+                lines.push('        collapse range selRange direction collapse end');
+                lines.push('        set step to "select_end"');
+                lines.push('        select selRange');
             } else if (ed.pos === 0) {
-                lines.push('        set step to "collapse_field_start"');
-                lines.push('        collapse range fldRange direction collapse start');
-                lines.push('        set step to "select_field_start"');
-                lines.push('        select fldRange');
+                lines.push('        set step to "collapse_start"');
+                lines.push('        collapse range selRange direction collapse start');
+                lines.push('        set step to "select_start"');
+                lines.push('        select selRange');
             } else {
                 lines.push('        set step to "subrange"');
                 lines.push('        set subRange to characters 1 thru ' +
-                           ed.pos + ' of fldRange');
+                           ed.pos + ' of selRange');
                 lines.push('        set step to "collapse_subrange_end"');
                 lines.push('        collapse range subRange direction collapse end');
                 lines.push('        set step to "select_subrange"');
@@ -678,7 +679,7 @@ BH.fixHereinafters = function (win) {
         }
 
         BH.writeDiagFile(
-            'v0.1.21 | fields=' + fields.length +
+            'v0.1.22 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
