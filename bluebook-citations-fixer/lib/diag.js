@@ -1,42 +1,42 @@
 "use strict";
 
 // Optional diagnostic log for debugging. Off by default; enable by setting
-// the pref `extensions.legal-citations-fixer.diag = true` in about:config.
-// When enabled, appends lines to /tmp/legal-citations-fixer-diag.txt.
+// the pref `extensions.bluebook-citations-fixer.diag = true` in about:config.
+// When enabled, appends lines to /tmp/bluebook-citations-fixer-diag.txt.
 
-LCF.diag = {};
+BCF.diag = {};
 
-LCF.diag.PATH = "/tmp/legal-citations-fixer-diag.txt";
-LCF.diag.enabled = false;
+BCF.diag.PATH = "/tmp/bluebook-citations-fixer-diag.txt";
+BCF.diag.enabled = false;
 
-LCF.diag.init = function () {
+BCF.diag.init = function () {
     try {
-        var v = Zotero.Prefs.get("extensions.legal-citations-fixer.diag", true);
-        LCF.diag.enabled = !!v;
+        var v = Zotero.Prefs.get("extensions.bluebook-citations-fixer.diag", true);
+        BCF.diag.enabled = !!v;
     } catch (_) {
-        LCF.diag.enabled = false;
+        BCF.diag.enabled = false;
     }
-    if (LCF.diag.enabled) {
-        LCF.diag._truncate();
-        LCF.diag.log("---- session start " + new Date().toISOString() + " ----");
+    if (BCF.diag.enabled) {
+        BCF.diag._truncate();
+        BCF.diag.log("---- session start " + new Date().toISOString() + " ----");
     }
 };
 
-LCF.diag._truncate = function () {
+BCF.diag._truncate = function () {
     try {
         var f = Components.classes["@mozilla.org/file/local;1"]
             .createInstance(Components.interfaces.nsIFile);
-        f.initWithPath(LCF.diag.PATH);
+        f.initWithPath(BCF.diag.PATH);
         if (f.exists()) f.remove(false);
     } catch (_) {}
 };
 
-LCF.diag._append = function (text) {
+BCF.diag._append = function (text) {
     try {
         var Cc = Components.classes;
         var Ci = Components.interfaces;
         var f = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
-        f.initWithPath(LCF.diag.PATH);
+        f.initWithPath(BCF.diag.PATH);
         // PR_WRONLY | PR_CREATE_FILE | PR_APPEND
         var os = Cc["@mozilla.org/network/file-output-stream;1"]
             .createInstance(Ci.nsIFileOutputStream);
@@ -49,8 +49,8 @@ LCF.diag._append = function (text) {
     } catch (_) {}
 };
 
-LCF.diag.log = function () {
-    if (!LCF.diag.enabled) return;
+BCF.diag.log = function () {
+    if (!BCF.diag.enabled) return;
     var parts = [];
     for (var i = 0; i < arguments.length; i++) {
         var a = arguments[i];
@@ -60,12 +60,12 @@ LCF.diag.log = function () {
             catch (_) { parts.push(String(a)); }
         }
     }
-    LCF.diag._append(parts.join(" ") + "\n");
+    BCF.diag._append(parts.join(" ") + "\n");
 };
 
-LCF.diag.err = function (tag, e) {
+BCF.diag.err = function (tag, e) {
     var s = "[ERR " + tag + "] " + String(e);
     if (e && e.stack) s += "\n" + e.stack;
-    try { Components.utils.reportError("legal-citations-fixer: " + s); } catch (_) {}
-    if (LCF.diag.enabled) LCF.diag._append(s + "\n");
+    try { Components.utils.reportError("bluebook-citations-fixer: " + s); } catch (_) {}
+    if (BCF.diag.enabled) BCF.diag._append(s + "\n");
 };
