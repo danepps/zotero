@@ -523,7 +523,6 @@ BH.buildWriterScript = function (fields, editsByField) {
     editsByField.forEach(function (edits, fi) {
         var field = fields[fi];
         var ref = BH.fieldRef(field);
-        var story = BH.storyRef(field);
         var textLen = field.text.length;
 
         for (var i = 0; i < edits.length; i++) {
@@ -538,10 +537,10 @@ BH.buildWriterScript = function (fields, editsByField) {
             lines.push('        set step to "get_range"');
             lines.push('        set selRange to text object of selection');
             // Position within the field.  Append/prepend collapse selRange
-            // directly (works).  Mid-field uses story-relative character
-            // indexing because 'characters N thru M of selRange' fails
-            // ("object does not exist") — Word only indexes characters on
-            // the story, not on selection-derived ranges.
+            // directly (works).  Mid-field uses Find against an anchor
+            // string (the text at the insertion point, extracted from
+            // field.text on the JS side) — neither 'characters N thru M of
+            // selRange' nor story-relative character indexing resolves.
             if (ed.pos >= textLen && textLen > 0) {
                 lines.push('        set step to "collapse_end"');
                 lines.push('        collapse range selRange direction collapse end');
@@ -553,15 +552,29 @@ BH.buildWriterScript = function (fields, editsByField) {
                 lines.push('        set step to "select_start"');
                 lines.push('        select selRange');
             } else {
-                lines.push('        set step to "get_bounds"');
-                lines.push('        set fldStart to start of content of selRange');
-                lines.push('        set step to "subrange"');
-                lines.push('        set subRange to characters (fldStart + 1) thru ' +
-                           '(fldStart + ' + ed.pos + ') of ' + story);
-                lines.push('        set step to "collapse_subrange_end"');
-                lines.push('        collapse range subRange direction collapse end');
-                lines.push('        set step to "select_subrange"');
-                lines.push('        select subRange');
+                var anchor = field.text.slice(ed.pos, ed.pos +
+                    Math.min(16, textLen - ed.pos));
+                lines.push('        set step to "find_obj"');
+                lines.push('        set findObj to find object of selRange');
+                lines.push('        set step to "find_config"');
+                lines.push('        tell findObj');
+                lines.push('            clear formatting');
+                lines.push('            set forward to true');
+                lines.push('            set wrap to find stop');
+                lines.push('        end tell');
+                lines.push('        set step to "execute_find"');
+                lines.push('        set foundIt to execute find findObj ' +
+                           'find text "' + BH.asEscape(anchor) + '"');
+                lines.push('        set step to "check_found"');
+                lines.push('        if foundIt is false then error ' +
+                           '"anchor not found"');
+                // After execute find on a range's find object, the range is
+                // narrowed to the match.  Collapse start → cursor at start
+                // of match = the insertion point.
+                lines.push('        set step to "collapse_match_start"');
+                lines.push('        collapse range selRange direction collapse start');
+                lines.push('        set step to "select_match_start"');
+                lines.push('        select selRange');
             }
             lines.push('        set step to "typing"');
             if (ed.plain) {
@@ -693,7 +706,7 @@ BH.fixHereinafters = function (win) {
         }
 
         BH.writeDiagFile(
-            'v0.1.23 | fields=' + fields.length +
+            'v0.1.24 | fields=' + fields.length +
             ' ambig=' + analysis.ambiguous.size +
             ' edits=' + edits.size +
             ' applied=' + applied + '\n\n' + diagnostic +
