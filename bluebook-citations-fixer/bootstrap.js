@@ -22,48 +22,64 @@ function install() {}
 function uninstall() {}
 
 async function startup({ rootURI }) {
-    Components.classes["@zotero.org/Zotero;1"]
-        .getService(Components.interfaces.nsISupports)
-        .wrappedJSObject;
+    try {
+        Zotero = Components.classes["@zotero.org/Zotero;1"]
+            .getService(Components.interfaces.nsISupports)
+            .wrappedJSObject;
+        await Zotero.initializationPromise;
 
-    Zotero = Components.classes["@zotero.org/Zotero;1"]
-        .getService(Components.interfaces.nsISupports)
-        .wrappedJSObject;
-    await Zotero.initializationPromise;
+        BCF = {
+            rootURI: rootURI,
+            features: {}
+        };
 
-    BCF = {
-        rootURI: rootURI,
-        features: {}
-    };
+        var loadScope = {
+            Zotero: Zotero,
+            BCF: BCF,
+            Services: Services,
+            Components: Components,
+            Cc: Components.classes,
+            Ci: Components.interfaces
+        };
 
-    var loadScope = {
-        Zotero: Zotero,
-        BCF: BCF,
-        Services: Services,
-        Components: Components,
-        Cc: Components.classes,
-        Ci: Components.interfaces
-    };
+        var load = function (path) {
+            Services.scriptloader.loadSubScript(rootURI + path, loadScope);
+        };
 
-    var load = function (path) {
-        Services.scriptloader.loadSubScript(rootURI + path, loadScope);
-    };
+        load("lib/rtf.js");
+        load("lib/cite.js");
+        load("lib/diag.js");
+        load("lib/ui.js");
+        load("lib/session-run.js");
+        load("lib/features/hereinafter.js");
+        load("lib/features/registry.js");
+        load("lib/patch.js");
 
-    load("lib/rtf.js");
-    load("lib/cite.js");
-    load("lib/diag.js");
-    load("lib/session-run.js");
-    load("lib/features/hereinafter.js");
-    load("lib/features/registry.js");
-    load("lib/patch.js");
+        BCF.diag.init();
+        BCF.ui.installMenu();
+        BCF.ui.record("startup", "loaded");
+        BCF.patch.install();
 
-    BCF.diag.init();
-    BCF.patch.install();
-
-    Zotero.debug("[bluebook-citations-fixer] startup complete");
+        Zotero.debug("[bluebook-citations-fixer] startup complete");
+    } catch (e) {
+        try {
+            Components.utils.reportError(
+                "bluebook-citations-fixer startup error: " + e +
+                (e && e.stack ? "\n" + e.stack : "")
+            );
+        } catch (_) {}
+        try {
+            Services.prompt.alert(
+                null,
+                "Bluebook Citations Fixer",
+                "Startup error:\n\n" + e + (e && e.stack ? "\n\n" + e.stack : "")
+            );
+        } catch (_) {}
+    }
 }
 
 function shutdown() {
+    try { if (BCF && BCF.ui) BCF.ui.uninstallMenu(); } catch (_) {}
     try { if (BCF && BCF.patch) BCF.patch.uninstall(); } catch (_) {}
     BCF = null;
 }

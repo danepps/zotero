@@ -45,6 +45,7 @@ BCF.patch.install = function () {
     };
     Field.prototype.__lcfPatched = true;
     BCF.diag.log("patch installed on Zotero.Integration.Field.prototype.setText");
+    try { BCF.ui.record("patch", "installed"); } catch (_) {}
 };
 
 BCF.patch.uninstall = function () {
@@ -66,8 +67,13 @@ BCF.patch.uninstall = function () {
 // Run the feature chain for a single setText call. Returns the (possibly
 // rewritten) RTF string.
 BCF.patch.run = async function (field, text) {
+    try { BCF.ui.record("setText", "len=" + (text ? text.length : 0)); } catch (_) {}
+
     var session = Zotero.Integration.currentSession;
-    if (!session) return text;
+    if (!session) {
+        try { BCF.ui.record("skip", "no currentSession"); } catch (_) {}
+        return text;
+    }
 
     // Only touch citation clusters. Bibliography also flows through setText,
     // but it has different semantics and we don't want to rewrite it.
@@ -78,10 +84,14 @@ BCF.patch.run = async function (field, text) {
         BCF.diag.err("getCode", e);
         return text;
     }
-    if (!code || code.indexOf("CSL_CITATION") === -1) return text;
+    if (!code || code.indexOf("CSL_CITATION") === -1) {
+        try { BCF.ui.record("skip", "not a citation cluster"); } catch (_) {}
+        return text;
+    }
 
     var codeJson = BCF.cite.parseFieldCode(code);
     if (!codeJson || !codeJson.citationItems || !codeJson.citationItems.length) {
+        try { BCF.ui.record("skip", "no citationItems"); } catch (_) {}
         return text;
     }
 
@@ -99,7 +109,10 @@ BCF.patch.run = async function (field, text) {
         var feat = list[i];
         try {
             var out = feat.rewrite(ctx);
-            if (typeof out === "string") ctx.text = out;
+            if (typeof out === "string" && out !== ctx.text) {
+                try { BCF.ui.record("rewrite:" + feat.id, "applied"); } catch (_) {}
+                ctx.text = out;
+            }
         } catch (e) {
             BCF.diag.err("feature:" + (feat && feat.id), e);
         }

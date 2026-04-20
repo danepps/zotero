@@ -68,4 +68,9 @@ BCF.diag.err = function (tag, e) {
     if (e && e.stack) s += "\n" + e.stack;
     try { Components.utils.reportError("bluebook-citations-fixer: " + s); } catch (_) {}
     if (BCF.diag.enabled) BCF.diag._append(s + "\n");
+    try { if (BCF.ui) BCF.ui.record("error", tag + ": " + String(e)); } catch (_) {}
+    try { if (BCF.ui) BCF.ui.alert(
+        "Bluebook Citations Fixer — Error",
+        s
+    ); } catch (_) {}
 };
