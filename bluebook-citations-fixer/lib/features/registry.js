@@ -11,5 +11,7 @@
 //   3. Add it to the list below, in the order it should run.
 
 BCF.features.list = [
-    BCF.features.hereinafter
+    BCF.features.hereinafter,
+    BCF.features.journalVolumeYear,
+    BCF.features.bookAt
 ];

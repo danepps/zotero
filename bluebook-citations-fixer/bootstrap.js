@@ -40,7 +40,7 @@ async function startup(data) {
         BCF = {
             rootURI: rootURI,
             id: data.id || "bluebook-citations-fixer@danepps.com",
-            version: data.version || "0.1.1",
+            version: data.version || "0.1.4",
             features: {},
             startupError: null
         };
@@ -64,6 +64,8 @@ async function startup(data) {
         load("lib/ui.js");
         load("lib/session-run.js");
         load("lib/features/hereinafter.js");
+        load("lib/features/journal-volume-year.js");
+        load("lib/features/book-at.js");
         load("lib/features/registry.js");
         load("lib/patch.js");
 

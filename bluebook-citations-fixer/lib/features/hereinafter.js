@@ -137,6 +137,10 @@ BCF.features.hereinafter = {
         return /\bsupra\s+note\b/i.test(BCF.rtf.plainish(rtf));
     },
 
+    _hasIdCite: function (rtf) {
+        return /\bid\./i.test(BCF.rtf.plainish(rtf));
+    },
+
     _rewriteFirst: function (segRtf, shortTitle) {
         var plain = BCF.rtf.plainish(segRtf);
         // Idempotency: already has "[hereinafter <shortTitle>]" (loose).
@@ -147,6 +151,7 @@ BCF.features.hereinafter = {
         if (rx.test(plain)) return null;
         // Safety: never append [hereinafter] to short-form cites.
         if (/\bsupra\s+note\b/i.test(plain)) return null;
+        if (BCF.features.hereinafter._hasIdCite(segRtf)) return null;
 
         // Append inline RTF. setText wraps the whole string in {\rtf ...} if
         // needed; inline groups are fine.
