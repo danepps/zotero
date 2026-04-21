@@ -19,37 +19,46 @@ BCF.features.hereinafter = {
     id: "hereinafter",
 
     rewrite: function (ctx) {
-        var items = BCF.cite.itemsOf(ctx.codeJson);
-        if (!items.length) return ctx.text;
+        return BCF.features.hereinafter.rewriteText(ctx.text, ctx.codeJson, ctx.run);
+    },
+
+    rewriteCitation: function (ctx) {
+        if (!ctx || !ctx.citation) return ctx && ctx.text;
+        return BCF.features.hereinafter.rewriteText(ctx.text, ctx.citation, ctx.run);
+    },
+
+    rewriteText: function (text, codeJson, run) {
+        var items = BCF.cite.itemsOf(codeJson);
+        if (!items.length) return text;
 
         // Decide up front whether any item in this cluster is actually
-        // ambiguous and has a usable short title. If none, short-circuit.
+        // eligible and has a usable short title. If none, short-circuit.
         var anyWork = false;
         for (var i = 0; i < items.length; i++) {
-            if (BCF.run.isAmbiguous(ctx.run, items[i])) { anyWork = true; break; }
+            if (BCF.run.shouldUseHereinafter(run, items[i])) { anyWork = true; break; }
         }
         if (!anyWork) {
-            BCF.diag.event("skip:hereinafter", "no ambiguous item in cluster");
-            return ctx.text;
+            BCF.diag.event("skip:hereinafter", "no eligible item in cluster");
+            return text;
         }
 
         // Split multi-item clusters into per-subcite segments.
-        var segments = BCF.features.hereinafter._segments(ctx.text, items.length);
+        var segments = BCF.features.hereinafter._segments(text, items.length);
         if (!segments) {
             // Fall back to single-segment operation — treat the whole cluster
             // as one cite. Only safe for single-item clusters.
             if (items.length !== 1) {
                 BCF.diag.event("skip:hereinafter", "could not split multi-cite cluster");
-                return ctx.text;
+                return text;
             }
-            segments = [{ text: ctx.text, start: 0, end: ctx.text.length, sep: "" }];
+            segments = [{ text: text, start: 0, end: text.length, sep: "" }];
         }
 
         var rewrote = false;
         for (var j = 0; j < items.length; j++) {
             var item = items[j];
-            if (!BCF.run.isAmbiguous(ctx.run, item)) continue;
-            var data = BCF.run.itemData(ctx.run, item);
+            if (!BCF.run.shouldUseHereinafter(run, item)) continue;
+            var data = BCF.run.itemData(run, item);
             var shortTitle = BCF.cite.shortTitle(data);
             if (!shortTitle) {
                 BCF.diag.event("skip:hereinafter", "no short title for " + BCF.cite.itemKey(item));
@@ -68,7 +77,7 @@ BCF.features.hereinafter = {
 
         if (!rewrote) {
             BCF.diag.event("skip:hereinafter", "no rewrite");
-            return ctx.text;
+            return text;
         }
 
         // Rejoin.
