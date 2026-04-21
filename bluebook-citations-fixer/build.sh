@@ -9,7 +9,9 @@ rm -f "$OUT"
 zip -r "$OUT" \
     manifest.json \
     chrome.manifest \
+    prefs.js \
     bootstrap.js \
+    locale \
     lib
 echo "Built $OUT"
 echo "Next steps:"
