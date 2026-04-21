@@ -215,10 +215,7 @@ BCF.patch._prepareCitationTexts = function (session) {
     if (!session || !session.citationsByIndex) return;
     BCF.run.clearSession(session);
     var run = BCF.run.forSession(session);
-    if (!run || !run.eligibleKeys || !run.eligibleKeys.size) {
-        BCF.diag.event("prepare", "skip empty eligibility map");
-        return;
-    }
+    if (!run) return;
 
     var citations = BCF.run.citationsInOrder(session);
     var rewrites = 0;
@@ -312,8 +309,8 @@ BCF.patch.run = async function (field, text) {
     }
 
     var run = BCF.run.forSession(session);
-    if (!run || !run.eligibleKeys || !run.eligibleKeys.size) {
-        BCF.diag.event("skip", "empty eligibility map");
+    if (!run) {
+        BCF.diag.event("skip", "no run context");
         return text;
     }
 

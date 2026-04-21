@@ -41,6 +41,6 @@ that are awkward or impossible to express cleanly in CSL alone.
 
 ## Latest Released Version
 
-- `0.1.4`
-- Git tag: `bluebook-cite-v0.1.4`
-- GitHub release asset: `Bluebook_Citations_Fixer_v0.1.4.xpi`
+- `0.1.5`
+- Git tag: `bluebook-cite-v0.1.5`
+- GitHub release asset: `Bluebook_Citations_Fixer_v0.1.5.xpi`

@@ -8,7 +8,16 @@ const vm = require("vm");
 const root = path.resolve(__dirname, "..");
 const context = {
     BCF: { features: {} },
-    console
+    console,
+    Services: {},
+    Components: { classes: {}, interfaces: {}, utils: { reportError() {} } },
+    Zotero: {
+        Integration: {
+            currentSession: null,
+            Field: function () {},
+            Session: function () {}
+        }
+    }
 };
 context.global = context;
 
@@ -27,8 +36,11 @@ load("lib/session-run.js");
 load("lib/features/hereinafter.js");
 load("lib/features/journal-volume-year.js");
 load("lib/features/book-at.js");
+load("lib/features/registry.js");
+load("lib/patch.js");
 
 const BCF = context.BCF;
+const Zotero = context.Zotero;
 
 function cit(id, authorFamily, shortTitle, title, position, authors, extraItemData) {
     const item = {
@@ -53,6 +65,20 @@ function citation(noteIndex, citationItems) {
 
 function buildRun(citationsByIndex) {
     return BCF.run.forSession({ citationsByIndex, outputFormat: "rtf" });
+}
+
+async function runPatch(session, codeJson, text) {
+    const field = {
+        async getCode() {
+            return "ADDIN ZOTERO_ITEM CSL_CITATION " + JSON.stringify(codeJson);
+        }
+    };
+    Zotero.Integration.currentSession = session;
+    try {
+        return await BCF.patch.run(field, text);
+    } finally {
+        Zotero.Integration.currentSession = null;
+    }
 }
 
 {
@@ -452,4 +478,78 @@ function buildRun(citationsByIndex) {
     }), text);
 }
 
-console.log("bluebook-citations-fixer node tests passed");
+(async function () {
+    {
+        const journal = cit(
+            "PJ1",
+            "Smith",
+            "Journal Piece",
+            "Journal Piece",
+            undefined,
+            undefined,
+            { type: "article-journal", volume: "2024" }
+        );
+        const session = {
+            outputFormat: "rtf",
+            citationsByIndex: { 1: citation(1, [journal]) }
+        };
+        const out = await runPatch(
+            session,
+            session.citationsByIndex[1],
+            "John Smith, Journal Piece, 2024 Yale L.J. 55 (2024)"
+        );
+        assert.strictEqual(out, "John Smith, Journal Piece, 2024 Yale L.J. 55");
+    }
+
+    {
+        const book = cit(
+            "PB1",
+            "Jones",
+            "History of 1868",
+            "History of 1868",
+            undefined,
+            undefined,
+            { type: "book" }
+        );
+        book.locator = "45";
+        book.label = "page";
+        const session = {
+            outputFormat: "rtf",
+            citationsByIndex: { 1: citation(1, [book]) }
+        };
+        const out = await runPatch(
+            session,
+            session.citationsByIndex[1],
+            "Mary Jones, History of 1868 45 (2006)"
+        );
+        assert.strictEqual(out, "Mary Jones, History of 1868, at 45 (2006)");
+    }
+
+    {
+        const journal = cit(
+            "PJ2",
+            "Taylor",
+            "Another Journal Piece",
+            "Another Journal Piece",
+            undefined,
+            undefined,
+            { type: "article-journal", volume: "2023" }
+        );
+        const session = {
+            outputFormat: "rtf",
+            citationsByIndex: { 1: citation(1, [journal]) }
+        };
+        session.citationsByIndex[1].text =
+            "Alex Taylor, Another Journal Piece, 2023 Harv. L. Rev. 10 (2023)";
+        BCF.patch._prepareCitationTexts(session);
+        assert.strictEqual(
+            session.citationsByIndex[1].text,
+            "Alex Taylor, Another Journal Piece, 2023 Harv. L. Rev. 10"
+        );
+    }
+
+    console.log("bluebook-citations-fixer node tests passed");
+})().catch((err) => {
+    console.error(err);
+    process.exit(1);
+});

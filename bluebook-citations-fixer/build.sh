@@ -1,7 +1,7 @@
 #!/bin/bash
-# Usage: ./build.sh 0.1.4
+# Usage: ./build.sh 0.1.5
 set -e
-VERSION=${1:-0.1.4}
+VERSION=${1:-0.1.5}
 cd "$(dirname "$0")"
 mkdir -p releases
 OUT="releases/Bluebook_Citations_Fixer_v${VERSION}.xpi"
