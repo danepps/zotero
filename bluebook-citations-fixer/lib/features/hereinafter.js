@@ -28,14 +28,20 @@ BCF.features.hereinafter = {
         for (var i = 0; i < items.length; i++) {
             if (BCF.run.isAmbiguous(ctx.run, items[i])) { anyWork = true; break; }
         }
-        if (!anyWork) return ctx.text;
+        if (!anyWork) {
+            BCF.diag.event("skip:hereinafter", "no ambiguous item in cluster");
+            return ctx.text;
+        }
 
         // Split multi-item clusters into per-subcite segments.
         var segments = BCF.features.hereinafter._segments(ctx.text, items.length);
         if (!segments) {
             // Fall back to single-segment operation — treat the whole cluster
             // as one cite. Only safe for single-item clusters.
-            if (items.length !== 1) return ctx.text;
+            if (items.length !== 1) {
+                BCF.diag.event("skip:hereinafter", "could not split multi-cite cluster");
+                return ctx.text;
+            }
             segments = [{ text: ctx.text, start: 0, end: ctx.text.length, sep: "" }];
         }
 
@@ -45,7 +51,10 @@ BCF.features.hereinafter = {
             if (!BCF.run.isAmbiguous(ctx.run, item)) continue;
             var data = BCF.run.itemData(ctx.run, item);
             var shortTitle = BCF.cite.shortTitle(data);
-            if (!shortTitle) continue;
+            if (!shortTitle) {
+                BCF.diag.event("skip:hereinafter", "no short title for " + BCF.cite.itemKey(item));
+                continue;
+            }
 
             var seg = segments[j];
             var newSeg = BCF.features.hereinafter._rewriteSegment(
@@ -57,7 +66,10 @@ BCF.features.hereinafter = {
             }
         }
 
-        if (!rewrote) return ctx.text;
+        if (!rewrote) {
+            BCF.diag.event("skip:hereinafter", "no rewrite");
+            return ctx.text;
+        }
 
         // Rejoin.
         var out = "";
