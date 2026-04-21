@@ -43,15 +43,10 @@ BCF.features.hereinafter = {
         }
 
         // Split multi-item clusters into per-subcite segments.
-        var segments = BCF.features.hereinafter._segments(text, items.length);
+        var segments = BCF.rtf.segments(text, items.length);
         if (!segments) {
-            // Fall back to single-segment operation — treat the whole cluster
-            // as one cite. Only safe for single-item clusters.
-            if (items.length !== 1) {
-                BCF.diag.event("skip:hereinafter", "could not split multi-cite cluster");
-                return text;
-            }
-            segments = [{ text: text, start: 0, end: text.length, sep: "" }];
+            BCF.diag.event("skip:hereinafter", "could not split multi-cite cluster");
+            return text;
         }
 
         var rewrote = false;
@@ -87,37 +82,6 @@ BCF.features.hereinafter = {
             out += segments[k].text;
         }
         return out;
-    },
-
-    // Split the RTF cluster into per-sub-cite segments on the citeproc
-    // cite-group delimiter "; ". Returns [{text, start, end, sep}] or null
-    // if the split doesn't yield expectedCount segments.
-    _segments: function (rtf, expectedCount) {
-        if (expectedCount === 1) {
-            return [{ text: rtf, start: 0, end: rtf.length, sep: "" }];
-        }
-        // Simple literal split — "; " is an ASCII pair that passes through
-        // RTF escaping unchanged in practice. We split only at top level
-        // (depth 0 braces) to avoid breaking inside {\i{}...} groups.
-        var segs = [];
-        var depth = 0;
-        var start = 0;
-        for (var i = 0; i < rtf.length; i++) {
-            var ch = rtf.charAt(i);
-            if (ch === "\\") { i += 1; continue; } // skip escaped char
-            if (ch === "{") depth++;
-            else if (ch === "}") depth--;
-            else if (depth === 0 && ch === ";" && rtf.charAt(i + 1) === " ") {
-                segs.push({
-                    text: rtf.slice(start, i),
-                    start: start, end: i, sep: "; "
-                });
-                start = i + 2;
-                i += 1;
-            }
-        }
-        segs.push({ text: rtf.slice(start), start: start, end: rtf.length, sep: "" });
-        return segs.length === expectedCount ? segs : null;
     },
 
     _rewriteSegment: function (segRtf, citItem, shortTitle) {

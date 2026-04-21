@@ -19,13 +19,10 @@ BCF.features.journalVolumeYear = {
         var items = BCF.cite.itemsOf(codeJson);
         if (!items.length) return text;
 
-        var segments = BCF.features.hereinafter._segments(text, items.length);
+        var segments = BCF.rtf.segments(text, items.length);
         if (!segments) {
-            if (items.length !== 1) {
-                BCF.diag.event("skip:journal-volume-year", "could not split multi-cite cluster");
-                return text;
-            }
-            segments = [{ text: text, start: 0, end: text.length, sep: "" }];
+            BCF.diag.event("skip:journal-volume-year", "could not split multi-cite cluster");
+            return text;
         }
 
         var rewrote = false;

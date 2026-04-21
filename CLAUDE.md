@@ -23,7 +23,7 @@ Each top-level directory is a separate Zotero 7/9 bootstrap plugin. They share n
 
 - `bluebook-signals/` — Ctrl+S signal picker for the citation-dialog prefix field (fork of Frank Bennett's plugin, updated for Zotero 9).
 - `bluebook-hereinafter/` — Applies Bluebook Rule 4.2(b) "hereinafter" handling by post-processing the Word document after every Zotero integration call. **macOS + Microsoft Word only (AppleScript).** Being superseded by `bluebook-citations-fixer/`; kept running in parallel until the new plugin is validated.
-- `bluebook-citations-fixer/` — In-pipeline replacement for `bluebook-hereinafter`. Hooks `Zotero.Integration.Field.prototype.setText` so rewrites happen *inside* Zotero's citation pipeline instead of post-hoc in the word processor. RTF output only for now (Word + LibreOffice). Designed as a feature chain — each Bluebook rule is a file under `lib/features/`.
+- `bluebook-citations-fixer/` — In-pipeline replacement for `bluebook-hereinafter`. Rewrites happen *inside* Zotero's citation pipeline via a `Field.prototype.setText` patch plus an earlier `Session._updateDocument` prewrite pass. RTF output only for now (Word + LibreOffice). Designed as a feature chain — each Bluebook rule is a file under `lib/features/`.
 
 At the repo root, `update-*.json` files are the Zotero auto-update manifests, served from GitHub Pages at `https://danepps.github.io/zotero/<file>`. The `update_url` in each plugin's `manifest.json` points back to one of these. If the JSON is missing or 404s, Zotero periodically **deletes the plugin** — so any new version must have a matching entry here before release.
 
@@ -92,7 +92,12 @@ The plugin rewrites Zotero's citation output *inside* the integration pipeline, 
 
 ### Hook seam
 
-`Zotero.Integration.Field.prototype.setText` (in Zotero's `chrome/content/zotero/xpcom/integration.js`). This sits downstream of citeproc (both citeproc-js and citeproc-rs write to `citation.text` before this is called) and upstream of every word-processor-specific field implementation (`WinWord`/`MacWord`/LibreOffice `ReferenceMark`/`httpIntegrationClient`). A monkey-patch here replaces the old AppleScript post-processor entirely.
+Two patches, run in order:
+
+1. `Zotero.Integration.Session.prototype._updateDocument` — prewrite pass that walks `session.citationsByIndex` and rewrites each cluster's `.text` before Zotero fans those strings out to concrete field writes. Runs the feature chain via `feat.rewriteCitation(ctx)`.
+2. `Zotero.Integration.Field.prototype.setText` — downstream hook on the per-field write. Runs the same feature chain via `feat.rewrite(ctx)`. Sits downstream of citeproc (both citeproc-js and citeproc-rs write to `citation.text` before this is called) and upstream of every word-processor-specific field implementation (`WinWord`/`MacWord`/LibreOffice `ReferenceMark`/`httpIntegrationClient`).
+
+Together these patches replace the old AppleScript post-processor. `execCommand`, `Session.updateDocument`, and `Session.writeDelayedCitation` are also wrapped but only for diagnostics.
 
 Key facts that anchor the design:
 
@@ -100,6 +105,7 @@ Key facts that anchor the design:
 - **Bibliography also calls `setText`.** Filter by checking that the field's code contains `CSL_CITATION` — bibliography fields have a different ADDIN prefix.
 - **Delayed citations** (`Session.writeDelayedCitation`) go through the same `setText` seam, so our patch covers them for free.
 - **`properties.custom`** short-circuits `_updateDocument`, but writing to it persists into the field code. We intentionally do *not* use it.
+- **Do not globally gate the feature chain on hereinafter eligibility.** `run.eligibleKeys` is specific to Rule 4.2(b); the other features must continue to run even when no cite in the document qualifies for hereinafter treatment. Each feature owns its own eligibility predicate.
 
 ### File layout
 
@@ -113,39 +119,50 @@ bluebook-citations-fixer/
 ├── locale/en-US/bluebook-citations-fixer.ftl
 ├── tests/run-node-tests.js       # pure helper tests for ambiguity + rewrites
 └── lib/
-    ├── rtf.js                    # escape, italic(), plainish projection, findPlainOffset
-    ├── cite.js                   # CSL_CITATION parse, authorKey, shortTitle, position
+    ├── rtf.js                    # escape, italic(), plainish projection, findPlainOffset, segments
+    ├── cite.js                   # CSL_CITATION parse, authorKey, shortTitle, position, item-type predicates
     ├── diag.js                   # /tmp log, gated on extensions.bluebook-citations-fixer.diag pref
     ├── ui.js                     # Tools-menu status popup + recent event buffer
-    ├── session-run.js            # per-run context cached on currentSession (ambiguity map)
-    ├── patch.js                  # monkey-patch Field.prototype.setText + run feature chain
+    ├── session-run.js            # per-run context cached on currentSession (eligibility maps)
+    ├── patch.js                  # patch Session/Field integration seams + run feature chain
     └── features/
         ├── registry.js           # ordered list of features
-        └── hereinafter.js        # Rule 4.2(b): [hereinafter Short] + supra-cite rewrite
+        ├── hereinafter.js        # Rule 4.2(b): [hereinafter Short] + supra-cite rewrite
+        ├── journal-volume-year.js# suppress trailing (YYYY) when the volume itself is a four-digit year
+        └── book-at.js            # insert ", at" when numeral-ending book titles collide with the locator
 ```
 
 All lib files attach to a single shared `BCF` namespace populated via `Services.scriptloader.loadSubScript`.
 
 ### Feature contract
 
-Each feature is a plain object `{ id, rewrite(ctx) -> string | undefined }` registered in `lib/features/registry.js`. `rewrite` receives:
+Each feature is a plain object registered in `lib/features/registry.js` with two entry points:
+
+- `rewrite(ctx)` — called by the `Field.setText` hook for each individual field write.
+- `rewriteCitation(ctx)` — called by the `Session._updateDocument` prewrite pass for each cluster in `session.citationsByIndex`.
+
+Both receive a similar ctx; they typically delegate to a shared `rewriteText(text, codeJson, run)` helper. The current chain order is `hereinafter` → `journal-volume-year` → `book-at`.
 
 ```
 ctx = {
   session,   // Zotero.Integration.currentSession
-  field,     // Zotero.Integration.Field the text is about to be written to
-  codeJson,  // parsed CSL_CITATION from field.getCode()
-  run,       // per-session cache: { items, ambiguousKeys, firstCiteSeen, log }
+  field,     // Zotero.Integration.Field (setText path) or absent (prewrite path)
+  citation,  // live session citation (prewrite path) or absent (setText path)
+  codeJson,  // parsed CSL_CITATION from field.getCode() (setText) or citation (prewrite)
+  run,       // per-session cache: { items, authorBuckets, itemCounts, ambiguousKeys,
+             //                      sameFootnoteKeys, thresholdKeys, eligibleKeys, log }
   text,      // current RTF (output of the previous feature, or the original)
   rtf        // BCF.rtf helpers
 }
 ```
 
-Returning a string replaces `ctx.text`; returning undefined is a pass-through. Features run in `registry.list` order, each seeing the previous feature's output. **To add a new Bluebook rule: create `lib/features/<id>.js`, load it in `bootstrap.js`, and append it to `registry.list`.**
+Returning a string replaces `ctx.text`; returning undefined is a pass-through. Features run in `registry.list` order, each seeing the previous feature's output. Use `BCF.rtf.segments(text, itemCount)` to split multi-item clusters at the `; ` delimiter (brace-depth-aware); it returns null when the split can't be made reliably, at which point the feature should pass the cluster through. **To add a new Bluebook rule: create `lib/features/<id>.js`, load it in `bootstrap.js`, and append it to `registry.list`.**
 
 ### Per-run ambiguity map
 
-`BCF.run.forSession(session)` lazily walks `session.citationsByIndex` once per run and caches `{ ambiguousKeys, items, firstCiteSeen }` on the session object under a non-enumerable `__bluebookCitationsFixer` key. Zotero's `citationsByIndex` is an object keyed by field index, not necessarily an array, so iterate it with `BCF.run.citationsInOrder(session)`. All features can read the cached context without recomputing.
+`BCF.run.forSession(session)` lazily walks `session.citationsByIndex` once per run and caches `{ items, authorBuckets, itemCounts, itemFirstNotes, ambiguousKeys, sameFootnoteKeys, thresholdKeys, eligibleKeys, log }` on the session object under a non-enumerable `__bluebookCitationsFixer` key. Zotero's `citationsByIndex` is an object keyed by field index, not necessarily an array, so iterate it with `BCF.run.citationsInOrder(session)`.
+
+Hereinafter-specific eligibility triggers (`BCF.run.shouldUseHereinafter` → `eligibleKeys`): a work qualifies when either (1) two or more works with the same author list first appear in the same footnote (`sameFootnoteKeys`), or (2) at least two works with that author list are each cited `BCF.run.FREQUENCY_THRESHOLD` (3) or more times in the document (`thresholdKeys`). Other features should consult their own predicates and must not gate on `eligibleKeys`.
 
 ### RTF conventions
 
@@ -158,7 +175,7 @@ Zotero hands RTF to the integration bridge using citeproc-js's RTF output format
 
 ### Idempotency
 
-Every feature must be idempotent — `setText` fires on every refresh and we'll see already-rewritten text on subsequent runs. `hereinafter` checks for `[hereinafter <shortTitle>]` (first cite) and `shortTitle ... supra note` (subsequent cite) in the plainish projection before inserting.
+Every feature must be idempotent — both the `_updateDocument` prewrite pass and `setText` can see already-rewritten text on later refreshes. `hereinafter` checks for `[hereinafter <shortTitle>]` (first cite) and `shortTitle ... supra note` (subsequent cite) in the plainish projection before inserting. `journal-volume-year` checks for the trailing `(YYYY)` before stripping. `book-at` checks for `, at <locator>` before rewriting.
 
 ### Diagnostics
 

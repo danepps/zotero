@@ -121,3 +121,33 @@ BCF.rtf.findPlainOffset = function (rtf, needleRe) {
     if (m.index >= map.length) return rtf.length;
     return map[m.index][1];
 };
+
+// Split a multi-item RTF citation cluster on the citeproc cite-group delimiter
+// "; ", but only at brace depth 0 so italic / small-caps groups stay intact.
+// Returns [{text, start, end, sep}] of length expectedCount, or null if the
+// split doesn't yield that many segments (caller should fall back to
+// pass-through for multi-item clusters it can't split reliably).
+BCF.rtf.segments = function (rtf, expectedCount) {
+    if (expectedCount === 1) {
+        return [{ text: rtf, start: 0, end: rtf.length, sep: "" }];
+    }
+    var segs = [];
+    var depth = 0;
+    var start = 0;
+    for (var i = 0; i < rtf.length; i++) {
+        var ch = rtf.charAt(i);
+        if (ch === "\\") { i += 1; continue; }
+        if (ch === "{") depth++;
+        else if (ch === "}") depth--;
+        else if (depth === 0 && ch === ";" && rtf.charAt(i + 1) === " ") {
+            segs.push({
+                text: rtf.slice(start, i),
+                start: start, end: i, sep: "; "
+            });
+            start = i + 2;
+            i += 1;
+        }
+    }
+    segs.push({ text: rtf.slice(start), start: start, end: rtf.length, sep: "" });
+    return segs.length === expectedCount ? segs : null;
+};
