@@ -59,10 +59,56 @@ BCF.cite.authorKey = function (itemData) {
     return ss.join("|").toLowerCase();
 };
 
+BCF.cite.normalizeTitleMarkup = function (s) {
+    if (s == null) return "";
+    s = String(s);
+    s = s.replace(/<\/?(?:i|em|b|strong|sub|sup|span)[^>]*>/gi, "");
+    s = s.replace(/<[^>]+>/g, "");
+    s = s.replace(/&amp;/gi, "&");
+    s = s.replace(/&lt;/gi, "<");
+    s = s.replace(/&gt;/gi, ">");
+    s = s.replace(/&quot;/gi, "\"");
+    s = s.replace(/&#39;/gi, "'");
+    s = s.replace(/&nbsp;/gi, " ");
+    return s;
+};
+
 // Short title to inject. Prefers `title-short`; falls back to full title.
 BCF.cite.shortTitle = function (itemData) {
     if (!itemData) return "";
-    return itemData["title-short"] || itemData.title || "";
+    return BCF.cite.normalizeTitleMarkup(itemData["title-short"] || itemData.title || "");
+};
+
+BCF.cite.itemType = function (itemData) {
+    if (!itemData) return "";
+    return String(itemData.type || itemData.itemType || "").toLowerCase();
+};
+
+BCF.cite.isBookLike = function (itemData) {
+    var t = BCF.cite.itemType(itemData);
+    return t === "book" ||
+        t === "chapter" ||
+        t === "entry-encyclopedia" ||
+        t === "entry-dictionary" ||
+        t === "pamphlet" ||
+        t === "manuscript";
+};
+
+BCF.cite.isJournalArticleLike = function (itemData) {
+    var t = BCF.cite.itemType(itemData);
+    return t === "article-journal" ||
+        t === "article-magazine" ||
+        t === "article-newspaper";
+};
+
+BCF.cite.titleEndsInNumeral = function (itemData) {
+    var title = BCF.cite.shortTitle(itemData);
+    return /\d\s*$/.test(title);
+};
+
+BCF.cite.hasFourDigitVolume = function (itemData) {
+    if (!itemData || itemData.volume == null) return false;
+    return /^\d{4}$/.test(String(itemData.volume).trim());
 };
 
 // citeproc position: 0=first, 1=subsequent, 2=ibid, 3=ibid-with-locator.
@@ -85,6 +131,17 @@ BCF.cite.itemsOf = function (citOrJson) {
 BCF.cite.idOf = function (citOrJson) {
     if (!citOrJson) return "";
     return citOrJson.citationID || (citOrJson.properties && citOrJson.properties.citationID) || "";
+};
+
+// Best-effort note index extraction from a live citation/session object.
+BCF.cite.noteIndexOf = function (citOrJson) {
+    if (!citOrJson) return 0;
+    var p = citOrJson.properties || {};
+    var v = citOrJson.noteIndex != null ? citOrJson.noteIndex
+        : (p.noteIndex != null ? p.noteIndex
+        : (p.noteIndexAtInsertion != null ? p.noteIndexAtInsertion : 0));
+    v = Number(v);
+    return isNaN(v) ? 0 : v;
 };
 
 // Regex-escape helper.

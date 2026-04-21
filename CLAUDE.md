@@ -29,7 +29,7 @@ At the repo root, `update-*.json` files are the Zotero auto-update manifests, se
 
 ## Build / release
 
-Each plugin is a zip of its root files (`manifest.json`, `chrome.manifest`, `bootstrap.js`, and — for `bluebook-citations-fixer` — the `lib/` tree) with a `.xpi` extension. Plugins with a `build.sh` use it:
+Each plugin is a zip of its root files (`manifest.json`, `chrome.manifest`, `bootstrap.js`, and — for `bluebook-citations-fixer` — `prefs.js`, `locale/`, and the `lib/` tree) with a `.xpi` extension. Plugins with a `build.sh` use it:
 
 ```
 ./bluebook-hereinafter/build.sh <version>
@@ -45,7 +45,7 @@ Shipping a real release requires three things in lock-step:
 2. Update the matching `update-*.json` at the repo root (`update-hereinafter.json`, `update-bluebook-citations.json`) with the new version + download link.
 3. Push to main so GitHub Pages serves the updated JSON.
 
-There is no test suite, linter, or CI. Validation is manual: install the XPI in Zotero, run the feature, read the diagnostic written to `/tmp/bluebook-hereinafter-diag.txt` or `/tmp/bluebook-citations-fixer-diag.txt` (the latter must be enabled via the `extensions.bluebook-citations-fixer.diag` pref in about:config).
+There is no CI. `bluebook-citations-fixer` has a small Node helper test harness at `bluebook-citations-fixer/tests/run-node-tests.js`; broader validation is manual: install the XPI in Zotero, run the feature, read the diagnostic written to `/tmp/bluebook-hereinafter-diag.txt` or `/tmp/bluebook-citations-fixer-diag.txt` (the latter must be enabled via the `extensions.bluebook-citations-fixer.diag` pref in about:config), and use Tools -> Bluebook Citations Fixer: Status for recent hook events.
 
 ## bluebook-hereinafter architecture
 
@@ -109,10 +109,14 @@ bluebook-citations-fixer/
 ├── manifest.json
 ├── chrome.manifest
 ├── build.sh
+├── prefs.js                      # default diag pref
+├── locale/en-US/bluebook-citations-fixer.ftl
+├── tests/run-node-tests.js       # pure helper tests for ambiguity + rewrites
 └── lib/
     ├── rtf.js                    # escape, italic(), plainish projection, findPlainOffset
     ├── cite.js                   # CSL_CITATION parse, authorKey, shortTitle, position
     ├── diag.js                   # /tmp log, gated on extensions.bluebook-citations-fixer.diag pref
+    ├── ui.js                     # Tools-menu status popup + recent event buffer
     ├── session-run.js            # per-run context cached on currentSession (ambiguity map)
     ├── patch.js                  # monkey-patch Field.prototype.setText + run feature chain
     └── features/
@@ -141,7 +145,7 @@ Returning a string replaces `ctx.text`; returning undefined is a pass-through. F
 
 ### Per-run ambiguity map
 
-`BCF.run.forSession(session)` lazily walks `session.citationsByIndex` once per run and caches `{ ambiguousKeys, items, firstCiteSeen }` on the session object under a non-enumerable `__bluebookCitationsFixer` key. All features can read it without recomputing.
+`BCF.run.forSession(session)` lazily walks `session.citationsByIndex` once per run and caches `{ ambiguousKeys, items, firstCiteSeen }` on the session object under a non-enumerable `__bluebookCitationsFixer` key. Zotero's `citationsByIndex` is an object keyed by field index, not necessarily an array, so iterate it with `BCF.run.citationsInOrder(session)`. All features can read the cached context without recomputing.
 
 ### RTF conventions
 
@@ -158,7 +162,7 @@ Every feature must be idempotent — `setText` fires on every refresh and we'll 
 
 ### Diagnostics
 
-Off by default. Set `extensions.bluebook-citations-fixer.diag = true` in about:config, restart Zotero, and lines appear in `/tmp/bluebook-citations-fixer-diag.txt`. Errors always surface via `Components.utils.reportError` regardless of the pref.
+Off by default via root `prefs.js`. Set `extensions.bluebook-citations-fixer.diag = true` in about:config, restart Zotero, and lines appear in `/tmp/bluebook-citations-fixer-diag.txt`. Errors always surface via `Components.utils.reportError` regardless of the pref. The status menu item records recent startup, patch, setText, skip, and rewrite events even when file diagnostics are disabled.
 
 ### Known limitations
 
