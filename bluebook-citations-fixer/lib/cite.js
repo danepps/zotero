@@ -87,6 +87,17 @@ BCF.cite.idOf = function (citOrJson) {
     return citOrJson.citationID || (citOrJson.properties && citOrJson.properties.citationID) || "";
 };
 
+// Best-effort note index extraction from a live citation/session object.
+BCF.cite.noteIndexOf = function (citOrJson) {
+    if (!citOrJson) return 0;
+    var p = citOrJson.properties || {};
+    var v = citOrJson.noteIndex != null ? citOrJson.noteIndex
+        : (p.noteIndex != null ? p.noteIndex
+        : (p.noteIndexAtInsertion != null ? p.noteIndexAtInsertion : 0));
+    v = Number(v);
+    return isNaN(v) ? 0 : v;
+};
+
 // Regex-escape helper.
 BCF.cite.escapeRegex = function (s) {
     return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
