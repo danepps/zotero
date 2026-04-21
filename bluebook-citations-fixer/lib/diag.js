@@ -63,9 +63,15 @@ BCF.diag.log = function () {
     BCF.diag._append(parts.join(" ") + "\n");
 };
 
+BCF.diag.event = function (kind, data) {
+    try { if (BCF.ui) BCF.ui.record(kind, data); } catch (_) {}
+    BCF.diag.log("[" + kind + "]", data == null ? "" : data);
+};
+
 BCF.diag.err = function (tag, e) {
     var s = "[ERR " + tag + "] " + String(e);
     if (e && e.stack) s += "\n" + e.stack;
     try { Components.utils.reportError("bluebook-citations-fixer: " + s); } catch (_) {}
     if (BCF.diag.enabled) BCF.diag._append(s + "\n");
+    try { if (BCF.ui) BCF.ui.record("error", tag + ": " + String(e)); } catch (_) {}
 };
