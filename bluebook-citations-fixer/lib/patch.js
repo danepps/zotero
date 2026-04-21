@@ -44,7 +44,7 @@ BCF.patch.install = function () {
             .then(function (rewritten) { return origCall(rewritten); });
     };
     Field.prototype.__lcfPatched = true;
-    BCF.diag.log("patch installed on Zotero.Integration.Field.prototype.setText");
+    BCF.diag.event("patch", "installed on Zotero.Integration.Field.prototype.setText");
 };
 
 BCF.patch.uninstall = function () {
@@ -66,8 +66,18 @@ BCF.patch.uninstall = function () {
 // Run the feature chain for a single setText call. Returns the (possibly
 // rewritten) RTF string.
 BCF.patch.run = async function (field, text) {
+    BCF.diag.event("setText", "len=" + (text ? text.length : 0));
+
     var session = Zotero.Integration.currentSession;
-    if (!session) return text;
+    if (!session) {
+        BCF.diag.event("skip", "no currentSession");
+        return text;
+    }
+
+    if (session.outputFormat && session.outputFormat !== "rtf") {
+        BCF.diag.event("skip", "non-RTF output: " + session.outputFormat);
+        return text;
+    }
 
     // Only touch citation clusters. Bibliography also flows through setText,
     // but it has different semantics and we don't want to rewrite it.
@@ -78,10 +88,20 @@ BCF.patch.run = async function (field, text) {
         BCF.diag.err("getCode", e);
         return text;
     }
-    if (!code || code.indexOf("CSL_CITATION") === -1) return text;
+    if (!code || code.indexOf("CSL_CITATION") === -1) {
+        BCF.diag.event("skip", "not a CSL_CITATION field");
+        return text;
+    }
 
     var codeJson = BCF.cite.parseFieldCode(code);
     if (!codeJson || !codeJson.citationItems || !codeJson.citationItems.length) {
+        BCF.diag.event("skip", "no citationItems in field code");
+        return text;
+    }
+
+    var run = BCF.run.forSession(session);
+    if (!run || !run.ambiguousKeys || !run.ambiguousKeys.size) {
+        BCF.diag.event("skip", "empty ambiguity map");
         return text;
     }
 
@@ -89,7 +109,7 @@ BCF.patch.run = async function (field, text) {
         session: session,
         field: field,
         codeJson: codeJson,
-        run: BCF.run.forSession(session),
+        run: run,
         text: text,
         rtf: BCF.rtf
     };
@@ -99,10 +119,14 @@ BCF.patch.run = async function (field, text) {
         var feat = list[i];
         try {
             var out = feat.rewrite(ctx);
-            if (typeof out === "string") ctx.text = out;
+            if (typeof out === "string" && out !== ctx.text) {
+                BCF.diag.event("rewrite:" + (feat && feat.id), "applied");
+                ctx.text = out;
+            }
         } catch (e) {
             BCF.diag.err("feature:" + (feat && feat.id), e);
         }
     }
+    if (ctx.text === text) BCF.diag.event("skip", "no rewrite");
     return ctx.text;
 };
