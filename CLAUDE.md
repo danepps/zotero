@@ -17,6 +17,8 @@ Update CLAUDE.md in the same change as the code whenever any of the following sh
 
 Do not let it drift. Stale guidance is worse than no guidance.
 
+`AGENTS.md` at the repo root is the Codex-facing sister file and mirrors the architecture sections below. When you change anything in "Repository layout", "Build / release", "bluebook-hereinafter architecture", or "bluebook-citations-fixer architecture" here, apply the same edit to `AGENTS.md` in the same commit. The two files exist for different agents but describe one codebase; they must agree.
+
 ## Repository layout
 
 Each top-level directory is a separate Zotero 7/9 bootstrap plugin. They share no code — each has its own `manifest.json`, `bootstrap.js`, and `chrome.manifest`.
