@@ -28,18 +28,25 @@ load("lib/features/hereinafter.js");
 
 const BCF = context.BCF;
 
-function cit(id, authorFamily, shortTitle, title, position) {
+function cit(id, authorFamily, shortTitle, title, position, authors) {
     const item = {
         id,
         uris: [`http://zotero.org/users/local/items/${id}`],
         itemData: {
-            author: [{ family: authorFamily }],
+            author: authors || [{ family: authorFamily }],
             "title-short": shortTitle,
             title
         }
     };
     if (position !== undefined) item.position = position;
     return item;
+}
+
+function citation(noteIndex, citationItems) {
+    return {
+        citationItems,
+        properties: { noteIndex }
+    };
 }
 
 function buildRun(citationsByIndex) {
@@ -50,30 +57,94 @@ function buildRun(citationsByIndex) {
     const a = cit("A", "Epps", "Checks", "Checks and Balances");
     const b = cit("B", "Epps", "Asymmetry", "Adversarial Asymmetry");
     const run = buildRun({
-        2: { citationItems: [b] },
-        1: { citationItems: [a] }
+        2: citation(1, [b]),
+        1: citation(1, [a])
     });
     assert.strictEqual(run.ambiguousKeys.size, 2);
-    assert(BCF.run.isAmbiguous(run, a));
-    assert(BCF.run.isAmbiguous(run, b));
+    assert.strictEqual(run.sameFootnoteKeys.size, 2);
+    assert(BCF.run.shouldUseHereinafter(run, a));
+    assert(BCF.run.shouldUseHereinafter(run, b));
 }
 
 {
     const a = cit("A", "Epps", "Checks", "Checks and Balances");
     const b = cit("B", "Reich", "Property", "The New Property");
     const run = buildRun({
-        1: { citationItems: [a] },
-        2: { citationItems: [b] }
+        1: citation(1, [a]),
+        2: citation(2, [b])
     });
     assert.strictEqual(run.ambiguousKeys.size, 0);
+    assert.strictEqual(run.eligibleKeys.size, 0);
 }
 
 {
     const a = cit("A", "Epps", "Checks", "Checks and Balances");
     const b = cit("B", "Epps", "Asymmetry", "Adversarial Asymmetry");
     const run = buildRun({
-        1: { citationItems: [a] },
-        2: { citationItems: [b] }
+        1: citation(1, [a]),
+        2: citation(2, [b])
+    });
+    assert.strictEqual(run.ambiguousKeys.size, 2);
+    assert.strictEqual(run.sameFootnoteKeys.size, 0);
+    assert.strictEqual(run.thresholdKeys.size, 0);
+    assert.strictEqual(run.eligibleKeys.size, 0);
+}
+
+{
+    const a = cit("A", "Epps", "Checks", "Checks and Balances");
+    const b = cit("B", "Epps", "Asymmetry", "Adversarial Asymmetry");
+    const run = buildRun({
+        1: citation(1, [a]),
+        2: citation(2, [b]),
+        3: citation(3, [a]),
+        4: citation(4, [b]),
+        5: citation(5, [a]),
+        6: citation(6, [b])
+    });
+    assert.strictEqual(run.thresholdKeys.size, 2);
+    assert(BCF.run.shouldUseHereinafter(run, a));
+    assert(BCF.run.shouldUseHereinafter(run, b));
+}
+
+{
+    const a = cit("A", "Epps", "Checks", "Checks and Balances");
+    const b = cit("B", "Epps", "Asymmetry", "Adversarial Asymmetry");
+    const c = cit("C", "Epps", "Third", "Third Article");
+    const run = buildRun({
+        1: citation(1, [a]),
+        2: citation(2, [b]),
+        3: citation(3, [a]),
+        4: citation(4, [b]),
+        5: citation(5, [a]),
+        6: citation(6, [b]),
+        7: citation(7, [c])
+    });
+    assert(BCF.run.shouldUseHereinafter(run, a));
+    assert(BCF.run.shouldUseHereinafter(run, b));
+    assert(!BCF.run.shouldUseHereinafter(run, c));
+}
+
+{
+    const coauthors = [{ family: "Epps" }, { family: "Nelson" }];
+    const a = cit("A", "Epps", "Checks", "Checks and Balances", undefined, coauthors);
+    const b = cit("B", "Epps", "Asymmetry", "Adversarial Asymmetry", undefined, coauthors);
+    const c = cit("C", "Epps", "Solo", "Solo Piece");
+    const run = buildRun({
+        1: citation(1, [a]),
+        2: citation(1, [b]),
+        3: citation(2, [c])
+    });
+    assert(BCF.run.shouldUseHereinafter(run, a));
+    assert(BCF.run.shouldUseHereinafter(run, b));
+    assert(!BCF.run.shouldUseHereinafter(run, c));
+}
+
+{
+    const a = cit("A", "Epps", "Checks", "Checks and Balances");
+    const b = cit("B", "Epps", "Asymmetry", "Adversarial Asymmetry");
+    const run = buildRun({
+        1: citation(1, [a]),
+        2: citation(1, [b])
     });
     const out = BCF.features.hereinafter.rewrite({
         codeJson: { citationItems: [a] },
@@ -91,8 +162,8 @@ function buildRun(citationsByIndex) {
     const a = cit("A", "Epps", "Checks", "Checks and Balances", 1);
     const b = cit("B", "Epps", "Asymmetry", "Adversarial Asymmetry");
     const run = buildRun({
-        1: { citationItems: [a] },
-        2: { citationItems: [b] }
+        1: citation(1, [a]),
+        2: citation(1, [b])
     });
     const out = BCF.features.hereinafter.rewrite({
         codeJson: { citationItems: [a] },
@@ -107,8 +178,8 @@ function buildRun(citationsByIndex) {
     const a = cit("A", "Epps", "Checks", "Checks and Balances");
     const b = cit("B", "Epps", "Asymmetry", "Adversarial Asymmetry", 1);
     const run = buildRun({
-        1: { citationItems: [a] },
-        2: { citationItems: [b] }
+        1: citation(1, [a]),
+        2: citation(1, [b])
     });
     const first = "Dan Epps, Checks and Balances [hereinafter {\\i{}Checks}]";
     const subsequent = "Epps, {\\i{}Asymmetry}, supra note 4";
@@ -130,7 +201,7 @@ function buildRun(citationsByIndex) {
     const a = cit("A", "Epps", "Checks", "Checks and Balances");
     const b = cit("B", "Epps", "Asymmetry", "Adversarial Asymmetry");
     const run = buildRun({
-        1: { citationItems: [a, b] }
+        1: citation(1, [a, b])
     });
     const out = BCF.features.hereinafter.rewrite({
         codeJson: { citationItems: [a, b] },
