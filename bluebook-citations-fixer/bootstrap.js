@@ -24,9 +24,17 @@ function uninstall() {}
 async function startup(data) {
     var rootURI = data.rootURI;
     try {
-        Zotero = Components.classes["@zotero.org/Zotero;1"]
-            .getService(Components.interfaces.nsISupports)
-            .wrappedJSObject;
+        var bootZotero = null;
+        if (typeof globalThis.Zotero !== "undefined" && globalThis.Zotero) {
+            bootZotero = globalThis.Zotero;
+        } else if (Components.classes["@zotero.org/Zotero;1"]) {
+            bootZotero = Components.classes["@zotero.org/Zotero;1"]
+                .getService(Components.interfaces.nsISupports)
+                .wrappedJSObject;
+        } else {
+            throw new Error("Zotero bootstrap global is unavailable");
+        }
+        Zotero = bootZotero;
         await Zotero.initializationPromise;
 
         BCF = {
