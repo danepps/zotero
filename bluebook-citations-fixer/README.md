@@ -1,5 +1,9 @@
 # Bluebook Citations Fixer
 
+> ⚠️ **Beta / experimental.** This plugin is in active development and
+> likely buggy. Install only if you want to help beta test and are
+> comfortable reporting issues. Back up any document you run it against.
+
 Zotero plugin that rewrites rendered citation text to apply Bluebook rules
 that are awkward or impossible to express cleanly in CSL alone.
 
