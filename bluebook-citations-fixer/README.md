@@ -43,4 +43,4 @@ that are awkward or impossible to express cleanly in CSL alone.
 
 - `0.1.5`
 - Git tag: `bluebook-cite-v0.1.5`
-- GitHub release asset: `Bluebook_Citations_Fixer_v0.1.5.xpi`
+- GitHub release asset: [Bluebook_Citations_Fixer_v0.1.5.xpi](https://github.com/danepps/zotero/releases/download/bluebook-cite-v0.1.5/Bluebook_Citations_Fixer_v0.1.5.xpi)
