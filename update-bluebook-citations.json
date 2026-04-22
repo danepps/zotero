@@ -4,7 +4,7 @@
       "updates": [
         {
           "version": "0.1.5",
-          "update_link": "https://github.com/danepps/zotero/releases/download/bluebook-cite-v0.1.5/Bluebook_Citations_Fixer_v0.1.5.xpi",
+          "update_link": "https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.1.5/Bluebook_Citations_Fixer_v0.1.5.xpi",
           "applications": {
             "zotero": {
               "strict_min_version": "6.999"
