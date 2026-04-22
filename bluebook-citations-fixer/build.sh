@@ -12,7 +12,8 @@ zip -r "$OUT" \
     prefs.js \
     bootstrap.js \
     locale \
-    lib
+    lib \
+    COPYING.txt
 echo "Built $OUT"
 echo "Next steps:"
 echo "  1. Create GitHub release tagged bluebook-citations-fixer-v${VERSION}"
