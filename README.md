@@ -20,6 +20,39 @@ while the prefix field is focused to insert a Bluebook signal
 
 ---
 
+## Bluebook Citations Fixer
+
+Rewrites Zotero's citation output inside the integration pipeline to apply
+Bluebook rules that CSL alone can't express cleanly. Runs automatically on
+every insert/refresh.
+
+**Install:** Download [Bluebook_Citations_Fixer_v0.1.5.xpi](https://github.com/danepps/zotero/releases/download/bluebook-cite-v0.1.5/Bluebook_Citations_Fixer_v0.1.5.xpi)
+
+**Current rules:**
+
+- **Hereinafter (Rule 4.2(b))** — When a document cites multiple works by
+  the same author, appends `[hereinafter <i>Short Title</i>]` to each
+  work's first full cite and rewrites subsequent `supra note` cites to
+  include the short title (e.g. `Epps, supra note 1` →
+  `Epps, <i>Adversarial Asymmetry</i>, supra note 1`). Skips `Id.` cites,
+  including signal-prefixed forms like `See id.`
+- **Journal volume/year** — Suppresses the trailing `(YYYY)` parenthetical
+  for journal articles when the volume number itself is a four-digit
+  year-like value.
+- **Book `, at`** — When a book title ends in a numeral, rewrites bare page
+  locators into the Bluebook `, at <page>` form to avoid ambiguous output
+  like `... 1868 45 (2006)`.
+
+**Platform:** Word and LibreOffice (RTF output). Google Docs not yet
+supported.
+
+**Status:** v0.1.5 (early). Intended to replace Bluebook Hereinafter below
+once validated — it runs inside the Zotero pipeline rather than
+post-processing the Word document via AppleScript, so it works
+cross-platform.
+
+---
+
 ## Bluebook Hereinafter
 
 Auto-applies Bluebook Rule 4.2(b) "hereinafter" handling in Word documents.
