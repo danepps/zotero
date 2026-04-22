@@ -8,7 +8,7 @@ A signal picker for the citation dialog prefix field. Press **Ctrl+S**
 while the prefix field is focused to insert a Bluebook signal 
 (*See*, *E.g.*, *Accord*, etc.).
 
-**Install:** Download [Bluebook_Signals_v3.0.0.xpi](https://github.com/danepps/zotero/releases/tag/bluebook-signals-v3.0.0)
+**More info and install:** [danepps.github.io/zotero/bluebook-signals](https://danepps.github.io/zotero/bluebook-signals/)
 
 **Usage:**
 1. Open the Add Citation dialog in your word processor
