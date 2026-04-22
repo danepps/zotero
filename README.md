@@ -22,6 +22,10 @@ while the prefix field is focused to insert a Bluebook signal
 
 ## Bluebook Citations Fixer
 
+> ⚠️ **Beta / experimental.** This plugin is in active development and
+> likely buggy. Install only if you want to help beta test and are
+> comfortable reporting issues. Back up any document you run it against.
+
 Rewrites Zotero's citation output inside the integration pipeline to apply
 Bluebook rules that CSL alone can't express cleanly. Runs automatically on
 every insert/refresh.
@@ -45,41 +49,6 @@ every insert/refresh.
 
 **Platform:** Word and LibreOffice (RTF output). Google Docs not yet
 supported.
-
-**Status:** v0.1.5 (early). Intended to replace Bluebook Hereinafter below
-once validated — it runs inside the Zotero pipeline rather than
-post-processing the Word document via AppleScript, so it works
-cross-platform.
-
----
-
-## Bluebook Hereinafter
-
-Auto-applies Bluebook Rule 4.2(b) "hereinafter" handling in Word documents.
-When the same author has two or more distinct works cited, the plugin:
-
-- Appends ` [hereinafter <i>Short Title</i>]` to each work's first full cite
-- Rewrites later short-form cites from `Reich, supra note 5` to
-  `Reich, <i>New Property</i>, supra note 5`
-
-**Install:** Download [Bluebook_Hereinafter_v0.1.8.xpi](https://github.com/danepps/zotero/releases/tag/hereinafter-v0.1.8)
-
-Short titles come from each item's **Short Title** field in Zotero (with
-the full title as fallback). The plugin runs automatically after every
-Zotero insert/refresh and is also exposed as **Tools &rarr; Fix Hereinafters**
-for manual invocation.
-
-**Platform:** macOS + Microsoft Word only (AppleScript).
-
-**Status:** v0.1.8 (early). Known limitations:
-- Mac/Word only for now
-- Multi-cite fields (two works in one citation) append both hereinafters
-  at the end of the combined field rather than inline per work
-- Brief visual flicker during refresh (plugin re-writes after Zotero paints)
-- Italicizes short titles uniformly; book titles in Bluebook actually use
-  small caps
-- Ambiguity grouping is by surname list only (no handling of editor-as-author
-  or institutional authors yet)
 
 ---
 
