@@ -15,6 +15,6 @@ zip -r "$OUT" \
     lib
 echo "Built $OUT"
 echo "Next steps:"
-echo "  1. Create GitHub release tagged bluebook-cite-v${VERSION}"
+echo "  1. Create GitHub release tagged bluebook-citations-fixer-v${VERSION}"
 echo "  2. Upload the XPI as a release asset"
 echo "  3. Push update-bluebook-citations.json so the update URL serves this release"

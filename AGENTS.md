@@ -43,7 +43,7 @@ Each writes `releases/<Name>_v<version>.xpi` inside the plugin dir. The `release
 Shipping a real release requires three things in lock-step:
 1. Create a GitHub release with the XPI attached. Tag conventions:
    - `bluebook-hereinafter` → `hereinafter-v<version>`
-   - `bluebook-citations-fixer` → `bluebook-cite-v<version>`
+   - `bluebook-citations-fixer` → `bluebook-citations-fixer-v<version>`
 2. Update the matching `update-*.json` at the repo root (`update-hereinafter.json`, `update-bluebook-citations.json`) with the new version + download link.
 3. Push to main so GitHub Pages serves the updated JSON.
 
