@@ -40,7 +40,7 @@ async function startup(data) {
         BCF = {
             rootURI: rootURI,
             id: data.id || "bluebook-citations-fixer@danepps.com",
-            version: data.version || "0.1.6",
+            version: data.version || "0.1.7",
             features: {},
             startupError: null
         };
