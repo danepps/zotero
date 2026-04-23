@@ -1,16 +1,16 @@
 "use strict";
 
-// Lightweight status UI for field-hook debugging. Zotero 7+ exposes
-// MenuManager; older builds fall back to direct Tools-menu insertion.
+// Lightweight status UI for field-hook debugging. Appends a menuitem to
+// the Tools menu via direct DOM insertion — Zotero.MenuManager only
+// accepts an l10nID, which would require registering our FTL with the
+// document's localization; direct insertion lets us use a static label.
 
 BCF.ui = {};
 
 BCF.ui.MENU_ID = "bluebook-citations-fixer-status-menuitem";
-BCF.ui.MENU_L10N_ID = "bluebook-citations-fixer-status-menuitem";
 BCF.ui.MENU_LABEL = "Bluebook Citations Fixer: Status";
 BCF.ui._buffer = [];
 BCF.ui._bufferMax = 200;
-BCF.ui._menuManagerIDs = [];
 BCF.ui._windowWatcher = null;
 
 BCF.ui.record = function (kind, data) {
@@ -74,65 +74,43 @@ BCF.ui.showStatus = function () {
 };
 
 BCF.ui.install = function () {
-    if (BCF.ui._installMenuManager()) return;
     BCF.ui._installManualMenu();
 };
 
 BCF.ui.uninstall = function () {
-    BCF.ui._uninstallMenuManager();
     BCF.ui._uninstallManualMenu();
 };
 
-BCF.ui._installMenuManager = function () {
-    try {
-        if (!Zotero.MenuManager || typeof Zotero.MenuManager.registerMenu !== "function") {
-            return false;
-        }
-        var menuID = Zotero.MenuManager.registerMenu({
-            menuID: BCF.ui.MENU_ID,
-            pluginID: BCF.id,
-            target: "main/menubar/tools",
-            menus: [
-                {
-                    menuType: "menuitem",
-                    label: BCF.ui.MENU_LABEL,
-                    onCommand: function () { BCF.ui.showStatus(); }
-                }
-            ]
-        });
-        if (menuID) BCF.ui._menuManagerIDs.push(menuID);
-        BCF.ui.record("ui", "MenuManager status item installed");
-        return true;
-    } catch (e) {
-        BCF.ui.record("ui", "MenuManager unavailable: " + e);
-        return false;
-    }
-};
+BCF.ui.WINDOW_TYPES = ["navigator:browser", "zotero:main"];
 
-BCF.ui._uninstallMenuManager = function () {
+BCF.ui._eachMainWindow = function (fn) {
+    var seen = new Set();
     try {
-        if (!Zotero.MenuManager || typeof Zotero.MenuManager.unregisterMenu !== "function") {
-            BCF.ui._menuManagerIDs = [];
-            return;
-        }
-        for (var i = 0; i < BCF.ui._menuManagerIDs.length; i++) {
-            try { Zotero.MenuManager.unregisterMenu(BCF.ui._menuManagerIDs[i]); } catch (_) {}
-        }
+        var main = Zotero.getMainWindow && Zotero.getMainWindow();
+        if (main && !seen.has(main)) { seen.add(main); fn(main); }
     } catch (_) {}
-    BCF.ui._menuManagerIDs = [];
+    for (var i = 0; i < BCF.ui.WINDOW_TYPES.length; i++) {
+        try {
+            var wins = Services.wm.getEnumerator(BCF.ui.WINDOW_TYPES[i]);
+            while (wins.hasMoreElements()) {
+                var w = wins.getNext();
+                if (!seen.has(w)) { seen.add(w); fn(w); }
+            }
+        } catch (_) {}
+    }
 };
 
 BCF.ui._installManualMenu = function () {
     try {
-        var wins = Services.wm.getEnumerator("navigator:browser");
-        while (wins.hasMoreElements()) BCF.ui._addManualMenuItem(wins.getNext());
+        BCF.ui._eachMainWindow(function (w) { BCF.ui._addManualMenuItem(w); });
         BCF.ui._windowWatcher = {
             observe: function (subject, topic) {
                 if (topic !== "domwindowopened") return;
                 subject.addEventListener("load", function onLoad() {
                     subject.removeEventListener("load", onLoad);
                     var root = subject.document && subject.document.documentElement;
-                    if (root && root.getAttribute("windowtype") === "navigator:browser") {
+                    var wt = root && root.getAttribute("windowtype");
+                    if (wt && BCF.ui.WINDOW_TYPES.indexOf(wt) !== -1) {
                         BCF.ui._addManualMenuItem(subject);
                     }
                 });
@@ -152,10 +130,7 @@ BCF.ui._uninstallManualMenu = function () {
             BCF.ui._windowWatcher = null;
         }
     } catch (_) {}
-    try {
-        var wins = Services.wm.getEnumerator("navigator:browser");
-        while (wins.hasMoreElements()) BCF.ui._removeManualMenuItem(wins.getNext());
-    } catch (_) {}
+    BCF.ui._eachMainWindow(function (w) { BCF.ui._removeManualMenuItem(w); });
 };
 
 BCF.ui._addManualMenuItem = function (win) {
