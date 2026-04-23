@@ -95,6 +95,7 @@ BCF.ui._installMenuManager = function () {
             menus: [
                 {
                     menuType: "menuitem",
+                    label: BCF.ui.MENU_LABEL,
                     l10nID: BCF.ui.MENU_L10N_ID,
                     onCommand: function () { BCF.ui.showStatus(); }
                 }
