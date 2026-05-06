@@ -182,7 +182,7 @@ async function runPatch(session, codeJson, text) {
     });
     assert.strictEqual(
         out,
-        "Dan Epps, Checks and Balances [hereinafter {\\i{}Checks}]"
+        "Dan Epps, Checks and Balances [hereinafter Epps, {\\i{}Checks}]"
     );
 }
 
@@ -209,7 +209,7 @@ async function runPatch(session, codeJson, text) {
         1: citation(1, [a]),
         2: citation(1, [b])
     });
-    const first = "Dan Epps, Checks and Balances [hereinafter {\\i{}Checks}]";
+    const first = "Dan Epps, Checks and Balances [hereinafter Epps, {\\i{}Checks}]";
     const subsequent = "Epps, {\\i{}Asymmetry}, supra note 4";
     assert.strictEqual(BCF.features.hereinafter.rewrite({
         codeJson: { citationItems: [a] },
@@ -271,9 +271,76 @@ async function runPatch(session, codeJson, text) {
     });
     assert.strictEqual(
         out,
-        "Dan Epps, Checks and Balances [hereinafter {\\i{}Checks}]; " +
-            "Dan Epps, Adversarial Asymmetry [hereinafter {\\i{}Asymmetry}]"
+        "Dan Epps, Checks and Balances [hereinafter Epps, {\\i{}Checks}]; " +
+            "Dan Epps, Adversarial Asymmetry [hereinafter Epps, {\\i{}Asymmetry}]"
     );
+}
+
+{
+    // Two-author work: "Surname1 & Surname2, ShortTitle".
+    const coauthors = [{ family: "Epps" }, { family: "Nelson" }];
+    const a = cit("CA", "Epps", "Checks", "Checks and Balances", undefined, coauthors);
+    const b = cit("CB", "Epps", "Asymmetry", "Adversarial Asymmetry", undefined, coauthors);
+    const run = buildRun({
+        1: citation(1, [a]),
+        2: citation(1, [b])
+    });
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: "Daniel Epps & William Ortman, Checks and Balances",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Daniel Epps & William Ortman, Checks and Balances " +
+            "[hereinafter Epps & Nelson, {\\i{}Checks}]"
+    );
+}
+
+{
+    // Three-author work: "Surname1 et al., ShortTitle" with italic "et al.".
+    const triauthors = [
+        { family: "Epps" },
+        { family: "Nelson" },
+        { family: "Ortman" }
+    ];
+    const a = cit("TA", "Epps", "Checks", "Checks and Balances", undefined, triauthors);
+    const b = cit("TB", "Epps", "Asymmetry", "Adversarial Asymmetry", undefined, triauthors);
+    const run = buildRun({
+        1: citation(1, [a]),
+        2: citation(1, [b])
+    });
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: "Daniel Epps et al., Checks and Balances",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Daniel Epps et al., Checks and Balances " +
+            "[hereinafter Epps {\\i{}et al.}, {\\i{}Checks}]"
+    );
+}
+
+{
+    // Idempotency: a document already rewritten under the legacy form
+    // ("[hereinafter <ShortTitle>]") must not get a second hereinafter
+    // appended on reprocessing.
+    const a = cit("LA", "Epps", "Checks", "Checks and Balances");
+    const b = cit("LB", "Epps", "Asymmetry", "Adversarial Asymmetry");
+    const run = buildRun({
+        1: citation(1, [a]),
+        2: citation(1, [b])
+    });
+    const legacy = "Dan Epps, Checks and Balances [hereinafter {\\i{}Checks}]";
+    assert.strictEqual(BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: legacy,
+        rtf: BCF.rtf
+    }), legacy);
 }
 
 {
