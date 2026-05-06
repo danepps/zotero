@@ -3,7 +3,7 @@
 // Feature: Bluebook Rule 4.2(b) "hereinafter".
 //
 // When a document cites multiple works by the same author:
-//   First cite: append  [hereinafter <i>Short Title</i>]
+//   First cite: append  [hereinafter Author, <i>Short Title</i>]
 //   Subsequent cite:    rewrite "Author, supra note N"
 //                       to       "Author, <i>Short Title</i>, supra note N"
 //
@@ -62,7 +62,7 @@ BCF.features.hereinafter = {
 
             var seg = segments[j];
             var newSeg = BCF.features.hereinafter._rewriteSegment(
-                seg.text, item, shortTitle
+                seg.text, item, data, shortTitle
             );
             if (newSeg !== null && newSeg !== seg.text) {
                 seg.text = newSeg;
@@ -84,7 +84,7 @@ BCF.features.hereinafter = {
         return out;
     },
 
-    _rewriteSegment: function (segRtf, citItem, shortTitle) {
+    _rewriteSegment: function (segRtf, citItem, itemData, shortTitle) {
         // Dispatch: subsequent-cite path (by citeproc position OR text-match
         // on "supra note", since citeproc sometimes reports position=0 for
         // short-form cites) vs. first-cite path.
@@ -94,7 +94,7 @@ BCF.features.hereinafter = {
         if (isSubsequent) {
             return BCF.features.hereinafter._rewriteSubsequent(segRtf, shortTitle);
         }
-        return BCF.features.hereinafter._rewriteFirst(segRtf, shortTitle);
+        return BCF.features.hereinafter._rewriteFirst(segRtf, itemData, shortTitle);
     },
 
     _hasSupraNote: function (rtf) {
@@ -105,11 +105,14 @@ BCF.features.hereinafter = {
         return /\bid\./i.test(BCF.rtf.plainish(rtf));
     },
 
-    _rewriteFirst: function (segRtf, shortTitle) {
+    _rewriteFirst: function (segRtf, itemData, shortTitle) {
         var plain = BCF.rtf.plainish(segRtf);
-        // Idempotency: already has "[hereinafter <shortTitle>]" (loose).
+        // Idempotency: already has "[hereinafter ...<shortTitle>...]" (loose).
+        // Matches both the legacy form ("[hereinafter <ShortTitle>]") and the
+        // current form ("[hereinafter Author, <ShortTitle>]") so we don't
+        // double-inject when reprocessing a document.
         var rx = new RegExp(
-            "\\[hereinafter\\s+" + BCF.cite.escapeRegex(shortTitle) + "\\s*\\]",
+            "\\[hereinafter\\b[^\\]]*" + BCF.cite.escapeRegex(shortTitle) + "[^\\]]*\\]",
             "i"
         );
         if (rx.test(plain)) return null;
@@ -119,7 +122,24 @@ BCF.features.hereinafter = {
 
         // Append inline RTF. setText wraps the whole string in {\rtf ...} if
         // needed; inline groups are fine.
-        return segRtf + " [hereinafter " + BCF.rtf.italic(shortTitle) + "]";
+        var authorPrefix = BCF.features.hereinafter._authorPrefix(itemData);
+        var inside = (authorPrefix ? authorPrefix + ", " : "") +
+            BCF.rtf.italic(shortTitle);
+        return segRtf + " [hereinafter " + inside + "]";
+    },
+
+    // Bluebook short-form author rendering (rule 15.1, applied inside the
+    // hereinafter bracket): single surname, "X & Y" for two authors, and
+    // "X et al." (with italicized "et al.") for three or more.
+    _authorPrefix: function (itemData) {
+        var surnames = BCF.cite.surnames(itemData);
+        if (!surnames.length) return "";
+        if (surnames.length === 1) return BCF.rtf.escape(surnames[0]);
+        if (surnames.length === 2) {
+            return BCF.rtf.escape(surnames[0]) + " & " +
+                BCF.rtf.escape(surnames[1]);
+        }
+        return BCF.rtf.escape(surnames[0]) + " " + BCF.rtf.italic("et al.");
     },
 
     _rewriteSubsequent: function (segRtf, shortTitle) {
