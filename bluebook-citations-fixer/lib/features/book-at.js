@@ -29,7 +29,11 @@ BCF.features.bookAt = {
         for (var i = 0; i < items.length; i++) {
             var item = items[i];
             var data = BCF.run.itemData(run, item);
-            var title = BCF.cite.shortTitle(data);
+            // The rendered first-cite uses the long-form title, so anchor
+            // the regex on its trailing numeral — not `title-short`, which
+            // a user may have abbreviated (e.g. "Stites") and which would
+            // otherwise make the feature silently no-op.
+            var title = BCF.cite.fullTitle(data);
             var locator = item && item.locator != null ? String(item.locator).trim() : "";
             var label = item && item.label != null ? String(item.label).trim().toLowerCase() : "";
             var titleEndsInNumeral = BCF.cite.titleEndsInNumeral(data);

@@ -545,6 +545,33 @@ async function runPatch(session, codeJson, text) {
     }), text);
 }
 
+{
+    // Regression: when a book has a short title that doesn't end in a
+    // numeral but the long-form title does, the rendered first-cite still
+    // ends in "<title-numeral> <locator>" and book-at must rewrite.
+    const book = cit(
+        "B4",
+        "Stites",
+        "Stites",
+        "Private Interest and Public Gain: The Dartmouth College Case, 1819",
+        undefined,
+        undefined,
+        { type: "book" }
+    );
+    book.locator = "78";
+    const run = buildRun({ 1: citation(1, [book]) });
+    const out = BCF.features.bookAt.rewrite({
+        codeJson: { citationItems: [book] },
+        run,
+        text: "Francis N. Stites, Private Interest and Public Gain: The Dartmouth College Case, 1819 78",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Francis N. Stites, Private Interest and Public Gain: The Dartmouth College Case, 1819, at 78"
+    );
+}
+
 (async function () {
     {
         const journal = cit(

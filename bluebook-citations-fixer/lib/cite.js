@@ -79,6 +79,16 @@ BCF.cite.shortTitle = function (itemData) {
     return BCF.cite.normalizeTitleMarkup(itemData["title-short"] || itemData.title || "");
 };
 
+// Full title as rendered in a first-cite. Prefers `title`; falls back to
+// `title-short`. Use this whenever you need the form CSL emits in long-form
+// citations (e.g. "ends in a numeral?" predicates that operate on the
+// rendered cluster) — `shortTitle` would lie when the user has a
+// `title-short` that doesn't preserve the numeral tail.
+BCF.cite.fullTitle = function (itemData) {
+    if (!itemData) return "";
+    return BCF.cite.normalizeTitleMarkup(itemData.title || itemData["title-short"] || "");
+};
+
 BCF.cite.itemType = function (itemData) {
     if (!itemData) return "";
     return String(itemData.type || itemData.itemType || "").toLowerCase();
@@ -102,7 +112,9 @@ BCF.cite.isJournalArticleLike = function (itemData) {
 };
 
 BCF.cite.titleEndsInNumeral = function (itemData) {
-    var title = BCF.cite.shortTitle(itemData);
+    // Operates on the long-form (first-cite) title because that's what CSL
+    // renders into the cluster text book-at then rewrites.
+    var title = BCF.cite.fullTitle(itemData);
     return /\d\s*$/.test(title);
 };
 
