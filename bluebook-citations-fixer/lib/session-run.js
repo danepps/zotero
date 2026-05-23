@@ -44,16 +44,12 @@ BCF.run.forSession = function (session) {
     return ctx;
 };
 
-// Lazily fetch CSL JSON for a citationItem when the live integration object
-// doesn't carry `itemData`. Zotero 10's integration session attaches the item
-// id but defers populating `itemData` until after citeproc runs, which is
-// after our prewrite hook fires — so without this fallback the run map ends
-// up empty and every feature silently bails.
-BCF.run._cslFor = function (citItem) {
+// Fetch current CSL JSON directly from Zotero.Items, bypassing any itemData
+// snapshot embedded in the citationItem. Used by _build so that library edits
+// (e.g. changing a short title) are reflected on the next Refresh without
+// requiring the user to re-insert the citation.
+BCF.run._fetchLibraryData = function (citItem) {
     if (!citItem) return null;
-    if (citItem.itemData && Object.keys(citItem.itemData).length) {
-        return citItem.itemData;
-    }
     var id = citItem.id;
     if (id == null) return null;
     try {
@@ -68,9 +64,22 @@ BCF.run._cslFor = function (citItem) {
             return Zotero.Utilities.itemToCSLJSON(item);
         }
     } catch (e) {
-        try { BCF.diag.err("cslFor:" + id, e); } catch (_) {}
+        try { BCF.diag.err("fetchLibraryData:" + id, e); } catch (_) {}
     }
     return null;
+};
+
+// Lazily fetch CSL JSON for a citationItem when the live integration object
+// doesn't carry `itemData`. Zotero 10's integration session attaches the item
+// id but defers populating `itemData` until after citeproc runs, which is
+// after our prewrite hook fires — so without this fallback the run map ends
+// up empty and every feature silently bails.
+BCF.run._cslFor = function (citItem) {
+    if (!citItem) return null;
+    if (citItem.itemData && Object.keys(citItem.itemData).length) {
+        return citItem.itemData;
+    }
+    return BCF.run._fetchLibraryData(citItem);
 };
 
 BCF.run._build = function (session) {
@@ -93,20 +102,22 @@ BCF.run._build = function (session) {
         for (var ci = 0; ci < itemsArr.length; ci++) {
             var ci_ = itemsArr[ci];
             var data;
-            if (ci_.itemData && Object.keys(ci_.itemData).length) {
+            // Prefer fresh data from the library so edits to a Zotero item
+            // (e.g. changing a short title) are picked up on the next Refresh
+            // without the user needing to re-insert the citation. The itemData
+            // embedded in the field-code snapshot is used only as a fallback
+            // when the live fetch fails (item deleted, unavailable, etc.).
+            var freshData = BCF.run._fetchLibraryData(ci_);
+            if (freshData) {
+                data = freshData;
+                enriched++;
+                try { ci_.itemData = freshData; } catch (_) {}
+            } else if (ci_.itemData && Object.keys(ci_.itemData).length) {
                 data = ci_.itemData;
                 liveHadData++;
             } else {
-                data = BCF.run._cslFor(ci_);
-                if (data) {
-                    enriched++;
-                    // Cache on the live citationItem so the setText path
-                    // (and later runs) sees it without re-fetching.
-                    try { ci_.itemData = data; } catch (_) {}
-                } else {
-                    noData++;
-                    data = {};
-                }
+                noData++;
+                data = {};
             }
             var key = BCF.cite.itemKey(ci_);
             var authorKey = BCF.cite.authorKey(data);

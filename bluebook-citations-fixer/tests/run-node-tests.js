@@ -463,6 +463,59 @@ function eligibleRun(initialCitationsByIndex, items) {
 }
 
 {
+    // Regression: editing a short title in Zotero and refreshing the doc must
+    // use the new title even though the field-code snapshot still has the old
+    // one. _build must prefer a fresh Zotero.Items fetch over ci_.itemData.
+    const staleData = { author: [{ family: "Epps" }], "title-short": "OldShort", title: "Checks and Balances" };
+    const freshData = { author: [{ family: "Epps" }], "title-short": "NewShort", title: "Checks and Balances" };
+    const otherData = { author: [{ family: "Epps" }], "title-short": "Asymmetry", title: "Adversarial Asymmetry" };
+    const aStale = { id: 8001, uris: ["http://zotero.org/users/local/items/ST1"], itemData: staleData, position: 0 };
+    const bOther = { id: 8002, uris: ["http://zotero.org/users/local/items/ST2"], itemData: otherData, position: 0 };
+
+    const savedItems = Zotero.Items;
+    const savedUtils = Zotero.Utilities;
+    Zotero.Items = {
+        get: function (id) {
+            if (id === 8001) return { id: 8001 };
+            if (id === 8002) return { id: 8002 };
+            return null;
+        }
+    };
+    Zotero.Utilities = {
+        itemToCSLJSON: function (item) {
+            if (item.id === 8001) return freshData;
+            if (item.id === 8002) return otherData;
+            return null;
+        }
+    };
+
+    const run = BCF.run.forSession({
+        citationsByIndex: {
+            1: citation(1, [aStale, bOther]),
+            2: citation(2, [aStale]),
+            3: citation(3, [bOther])
+        },
+        outputFormat: "rtf"
+    });
+
+    Zotero.Items = savedItems;
+    Zotero.Utilities = savedUtils;
+
+    assert.strictEqual(BCF.run.itemData(run, aStale)["title-short"], "NewShort");
+
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [aStale] },
+        run,
+        text: "Dan Epps, Checks and Balances",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Dan Epps, Checks and Balances [hereinafter Epps, {\\i{}NewShort}]"
+    );
+}
+
+{
     assert.strictEqual(
         BCF.cite.shortTitle({
             "title-short": "<i>Katz</i> as Originalism",
