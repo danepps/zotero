@@ -64,7 +64,7 @@ async function startup(data) {
         BCF = {
             rootURI: rootURI,
             id: data.id || "bluebook-citations-fixer@danepps.com",
-            version: data.version || "0.1.13",
+            version: data.version || "0.1.14",
             features: {},
             startupError: null,
             Zotero: Zot

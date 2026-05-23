@@ -21,7 +21,11 @@ BCF.features.bookAt = {
 
         var segments = BCF.rtf.segments(text, items.length);
         if (!segments) {
-            BCF.diag.event("skip:book-at", "could not split multi-cite cluster");
+            BCF.diag.event("book-at:skip", {
+                reason: "segments-mismatch",
+                expected: items.length,
+                plain: BCF.rtf.plainish(text).slice(0, 200)
+            });
             return text;
         }
 
@@ -38,7 +42,16 @@ BCF.features.bookAt = {
             var label = item && item.label != null ? String(item.label).trim().toLowerCase() : "";
             var titleEndsInNumeral = BCF.cite.titleEndsInNumeral(data);
 
-            if (!titleEndsInNumeral) continue;
+            if (!titleEndsInNumeral) {
+                BCF.diag.event("book-at:skip", {
+                    reason: "title-not-numeric",
+                    key: BCF.cite.itemKey(item),
+                    title: title,
+                    type: BCF.cite.itemType(data),
+                    hasData: !!data && !!Object.keys(data).length
+                });
+                continue;
+            }
 
             var seg = segments[i];
             var inferredLocator = BCF.features.bookAt._inferLocator(BCF.rtf.plainish(seg.text));
@@ -50,10 +63,14 @@ BCF.features.bookAt = {
                     label !== "page-first" &&
                     label !== "page-subsequent" &&
                     label !== "locator") {
+                BCF.diag.event("book-at:skip", { reason: "label-mismatch", label: label });
                 continue;
             }
 
-            if (!locator) continue;
+            if (!locator) {
+                BCF.diag.event("book-at:skip", { reason: "no-locator", title: title });
+                continue;
+            }
             var newSeg = BCF.features.bookAt._rewriteSegment(seg.text, locator, title);
             if (newSeg !== null && newSeg !== seg.text) {
                 seg.text = newSeg;
@@ -61,6 +78,12 @@ BCF.features.bookAt = {
                 BCF.diag.event("book-at:rewrite", {
                     before: BCF.rtf.plainish(text),
                     after: BCF.rtf.plainish(newSeg)
+                });
+            } else {
+                BCF.diag.event("book-at:no-replace", {
+                    title: title,
+                    locator: locator,
+                    plainTail: BCF.rtf.plainish(seg.text).slice(-80)
                 });
             }
         }
