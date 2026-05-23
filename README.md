@@ -30,25 +30,29 @@ Rewrites Zotero's citation output inside the integration pipeline to apply
 Bluebook rules that CSL alone can't express cleanly. Runs automatically on
 every insert/refresh.
 
-**Install:** Download [Bluebook_Citations_Fixer_v0.1.10.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.1.10/Bluebook_Citations_Fixer_v0.1.10.xpi)
+**Install:** Download [Bluebook_Citations_Fixer_v0.1.14.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.1.14/Bluebook_Citations_Fixer_v0.1.14.xpi)
 
 **Current rules:**
 
 - **Hereinafter (Rule 4.2(b))** — When a document cites multiple works by
-  the same author, appends `[hereinafter <i>Short Title</i>]` to each
-  work's first full cite and rewrites subsequent `supra note` cites to
-  include the short title (e.g. `Epps, supra note 1` →
-  `Epps, <i>Adversarial Asymmetry</i>, supra note 1`). Skips `Id.` cites,
-  including signal-prefixed forms like `See id.`
+  the same author *and* at least one of them is referenced subsequently,
+  appends `[hereinafter Author, <i>Short Title</i>]` to the first full
+  cite and rewrites subsequent `supra note` cites to include the short
+  title (e.g. `Epps, supra note 1` →
+  `Epps, <i>Adversarial Asymmetry</i>, supra note 1`). Books render the
+  author surname and short title in large-and-small caps (per Bluebook
+  rules 15.1, 16, B14) instead of italics; "et al." stays italic. Skips
+  `Id.` cites, including signal-prefixed forms like `See id.`
 - **Journal volume/year** — Suppresses the trailing `(YYYY)` parenthetical
   for journal articles when the volume number itself is a four-digit
   year-like value.
 - **Book `, at`** — When a book title ends in a numeral, rewrites bare page
   locators into the Bluebook `, at <page>` form to avoid ambiguous output
-  like `... 1868 45 (2006)`.
+  like `... 1868 45 (2006)`. Works regardless of what follows the pincite
+  (`(YYYY)`, `(rev. ed. 2005)`, `(Sarah Smith ed., 2010)`, etc.).
 
-**Platform:** Word and LibreOffice (RTF output). Google Docs not yet
-supported.
+**Platform:** Word and LibreOffice (RTF output) on Zotero 7 and Zotero 10
+beta. Google Docs not yet supported.
 
 ---
 

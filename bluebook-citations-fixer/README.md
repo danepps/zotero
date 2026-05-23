@@ -10,15 +10,27 @@ that are awkward or impossible to express cleanly in CSL alone.
 ## Current Features
 
 - Hereinafter support for ambiguous same-author works
-  - First full cite gets `[hereinafter ...]`
+  - First full cite gets `[hereinafter Author, <short title>]`
   - Subsequent `supra note` cites get the short title inserted before
     `supra note`
+  - Only fires when the work actually has a subsequent cite — no
+    `[hereinafter Short]` tags on works that are never referenced again
+  - Book-like items render the author surname and short title in
+    large-and-small caps (`{\scaps ...}`) per Bluebook rules 15.1, 16,
+    and B14; "et al." stays italic
   - `Id.` cites, including signal-prefixed forms such as `See id.`, should
     never get a hereinafter append
 - Suppress the trailing year parenthetical for journal articles when the
   volume itself is a four-digit year-like number
 - Insert `, at` for qualifying citations when a title ends in a numeral and
-  the rendered cite would otherwise look like `... 1868 45 (2006)`
+  the rendered cite would otherwise look like `... 1868 45 (2006)`. Works
+  regardless of what follows the pincite — `(YYYY)`, `(rev. ed. 2005)`,
+  `(Sarah Smith ed., 2010)`, citing-parentheticals, or nothing at all.
+
+## Compatibility
+
+Zotero 7 and Zotero 10 beta on macOS, Windows, and Linux. RTF output
+only — Word and LibreOffice work; Google Docs is not yet supported.
 
 ## Architecture
 
@@ -45,6 +57,6 @@ that are awkward or impossible to express cleanly in CSL alone.
 
 ## Latest Released Version
 
-- `0.1.10`
-- Git tag: `bluebook-citations-fixer-v0.1.10`
-- GitHub release asset: [Bluebook_Citations_Fixer_v0.1.10.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.1.10/Bluebook_Citations_Fixer_v0.1.10.xpi)
+- `0.1.14`
+- Git tag: `bluebook-citations-fixer-v0.1.14`
+- GitHub release asset: [Bluebook_Citations_Fixer_v0.1.14.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.1.14/Bluebook_Citations_Fixer_v0.1.14.xpi)
