@@ -3,8 +3,8 @@
     "bluebook-citations-fixer@danepps.com": {
       "updates": [
         {
-          "version": "0.1.11",
-          "update_link": "https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.1.11/Bluebook_Citations_Fixer_v0.1.11.xpi",
+          "version": "0.1.12",
+          "update_link": "https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.1.12/Bluebook_Citations_Fixer_v0.1.12.xpi",
           "applications": {
             "zotero": {
               "strict_min_version": "6.999"
