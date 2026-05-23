@@ -7,6 +7,10 @@
 //   Subsequent cite:    rewrite "Author, supra note N"
 //                       to       "Author, <i>Short Title</i>, supra note N"
 //
+// For book-like items the author surname and short title are rendered in
+// large-and-small capitals (`{\scaps ...}`) instead of italics, per Bluebook
+// rules 15.1 and 16. "Et al." remains italic in both cases.
+//
 // Operates on the RTF string Zotero is about to write for a single cluster.
 // Multi-item clusters ("A; B") are split on "; " so each hereinafter lands
 // inline after its own sub-cite.
@@ -61,8 +65,9 @@ BCF.features.hereinafter = {
             }
 
             var seg = segments[j];
+            var isBook = BCF.cite.isBookLike(data);
             var newSeg = BCF.features.hereinafter._rewriteSegment(
-                seg.text, item, data, shortTitle
+                seg.text, item, data, shortTitle, isBook
             );
             if (newSeg !== null && newSeg !== seg.text) {
                 seg.text = newSeg;
@@ -84,7 +89,7 @@ BCF.features.hereinafter = {
         return out;
     },
 
-    _rewriteSegment: function (segRtf, citItem, itemData, shortTitle) {
+    _rewriteSegment: function (segRtf, citItem, itemData, shortTitle, isBook) {
         // Dispatch: subsequent-cite path (by citeproc position OR text-match
         // on "supra note", since citeproc sometimes reports position=0 for
         // short-form cites) vs. first-cite path.
@@ -92,9 +97,9 @@ BCF.features.hereinafter = {
             BCF.features.hereinafter._hasSupraNote(segRtf);
 
         if (isSubsequent) {
-            return BCF.features.hereinafter._rewriteSubsequent(segRtf, shortTitle);
+            return BCF.features.hereinafter._rewriteSubsequent(segRtf, shortTitle, isBook);
         }
-        return BCF.features.hereinafter._rewriteFirst(segRtf, itemData, shortTitle);
+        return BCF.features.hereinafter._rewriteFirst(segRtf, itemData, shortTitle, isBook);
     },
 
     _hasSupraNote: function (rtf) {
@@ -105,7 +110,7 @@ BCF.features.hereinafter = {
         return /\bid\./i.test(BCF.rtf.plainish(rtf));
     },
 
-    _rewriteFirst: function (segRtf, itemData, shortTitle) {
+    _rewriteFirst: function (segRtf, itemData, shortTitle, isBook) {
         var plain = BCF.rtf.plainish(segRtf);
         // Idempotency: already has "[hereinafter ...<shortTitle>...]" (loose).
         // Matches both the legacy form ("[hereinafter <ShortTitle>]") and the
@@ -122,27 +127,30 @@ BCF.features.hereinafter = {
 
         // Append inline RTF. setText wraps the whole string in {\rtf ...} if
         // needed; inline groups are fine.
-        var authorPrefix = BCF.features.hereinafter._authorPrefix(itemData);
-        var inside = (authorPrefix ? authorPrefix + ", " : "") +
-            BCF.rtf.italic(shortTitle);
+        var authorPrefix = BCF.features.hereinafter._authorPrefix(itemData, isBook);
+        var titleFrag = isBook ? BCF.rtf.smallCaps(shortTitle) : BCF.rtf.italic(shortTitle);
+        var inside = (authorPrefix ? authorPrefix + ", " : "") + titleFrag;
         return segRtf + " [hereinafter " + inside + "]";
     },
 
     // Bluebook short-form author rendering (rule 15.1, applied inside the
     // hereinafter bracket): single surname, "X & Y" for two authors, and
-    // "X et al." (with italicized "et al.") for three or more.
-    _authorPrefix: function (itemData) {
+    // "X et al." (with italicized "et al.") for three or more. For books the
+    // surname(s) are rendered in large-and-small caps; "et al." stays italic.
+    _authorPrefix: function (itemData, isBook) {
         var surnames = BCF.cite.surnames(itemData);
         if (!surnames.length) return "";
-        if (surnames.length === 1) return BCF.rtf.escape(surnames[0]);
+        var name = isBook ? BCF.rtf.smallCaps : BCF.rtf.escape;
+        if (surnames.length === 1) return name(surnames[0]);
         if (surnames.length === 2) {
-            return BCF.rtf.escape(surnames[0]) + " & " +
-                BCF.rtf.escape(surnames[1]);
+            return isBook
+                ? BCF.rtf.smallCaps(surnames[0] + " & " + surnames[1])
+                : BCF.rtf.escape(surnames[0]) + " & " + BCF.rtf.escape(surnames[1]);
         }
-        return BCF.rtf.escape(surnames[0]) + " " + BCF.rtf.italic("et al.");
+        return name(surnames[0]) + " " + BCF.rtf.italic("et al.");
     },
 
-    _rewriteSubsequent: function (segRtf, shortTitle) {
+    _rewriteSubsequent: function (segRtf, shortTitle, isBook) {
         var plain = BCF.rtf.plainish(segRtf);
         // Idempotency: short title already appears before "supra note".
         var beforeSupra = new RegExp(
@@ -157,7 +165,8 @@ BCF.features.hereinafter = {
         var rtfOffset = BCF.rtf.findPlainOffset(segRtf, needle);
         if (rtfOffset < 0) return null;
 
-        var injection = ", " + BCF.rtf.italic(shortTitle);
+        var titleFrag = isBook ? BCF.rtf.smallCaps(shortTitle) : BCF.rtf.italic(shortTitle);
+        var injection = ", " + titleFrag;
         return segRtf.slice(0, rtfOffset) + injection + segRtf.slice(rtfOffset);
     }
 };

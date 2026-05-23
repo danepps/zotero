@@ -68,10 +68,22 @@ BCF.diag.event = function (kind, data) {
     BCF.diag.log("[" + kind + "]", data == null ? "" : data);
 };
 
+// Recurring errors (e.g. Zotero 10 changed Field._code so every setText hit
+// throws "this._code.indexOf is not a function") would otherwise spam the
+// Error Console. Track a per-(tag + message) seen-set and downgrade
+// duplicates to file-only logging.
+BCF.diag._errSeen = Object.create(null);
+
 BCF.diag.err = function (tag, e) {
-    var s = "[ERR " + tag + "] " + String(e);
+    var msg = String(e);
+    var s = "[ERR " + tag + "] " + msg;
     if (e && e.stack) s += "\n" + e.stack;
-    try { Components.utils.reportError("bluebook-citations-fixer: " + s); } catch (_) {}
+    var key = tag + "::" + msg;
+    var firstTime = !BCF.diag._errSeen[key];
+    if (firstTime) {
+        BCF.diag._errSeen[key] = true;
+        try { Components.utils.reportError("bluebook-citations-fixer: " + s); } catch (_) {}
+    }
     if (BCF.diag.enabled) BCF.diag._append(s + "\n");
-    try { if (BCF.ui) BCF.ui.record("error", tag + ": " + String(e)); } catch (_) {}
+    try { if (BCF.ui) BCF.ui.record("error", tag + ": " + msg); } catch (_) {}
 };

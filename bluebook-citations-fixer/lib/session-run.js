@@ -8,7 +8,10 @@
 // by field index; each value holds the full CSL_CITATION shape.
 //
 // Hereinafter eligibility is computed once per run and stashed on the session.
-// A work qualifies when either:
+// A work qualifies when:
+//   - It has at least one subsequent cite in the document (itemCount >= 2 — a
+//     `[hereinafter Short]` on a work that's never cited again is pointless);
+//     AND either
 //   1. Two or more works with the same exact author list first appear in the
 //      same footnote; or
 //   2. At least two works with that exact author list are each cited three or
@@ -41,12 +44,44 @@ BCF.run.forSession = function (session) {
     return ctx;
 };
 
+// Lazily fetch CSL JSON for a citationItem when the live integration object
+// doesn't carry `itemData`. Zotero 10's integration session attaches the item
+// id but defers populating `itemData` until after citeproc runs, which is
+// after our prewrite hook fires — so without this fallback the run map ends
+// up empty and every feature silently bails.
+BCF.run._cslFor = function (citItem) {
+    if (!citItem) return null;
+    if (citItem.itemData && Object.keys(citItem.itemData).length) {
+        return citItem.itemData;
+    }
+    var id = citItem.id;
+    if (id == null) return null;
+    try {
+        if (typeof Zotero === "undefined" || !Zotero.Items || !Zotero.Items.get) return null;
+        var item = Zotero.Items.get(id);
+        if (!item) return null;
+        var util = Zotero.Utilities && (Zotero.Utilities.Item || Zotero.Utilities.Internal);
+        if (util && typeof util.itemToCSLJSON === "function") {
+            return util.itemToCSLJSON(item);
+        }
+        if (Zotero.Utilities && typeof Zotero.Utilities.itemToCSLJSON === "function") {
+            return Zotero.Utilities.itemToCSLJSON(item);
+        }
+    } catch (e) {
+        try { BCF.diag.err("cslFor:" + id, e); } catch (_) {}
+    }
+    return null;
+};
+
 BCF.run._build = function (session) {
     var items = new Map();              // itemKey -> itemData
     var authorBuckets = new Map();      // authorKey -> Set<itemKey>
     var itemCounts = new Map();         // itemKey -> count
     var itemFirstNotes = new Map();     // itemKey -> first note index
     var noteFirstBuckets = new Map();   // authorKey -> Map<groupKey, Set<itemKey>>
+    var enriched = 0;
+    var liveHadData = 0;
+    var noData = 0;
 
     var citations = BCF.run.citationsInOrder(session);
     for (var i = 0; i < citations.length; i++) {
@@ -57,7 +92,22 @@ BCF.run._build = function (session) {
         var itemsArr = BCF.cite.itemsOf(cit);
         for (var ci = 0; ci < itemsArr.length; ci++) {
             var ci_ = itemsArr[ci];
-            var data = ci_.itemData || {};
+            var data;
+            if (ci_.itemData && Object.keys(ci_.itemData).length) {
+                data = ci_.itemData;
+                liveHadData++;
+            } else {
+                data = BCF.run._cslFor(ci_);
+                if (data) {
+                    enriched++;
+                    // Cache on the live citationItem so the setText path
+                    // (and later runs) sees it without re-fetching.
+                    try { ci_.itemData = data; } catch (_) {}
+                } else {
+                    noData++;
+                    data = {};
+                }
+            }
             var key = BCF.cite.itemKey(ci_);
             var authorKey = BCF.cite.authorKey(data);
             if (!key || !authorKey) continue;
@@ -106,9 +156,18 @@ BCF.run._build = function (session) {
         }
     });
 
+    // A work is only eligible for hereinafter treatment if it actually has a
+    // subsequent cite (count >= 2). Otherwise the `[hereinafter Short]` tag
+    // attaches to a first-and-only cite that nothing ever references — pure
+    // noise. (thresholdKeys requires count >= 3 so the filter is a no-op for
+    // those, but apply it uniformly for clarity.)
     var eligibleKeys = new Set();
-    sameFootnoteKeys.forEach(function (key) { eligibleKeys.add(key); });
-    thresholdKeys.forEach(function (key) { eligibleKeys.add(key); });
+    sameFootnoteKeys.forEach(function (key) {
+        if ((itemCounts.get(key) || 0) >= 2) eligibleKeys.add(key);
+    });
+    thresholdKeys.forEach(function (key) {
+        if ((itemCounts.get(key) || 0) >= 2) eligibleKeys.add(key);
+    });
 
     var ctx = {
         session: session,
@@ -125,6 +184,9 @@ BCF.run._build = function (session) {
     BCF.diag.event("session", {
         citations: citations.length,
         items: items.size,
+        liveHadData: liveHadData,
+        enriched: enriched,
+        noData: noData,
         ambiguous: ambiguousKeys.size,
         sameFootnote: sameFootnoteKeys.size,
         threshold: thresholdKeys.size,
@@ -165,5 +227,14 @@ BCF.run.shouldUseHereinafter = function (ctx, citItem) {
 BCF.run.itemData = function (ctx, citItem) {
     var key = BCF.cite.itemKey(citItem);
     if (ctx && ctx.items && ctx.items.has(key)) return ctx.items.get(key);
-    return citItem.itemData || {};
+    if (citItem && citItem.itemData && Object.keys(citItem.itemData).length) {
+        return citItem.itemData;
+    }
+    var data = BCF.run._cslFor(citItem);
+    if (data) {
+        try { citItem.itemData = data; } catch (_) {}
+        if (ctx && ctx.items && key) ctx.items.set(key, data);
+        return data;
+    }
+    return {};
 };

@@ -21,7 +21,11 @@ BCF.features.bookAt = {
 
         var segments = BCF.rtf.segments(text, items.length);
         if (!segments) {
-            BCF.diag.event("skip:book-at", "could not split multi-cite cluster");
+            BCF.diag.event("book-at:skip", {
+                reason: "segments-mismatch",
+                expected: items.length,
+                plain: BCF.rtf.plainish(text).slice(0, 200)
+            });
             return text;
         }
 
@@ -38,7 +42,16 @@ BCF.features.bookAt = {
             var label = item && item.label != null ? String(item.label).trim().toLowerCase() : "";
             var titleEndsInNumeral = BCF.cite.titleEndsInNumeral(data);
 
-            if (!titleEndsInNumeral) continue;
+            if (!titleEndsInNumeral) {
+                BCF.diag.event("book-at:skip", {
+                    reason: "title-not-numeric",
+                    key: BCF.cite.itemKey(item),
+                    title: title,
+                    type: BCF.cite.itemType(data),
+                    hasData: !!data && !!Object.keys(data).length
+                });
+                continue;
+            }
 
             var seg = segments[i];
             var inferredLocator = BCF.features.bookAt._inferLocator(BCF.rtf.plainish(seg.text));
@@ -50,10 +63,14 @@ BCF.features.bookAt = {
                     label !== "page-first" &&
                     label !== "page-subsequent" &&
                     label !== "locator") {
+                BCF.diag.event("book-at:skip", { reason: "label-mismatch", label: label });
                 continue;
             }
 
-            if (!locator) continue;
+            if (!locator) {
+                BCF.diag.event("book-at:skip", { reason: "no-locator", title: title });
+                continue;
+            }
             var newSeg = BCF.features.bookAt._rewriteSegment(seg.text, locator, title);
             if (newSeg !== null && newSeg !== seg.text) {
                 seg.text = newSeg;
@@ -61,6 +78,12 @@ BCF.features.bookAt = {
                 BCF.diag.event("book-at:rewrite", {
                     before: BCF.rtf.plainish(text),
                     after: BCF.rtf.plainish(newSeg)
+                });
+            } else {
+                BCF.diag.event("book-at:no-replace", {
+                    title: title,
+                    locator: locator,
+                    plainTail: BCF.rtf.plainish(seg.text).slice(-80)
                 });
             }
         }
@@ -83,7 +106,12 @@ BCF.features.bookAt = {
 
         var titleNumeral = titleNumeralMatch[1];
         var escapedTitleNumeral = BCF.cite.escapeRegex(titleNumeral);
-        var tail = "(\\s*\\(\\d{4}\\))?\\s*$";
+        // Whatever follows the locator \u2014 `(2011)`, `(rev. ed. 2005)`,
+        // `(Sarah Smith ed., 2010)`, multiple citing-parentheticals, or nothing
+        // \u2014 is irrelevant to the decision. Anchor on `$` so we always target
+        // the *last* `<sep><locator>` in the segment (the one that's actually
+        // the pincite, not stray locator-shaped digits earlier in the title).
+        var tail = "(?:\\s*\\([^)]*\\))*\\s*$";
         if (new RegExp(escapedTitleNumeral + ",\\s*at\\s+" + escapedLocator + tail, "i").test(plain)) {
             return null;
         }
@@ -91,15 +119,15 @@ BCF.features.bookAt = {
             return null;
         }
         return segRtf.replace(
-            new RegExp("(?:,\\s*|\\s+)(" + escapedLocator + ")(\\s*\\(\\d{4}\\))?\\s*$"),
-            function (_, matchedLocator, yearPart) {
-                return ", at " + matchedLocator + (yearPart || "");
+            new RegExp("(?:,\\s*|\\s+)(" + escapedLocator + ")((?:\\s*\\([^)]*\\))*\\s*)$"),
+            function (_, matchedLocator, trailing) {
+                return ", at " + matchedLocator + trailing;
             }
         );
     },
 
     _inferLocator: function (plain) {
-        var m = /(?:,?\s+)(\d+(?:[-\u2013]\d+)?)(?:\s*\(\d{4}\))?\s*$/.exec(plain || "");
+        var m = /(?:,?\s+)(\d+(?:[-\u2013]\d+)?)(?:\s*\([^)]*\))?\s*$/.exec(plain || "");
         return m ? m[1] : "";
     }
 };

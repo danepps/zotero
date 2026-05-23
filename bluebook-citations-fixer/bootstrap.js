@@ -15,43 +15,68 @@
 // and register it in lib/features/registry.js.
 // ===========================================================================
 
+// Note: do NOT declare `var Zotero;` here. Zotero 10's plugin sandbox injects
+// `Zotero` as a free variable in the bootstrap scope; a module-level `var`
+// would shadow it to undefined, and the legacy
+// `Components.classes["@zotero.org/Zotero;1"]` XPCOM contract was removed in
+// Zotero 10, so the old fallback no longer works either.
 var BCF;          // shared namespace populated by each lib file
-var Zotero;
 
 function install() {}
 function uninstall() {}
 
+// Resolve the Zotero global across Zotero 7 (legacy XPCOM), Zotero 7+ sandbox
+// (globalThis.Zotero), and Zotero 10 sandbox (free `Zotero` in bootstrap
+// scope). Returns the Zotero object or throws.
+function _resolveZotero() {
+    // Zotero 10: free variable injected into the bootstrap sandbox scope.
+    // `typeof` doesn't throw on undeclared names, so this is safe even if
+    // Zotero isn't in scope.
+    try {
+        if (typeof Zotero !== "undefined" && Zotero) return Zotero;
+    } catch (_) {}
+    // Zotero 7: sandbox-as-global exposes it on globalThis.
+    try {
+        if (typeof globalThis.Zotero !== "undefined" && globalThis.Zotero) {
+            return globalThis.Zotero;
+        }
+    } catch (_) {}
+    // Pre-7 fallback. Zotero 10 dropped this contract ID; the guard keeps the
+    // legacy path available for old Zotero builds that still expose it.
+    try {
+        if (typeof Components !== "undefined" &&
+                Components.classes &&
+                Components.classes["@zotero.org/Zotero;1"]) {
+            return Components.classes["@zotero.org/Zotero;1"]
+                .getService(Components.interfaces.nsISupports)
+                .wrappedJSObject;
+        }
+    } catch (_) {}
+    throw new Error("Zotero global is unavailable in the bootstrap scope");
+}
+
 async function startup(data) {
     var rootURI = data.rootURI;
     try {
-        var bootZotero = null;
-        if (typeof globalThis.Zotero !== "undefined" && globalThis.Zotero) {
-            bootZotero = globalThis.Zotero;
-        } else if (Components.classes["@zotero.org/Zotero;1"]) {
-            bootZotero = Components.classes["@zotero.org/Zotero;1"]
-                .getService(Components.interfaces.nsISupports)
-                .wrappedJSObject;
-        } else {
-            throw new Error("Zotero bootstrap global is unavailable");
-        }
-        Zotero = bootZotero;
-        await Zotero.initializationPromise;
+        var Zot = _resolveZotero();
+        await Zot.initializationPromise;
 
         BCF = {
             rootURI: rootURI,
             id: data.id || "bluebook-citations-fixer@danepps.com",
-            version: data.version || "0.1.10",
+            version: data.version || "0.1.14",
             features: {},
-            startupError: null
+            startupError: null,
+            Zotero: Zot
         };
 
         var loadScope = {
-            Zotero: Zotero,
+            Zotero: Zot,
             BCF: BCF,
             Services: Services,
-            Components: Components,
-            Cc: Components.classes,
-            Ci: Components.interfaces
+            Components: typeof Components !== "undefined" ? Components : undefined,
+            Cc: typeof Components !== "undefined" ? Components.classes : undefined,
+            Ci: typeof Components !== "undefined" ? Components.interfaces : undefined
         };
 
         var load = function (path) {
@@ -74,14 +99,27 @@ async function startup(data) {
         BCF.diag.event("startup", "loaded");
         BCF.patch.install();
 
-        Zotero.debug("[bluebook-citations-fixer] startup complete");
+        try { Zot.debug("[bluebook-citations-fixer] startup complete"); } catch (_) {}
     } catch (e) {
         try {
             if (BCF) BCF.startupError = String(e);
-            Components.utils.reportError(
-                "bluebook-citations-fixer startup error: " + e +
-                (e && e.stack ? "\n" + e.stack : "")
-            );
+        } catch (_) {}
+        try {
+            if (typeof Components !== "undefined" && Components.utils && Components.utils.reportError) {
+                Components.utils.reportError(
+                    "bluebook-citations-fixer startup error: " + e +
+                    (e && e.stack ? "\n" + e.stack : "")
+                );
+            } else {
+                // Best-effort fallback for sandboxes without Components.
+                // eslint-disable-next-line no-console
+                if (typeof console !== "undefined" && console.error) {
+                    console.error(
+                        "bluebook-citations-fixer startup error:", e,
+                        e && e.stack ? "\n" + e.stack : ""
+                    );
+                }
+            }
         } catch (_) {}
         try {
             Services.prompt.alert(
