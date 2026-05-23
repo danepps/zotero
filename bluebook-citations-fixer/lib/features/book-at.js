@@ -83,7 +83,12 @@ BCF.features.bookAt = {
 
         var titleNumeral = titleNumeralMatch[1];
         var escapedTitleNumeral = BCF.cite.escapeRegex(titleNumeral);
-        var tail = "(\\s*\\(\\d{4}\\))?\\s*$";
+        // Whatever follows the locator \u2014 `(2011)`, `(rev. ed. 2005)`,
+        // `(Sarah Smith ed., 2010)`, multiple citing-parentheticals, or nothing
+        // \u2014 is irrelevant to the decision. Anchor on `$` so we always target
+        // the *last* `<sep><locator>` in the segment (the one that's actually
+        // the pincite, not stray locator-shaped digits earlier in the title).
+        var tail = "(?:\\s*\\([^)]*\\))*\\s*$";
         if (new RegExp(escapedTitleNumeral + ",\\s*at\\s+" + escapedLocator + tail, "i").test(plain)) {
             return null;
         }
@@ -91,15 +96,15 @@ BCF.features.bookAt = {
             return null;
         }
         return segRtf.replace(
-            new RegExp("(?:,\\s*|\\s+)(" + escapedLocator + ")(\\s*\\(\\d{4}\\))?\\s*$"),
-            function (_, matchedLocator, yearPart) {
-                return ", at " + matchedLocator + (yearPart || "");
+            new RegExp("(?:,\\s*|\\s+)(" + escapedLocator + ")((?:\\s*\\([^)]*\\))*\\s*)$"),
+            function (_, matchedLocator, trailing) {
+                return ", at " + matchedLocator + trailing;
             }
         );
     },
 
     _inferLocator: function (plain) {
-        var m = /(?:,?\s+)(\d+(?:[-\u2013]\d+)?)(?:\s*\(\d{4}\))?\s*$/.exec(plain || "");
+        var m = /(?:,?\s+)(\d+(?:[-\u2013]\d+)?)(?:\s*\([^)]*\))?\s*$/.exec(plain || "");
         return m ? m[1] : "";
     }
 };

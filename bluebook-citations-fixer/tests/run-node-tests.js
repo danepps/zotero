@@ -623,6 +623,62 @@ function eligibleRun(initialCitationsByIndex, items) {
 }
 
 {
+    // Regression: edition-bearing trailing parenthetical like
+    // "(rev. ed. 2005)" must not block book-at. The screenshot from
+    // 2026-05-23 showed Middlekauff's `Glorious Cause` cite ending in
+    // "1763–1789 12 (rev. ed. 2005)" with no `, at` inserted because the
+    // tail-regex only allowed `(YYYY)`.
+    const book = cit(
+        "B1f",
+        "Middlekauff",
+        "Glorious Cause",
+        "The Glorious Cause: The American Revolution, 1763–1789",
+        undefined,
+        undefined,
+        { type: "book" }
+    );
+    book.locator = "12";
+    book.label = "page";
+    const run = buildRun({ 1: citation(1, [book]) });
+    const out = BCF.features.bookAt.rewrite({
+        codeJson: { citationItems: [book] },
+        run,
+        text: "Robert Middlekauff, The Glorious Cause: The American Revolution, 1763–1789 12 (rev. ed. 2005)",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Robert Middlekauff, The Glorious Cause: The American Revolution, 1763–1789, at 12 (rev. ed. 2005)"
+    );
+}
+
+{
+    // Editor parenthetical: "(Sarah Smith ed., 2010)".
+    const book = cit(
+        "B1g",
+        "Jones",
+        "Title 1900",
+        "Some Title 1900",
+        undefined,
+        undefined,
+        { type: "book" }
+    );
+    book.locator = "45";
+    book.label = "page";
+    const run = buildRun({ 1: citation(1, [book]) });
+    const out = BCF.features.bookAt.rewrite({
+        codeJson: { citationItems: [book] },
+        run,
+        text: "Mary Jones, Some Title 1900 45 (Sarah Smith ed., 2010)",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Mary Jones, Some Title 1900, at 45 (Sarah Smith ed., 2010)"
+    );
+}
+
+{
     const book = cit(
         "B2",
         "Epps",
