@@ -732,6 +732,44 @@ function eligibleRun(initialCitationsByIndex, items) {
 }
 
 {
+    // Regression: pincite "403-07" must get ", at" even when the CSL style
+    // renders the range separator as an en-dash. In RTF the en-dash is the
+    // control sequence \uc0\u8211{}; plainish decodes it so the action
+    // check sees an en-dash while escapedLocator had a plain hyphen.
+    const book = cit(
+        "BA_endash",
+        "Jones",
+        "Short",
+        "Some Title Ending in 1900",
+        undefined, undefined,
+        { type: "book" }
+    );
+    book.locator = "403-07";
+    book.label = "page";
+    const run = buildRun({ 1: citation(1, [book]) });
+    const rtfWithEndash = "Mary Jones, Some Title Ending in 1900 403\\uc0\\u8211{}07 (2006)";
+    assert.strictEqual(
+        BCF.features.bookAt.rewrite({
+            codeJson: { citationItems: [book] },
+            run,
+            text: rtfWithEndash,
+            rtf: BCF.rtf
+        }),
+        "Mary Jones, Some Title Ending in 1900, at 403\\uc0\\u8211{}07 (2006)"
+    );
+    // Hyphen form (CSL style preserves hyphen) also works.
+    assert.strictEqual(
+        BCF.features.bookAt.rewrite({
+            codeJson: { citationItems: [book] },
+            run,
+            text: "Mary Jones, Some Title Ending in 1900 403-07 (2006)",
+            rtf: BCF.rtf
+        }),
+        "Mary Jones, Some Title Ending in 1900, at 403-07 (2006)"
+    );
+}
+
+{
     const book = cit(
         "B2",
         "Epps",

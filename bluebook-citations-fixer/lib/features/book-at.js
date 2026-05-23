@@ -99,7 +99,9 @@ BCF.features.bookAt = {
     },
 
     _rewriteSegment: function (segRtf, locator, title) {
-        var escapedLocator = BCF.cite.escapeRegex(locator);
+        // Normalize hyphens/en-dashes so a range like "403-07" also matches
+        // when the CSL style renders it as "403\u201307" (en-dash) in the output.
+        var escapedLocator = BCF.cite.escapeRegex(locator).replace(/[-\u2013]/g, "[-\u2013]");
         var plain = BCF.rtf.plainish(segRtf);
         var titleNumeralMatch = /(\d+)\s*$/.exec(title || "");
         if (!titleNumeralMatch) return null;
@@ -118,12 +120,16 @@ BCF.features.bookAt = {
         if (!new RegExp(escapedTitleNumeral + "(?:,\\s*|\\s+)" + escapedLocator + tail, "i").test(plain)) {
             return null;
         }
-        return segRtf.replace(
-            new RegExp("(?:,\\s*|\\s+)(" + escapedLocator + ")((?:\\s*\\([^)]*\\))*\\s*)$"),
-            function (_, matchedLocator, trailing) {
-                return ", at " + matchedLocator + trailing;
-            }
-        );
+        // Use findPlainOffset to locate the separator in the RTF rather than
+        // searching for the locator itself: the locator in the RTF may use a
+        // different separator (en-dash as \uc0\u8211{}) than item.locator (hyphen).
+        var sepNeedle = new RegExp("(?:,\\s*|\\s+)(?:" + escapedLocator + ")" + tail, "i");
+        var mSep = sepNeedle.exec(plain);
+        if (!mSep) return null;
+        var sepLength = /^(?:,\s*|\s+)/.exec(mSep[0])[0].length;
+        var rtfSepStart = BCF.rtf.findPlainOffset(segRtf, sepNeedle);
+        if (rtfSepStart < 0) return null;
+        return segRtf.slice(0, rtfSepStart) + ", at " + segRtf.slice(rtfSepStart + sepLength);
     },
 
     _inferLocator: function (plain) {
