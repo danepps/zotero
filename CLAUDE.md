@@ -99,7 +99,7 @@ Each feature is a plain object registered in `lib/features/registry.js` with two
 - `rewrite(ctx)` — called by the `Field.setText` hook for each individual field write.
 - `rewriteCitation(ctx)` — called by the `Session._updateDocument` prewrite pass for each cluster in `session.citationsByIndex`.
 
-Both receive a similar ctx; they typically delegate to a shared `rewriteText(text, codeJson, run)` helper. The current chain order is `hereinafter` → `journal-volume-year` → `book-at`.
+Both receive a similar ctx; they typically delegate to a shared `rewriteText(text, codeJson, run)` helper. The current chain order is `journal-volume-year` → `book-at` → `hereinafter`. **Hereinafter runs last on purpose:** it appends `[hereinafter ...]` to the end of a segment, and both `journal-volume-year` (strips trailing `(YYYY)`) and `book-at` (rewrites trailing `<numeral> <locator>`) anchor on `$`, so they must see the un-bracketed tail first.
 
 ```
 ctx = {
@@ -120,16 +120,19 @@ Returning a string replaces `ctx.text`; returning undefined is a pass-through. F
 
 `BCF.run.forSession(session)` lazily walks `session.citationsByIndex` once per run and caches `{ items, authorBuckets, itemCounts, itemFirstNotes, ambiguousKeys, sameFootnoteKeys, thresholdKeys, eligibleKeys, log }` on the session object under a non-enumerable `__bluebookCitationsFixer` key. Zotero's `citationsByIndex` is an object keyed by field index, not necessarily an array, so iterate it with `BCF.run.citationsInOrder(session)`.
 
-Hereinafter-specific eligibility triggers (`BCF.run.shouldUseHereinafter` → `eligibleKeys`): a work qualifies when either (1) two or more works with the same author list first appear in the same footnote (`sameFootnoteKeys`), or (2) at least two works with that author list are each cited `BCF.run.FREQUENCY_THRESHOLD` (3) or more times in the document (`thresholdKeys`). Other features should consult their own predicates and must not gate on `eligibleKeys`.
+Hereinafter-specific eligibility triggers (`BCF.run.shouldUseHereinafter` → `eligibleKeys`): a work qualifies when either (1) two or more works with the same author list first appear in the same footnote (`sameFootnoteKeys`), or (2) at least two works with that author list are each cited `BCF.run.FREQUENCY_THRESHOLD` (3) or more times in the document (`thresholdKeys`). In **both** cases the work must itself appear more than once in the document (`itemCounts >= 2`) — `[hereinafter Short]` on a work that's never cited again is noise. Other features should consult their own predicates and must not gate on `eligibleKeys`.
 
 ### RTF conventions
 
 Zotero hands RTF to the integration bridge using citeproc-js's RTF output format:
 - italics = `{\i{}TEXT}`
+- large-and-small caps = `{\scaps TEXT}`
 - escape `\` `{` `}` as `\\` `\{` `\}`
 - non-ASCII as `\uc0\uNNNN{}` (decimal codepoint)
 
-`BCF.rtf.italic(s)` and `BCF.rtf.escape(s)` produce the right fragments. `BCF.rtf.plainish(rtf)` collapses RTF to a plain-text projection for idempotency checks and anchor matching (e.g. finding `, supra note`). `BCF.rtf.findPlainOffset(rtf, re)` gives the RTF index corresponding to the first plainish-projection match, so injections land at the correct character even when there are `\uNNNN{}` escapes or italic groups before the match.
+`BCF.rtf.italic(s)`, `BCF.rtf.smallCaps(s)`, and `BCF.rtf.escape(s)` produce the right fragments. `BCF.rtf.plainish(rtf)` collapses RTF to a plain-text projection for idempotency checks and anchor matching (e.g. finding `, supra note`). `BCF.rtf.findPlainOffset(rtf, re)` gives the RTF index corresponding to the first plainish-projection match, so injections land at the correct character even when there are `\uNNNN{}` escapes or italic groups before the match.
+
+Hereinafter uses small caps for book-like items (`BCF.cite.isBookLike` → `book`, `chapter`, `entry-encyclopedia`, etc.) and italics for everything else, per Bluebook rules 15.1, 16, and B14. "Et al." stays italic in both cases.
 
 ### Idempotency
 
@@ -144,4 +147,3 @@ Off by default via root `prefs.js`. Set `extensions.bluebook-citations-fixer.dia
 - RTF output only — Google Docs (HTML output format) is not yet covered. Adding it is a branch on `session.outputFormat` inside `lib/rtf.js` + feature code that consults it.
 - Multi-cite splitting relies on the `; ` literal separator in the RTF. If a user's CSL style uses a different `cite-group-delimiter`, multi-item clusters will fall back to pass-through.
 - Ambiguity grouping is by author-surname list only — no handling of editor-as-author or institutional authors yet.
-- Small caps not supported; short titles are italicized uniformly.

@@ -8,7 +8,10 @@
 // by field index; each value holds the full CSL_CITATION shape.
 //
 // Hereinafter eligibility is computed once per run and stashed on the session.
-// A work qualifies when either:
+// A work qualifies when:
+//   - It has at least one subsequent cite in the document (itemCount >= 2 — a
+//     `[hereinafter Short]` on a work that's never cited again is pointless);
+//     AND either
 //   1. Two or more works with the same exact author list first appear in the
 //      same footnote; or
 //   2. At least two works with that exact author list are each cited three or
@@ -106,9 +109,18 @@ BCF.run._build = function (session) {
         }
     });
 
+    // A work is only eligible for hereinafter treatment if it actually has a
+    // subsequent cite (count >= 2). Otherwise the `[hereinafter Short]` tag
+    // attaches to a first-and-only cite that nothing ever references — pure
+    // noise. (thresholdKeys requires count >= 3 so the filter is a no-op for
+    // those, but apply it uniformly for clarity.)
     var eligibleKeys = new Set();
-    sameFootnoteKeys.forEach(function (key) { eligibleKeys.add(key); });
-    thresholdKeys.forEach(function (key) { eligibleKeys.add(key); });
+    sameFootnoteKeys.forEach(function (key) {
+        if ((itemCounts.get(key) || 0) >= 2) eligibleKeys.add(key);
+    });
+    thresholdKeys.forEach(function (key) {
+        if ((itemCounts.get(key) || 0) >= 2) eligibleKeys.add(key);
+    });
 
     var ctx = {
         session: session,

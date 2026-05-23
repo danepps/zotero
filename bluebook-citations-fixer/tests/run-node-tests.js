@@ -82,6 +82,10 @@ async function runPatch(session, codeJson, text) {
 }
 
 {
+    // Same FN, no subsequent cite anywhere in the document: even though both
+    // works share an author and first appear together, neither is eligible
+    // for hereinafter — a [hereinafter Short] on a work that's never cited
+    // again is pure noise.
     const a = cit("A", "Epps", "Checks", "Checks and Balances");
     const b = cit("B", "Epps", "Asymmetry", "Adversarial Asymmetry");
     const run = buildRun({
@@ -90,6 +94,19 @@ async function runPatch(session, codeJson, text) {
     });
     assert.strictEqual(run.ambiguousKeys.size, 2);
     assert.strictEqual(run.sameFootnoteKeys.size, 2);
+    assert(!BCF.run.shouldUseHereinafter(run, a));
+    assert(!BCF.run.shouldUseHereinafter(run, b));
+}
+
+{
+    // Same FN with at least one subsequent cite for each work: both eligible.
+    const a = cit("A2", "Epps", "Checks", "Checks and Balances");
+    const b = cit("B2", "Epps", "Asymmetry", "Adversarial Asymmetry");
+    const run = buildRun({
+        1: citation(1, [a, b]),
+        2: citation(2, [a]),
+        3: citation(3, [b])
+    });
     assert(BCF.run.shouldUseHereinafter(run, a));
     assert(BCF.run.shouldUseHereinafter(run, b));
 }
@@ -160,20 +177,37 @@ async function runPatch(session, codeJson, text) {
     const run = buildRun({
         1: citation(1, [a]),
         2: citation(1, [b]),
-        3: citation(2, [c])
+        3: citation(2, [c]),
+        4: citation(3, [a]),
+        5: citation(4, [b])
     });
     assert(BCF.run.shouldUseHereinafter(run, a));
     assert(BCF.run.shouldUseHereinafter(run, b));
     assert(!BCF.run.shouldUseHereinafter(run, c));
 }
 
+// Helper: build a session where each work in `items` has at least one
+// subsequent cite (so all are hereinafter-eligible under the count>=2 rule).
+// Extra subsequent cites land in successive footnotes after the supplied
+// initial cluster(s).
+function eligibleRun(initialCitationsByIndex, items) {
+    const byIndex = Object.assign({}, initialCitationsByIndex);
+    const existingKeys = Object.keys(byIndex).map(Number).filter((n) => !isNaN(n));
+    let nextIdx = (existingKeys.length ? Math.max(...existingKeys) : 0) + 1;
+    let nextNote = nextIdx;
+    items.forEach((item) => {
+        byIndex[nextIdx++] = citation(nextNote++, [item]);
+    });
+    return buildRun(byIndex);
+}
+
 {
     const a = cit("A", "Epps", "Checks", "Checks and Balances");
     const b = cit("B", "Epps", "Asymmetry", "Adversarial Asymmetry");
-    const run = buildRun({
+    const run = eligibleRun({
         1: citation(1, [a]),
         2: citation(1, [b])
-    });
+    }, [a, b]);
     const out = BCF.features.hereinafter.rewrite({
         codeJson: { citationItems: [a] },
         run,
@@ -189,10 +223,10 @@ async function runPatch(session, codeJson, text) {
 {
     const a = cit("A", "Epps", "Checks", "Checks and Balances", 1);
     const b = cit("B", "Epps", "Asymmetry", "Adversarial Asymmetry");
-    const run = buildRun({
+    const run = eligibleRun({
         1: citation(1, [a]),
         2: citation(1, [b])
-    });
+    }, [a, b]);
     const out = BCF.features.hereinafter.rewrite({
         codeJson: { citationItems: [a] },
         run,
@@ -205,10 +239,10 @@ async function runPatch(session, codeJson, text) {
 {
     const a = cit("A", "Epps", "Checks", "Checks and Balances");
     const b = cit("B", "Epps", "Asymmetry", "Adversarial Asymmetry", 1);
-    const run = buildRun({
+    const run = eligibleRun({
         1: citation(1, [a]),
         2: citation(1, [b])
-    });
+    }, [a, b]);
     const first = "Dan Epps, Checks and Balances [hereinafter Epps, {\\i{}Checks}]";
     const subsequent = "Epps, {\\i{}Asymmetry}, supra note 4";
     assert.strictEqual(BCF.features.hereinafter.rewrite({
@@ -228,10 +262,10 @@ async function runPatch(session, codeJson, text) {
 {
     const a = cit("Aid", "Kerr", "Theory", "An Equilibrium-Adjustment Theory of the Fourth Amendment");
     const b = cit("Bid", "Kerr", "Other", "The Curious History of Fourth Amendment Searches");
-    const run = buildRun({
+    const run = eligibleRun({
         1: citation(1, [a]),
         2: citation(1, [b])
-    });
+    }, [a, b]);
     const text = "Id. at 485";
     assert.strictEqual(BCF.features.hereinafter.rewrite({
         codeJson: { citationItems: [a] },
@@ -244,10 +278,10 @@ async function runPatch(session, codeJson, text) {
 {
     const a = cit("Aid2", "Kerr", "Theory", "An Equilibrium-Adjustment Theory of the Fourth Amendment");
     const b = cit("Bid2", "Kerr", "Other", "The Curious History of Fourth Amendment Searches");
-    const run = buildRun({
+    const run = eligibleRun({
         1: citation(1, [a]),
         2: citation(1, [b])
-    });
+    }, [a, b]);
     const text = "See id. at 526-27";
     assert.strictEqual(BCF.features.hereinafter.rewrite({
         codeJson: { citationItems: [a] },
@@ -260,9 +294,9 @@ async function runPatch(session, codeJson, text) {
 {
     const a = cit("A", "Epps", "Checks", "Checks and Balances");
     const b = cit("B", "Epps", "Asymmetry", "Adversarial Asymmetry");
-    const run = buildRun({
+    const run = eligibleRun({
         1: citation(1, [a, b])
-    });
+    }, [a, b]);
     const out = BCF.features.hereinafter.rewrite({
         codeJson: { citationItems: [a, b] },
         run,
@@ -281,10 +315,10 @@ async function runPatch(session, codeJson, text) {
     const coauthors = [{ family: "Epps" }, { family: "Nelson" }];
     const a = cit("CA", "Epps", "Checks", "Checks and Balances", undefined, coauthors);
     const b = cit("CB", "Epps", "Asymmetry", "Adversarial Asymmetry", undefined, coauthors);
-    const run = buildRun({
+    const run = eligibleRun({
         1: citation(1, [a]),
         2: citation(1, [b])
-    });
+    }, [a, b]);
     const out = BCF.features.hereinafter.rewrite({
         codeJson: { citationItems: [a] },
         run,
@@ -307,10 +341,10 @@ async function runPatch(session, codeJson, text) {
     ];
     const a = cit("TA", "Epps", "Checks", "Checks and Balances", undefined, triauthors);
     const b = cit("TB", "Epps", "Asymmetry", "Adversarial Asymmetry", undefined, triauthors);
-    const run = buildRun({
+    const run = eligibleRun({
         1: citation(1, [a]),
         2: citation(1, [b])
-    });
+    }, [a, b]);
     const out = BCF.features.hereinafter.rewrite({
         codeJson: { citationItems: [a] },
         run,
@@ -330,10 +364,10 @@ async function runPatch(session, codeJson, text) {
     // appended on reprocessing.
     const a = cit("LA", "Epps", "Checks", "Checks and Balances");
     const b = cit("LB", "Epps", "Asymmetry", "Adversarial Asymmetry");
-    const run = buildRun({
+    const run = eligibleRun({
         1: citation(1, [a]),
         2: citation(1, [b])
-    });
+    }, [a, b]);
     const legacy = "Dan Epps, Checks and Balances [hereinafter {\\i{}Checks}]";
     assert.strictEqual(BCF.features.hereinafter.rewrite({
         codeJson: { citationItems: [a] },
@@ -341,6 +375,91 @@ async function runPatch(session, codeJson, text) {
         text: legacy,
         rtf: BCF.rtf
     }), legacy);
+}
+
+{
+    // Issue 3: book-like items render the author surname and short title in
+    // large-and-small caps inside [hereinafter ...], not roman + italics.
+    // "et al." stays italic.
+    const a = cit(
+        "BookA", "Taslitz", "Reconstructing",
+        "Reconstructing the Fourth Amendment",
+        undefined, undefined, { type: "book" }
+    );
+    const b = cit(
+        "BookB", "Taslitz", "Treatise", "A Treatise on Search & Seizure",
+        undefined, undefined, { type: "book" }
+    );
+    const run = eligibleRun({
+        1: citation(1, [a]),
+        2: citation(1, [b])
+    }, [a, b]);
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: "Andrew E. Taslitz, Reconstructing the Fourth Amendment",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Andrew E. Taslitz, Reconstructing the Fourth Amendment " +
+            "[hereinafter {\\scaps Taslitz}, {\\scaps Reconstructing}]"
+    );
+}
+
+{
+    // Issue 3 — book subsequent cite: short title inserted in small caps
+    // before ", supra note".
+    const a = cit(
+        "BookSA", "Taslitz", "Reconstructing", "Reconstructing the Fourth Amendment",
+        1, undefined, { type: "book" }
+    );
+    const b = cit(
+        "BookSB", "Taslitz", "Treatise", "A Treatise on Search & Seizure",
+        undefined, undefined, { type: "book" }
+    );
+    const run = eligibleRun({
+        1: citation(1, [a]),
+        2: citation(1, [b])
+    }, [a, b]);
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: "{\\scaps Taslitz}, supra note 4",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "{\\scaps Taslitz}, {\\scaps Reconstructing}, supra note 4"
+    );
+}
+
+{
+    // Issue 3 — two book authors: both surnames in one small-caps group.
+    const coauthors = [{ family: "Taslitz" }, { family: "Friedman" }];
+    const a = cit(
+        "Book2A", "Taslitz", "Reconstructing", "Reconstructing the Fourth Amendment",
+        undefined, coauthors, { type: "book" }
+    );
+    const b = cit(
+        "Book2B", "Taslitz", "Treatise", "A Treatise on Search & Seizure",
+        undefined, coauthors, { type: "book" }
+    );
+    const run = eligibleRun({
+        1: citation(1, [a]),
+        2: citation(1, [b])
+    }, [a, b]);
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: "Andrew E. Taslitz & Barry Friedman, Reconstructing the Fourth Amendment",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Andrew E. Taslitz & Barry Friedman, Reconstructing the Fourth Amendment " +
+            "[hereinafter {\\scaps Taslitz & Friedman}, {\\scaps Reconstructing}]"
+    );
 }
 
 {
@@ -639,6 +758,43 @@ async function runPatch(session, codeJson, text) {
         assert.strictEqual(
             session.citationsByIndex[1].text,
             "Alex Taylor, Another Journal Piece, 2023 Harv. L. Rev. 10"
+        );
+    }
+
+    {
+        // Issue 2: book-at must still rewrite ", at" when the cite is *also*
+        // hereinafter-eligible. Before the registry reorder, hereinafter ran
+        // first, appended "[hereinafter ...]" to the end of the segment, and
+        // book-at's $-anchored regex silently no-opped.
+        const a = cit(
+            "BAH1", "Taslitz", "Reconstructing",
+            "Reconstructing the Fourth Amendment: A History of Search & Seizure, 1789-1868",
+            undefined, undefined, { type: "book" }
+        );
+        a.locator = "59";
+        a.label = "page";
+        const b = cit(
+            "BAH2", "Taslitz", "Treatise", "A Treatise on Search & Seizure",
+            undefined, undefined, { type: "book" }
+        );
+        const session = {
+            outputFormat: "rtf",
+            citationsByIndex: {
+                1: citation(1, [a]),
+                2: citation(1, [b]),
+                3: citation(2, [a]),
+                4: citation(3, [b])
+            }
+        };
+        const out = await runPatch(
+            session,
+            session.citationsByIndex[1],
+            "Andrew E. Taslitz, Reconstructing the Fourth Amendment: A History of Search & Seizure, 1789-1868 59 (2006)"
+        );
+        assert.strictEqual(
+            out,
+            "Andrew E. Taslitz, Reconstructing the Fourth Amendment: A History of Search & Seizure, 1789-1868, at 59 (2006) " +
+                "[hereinafter {\\scaps Taslitz}, {\\scaps Reconstructing}]"
         );
     }
 

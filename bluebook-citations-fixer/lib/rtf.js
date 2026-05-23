@@ -40,6 +40,13 @@ BCF.rtf.italic = function (s) {
     return "{\\i{}" + BCF.rtf.escape(s) + "}";
 };
 
+// Produce the RTF fragment for large-and-small-caps text. Used for book
+// titles and author names under Bluebook typography (rules 15.1, 16, B14).
+// citeproc-js's RTF output also uses `\scaps` for small caps.
+BCF.rtf.smallCaps = function (s) {
+    return "{\\scaps " + BCF.rtf.escape(s) + "}";
+};
+
 // Is the given string *likely* already RTF-wrapped?  Detects the outer
 // {\rtf ...} envelope that Zotero wraps around rich cluster text.
 BCF.rtf.isWrapped = function (s) {
