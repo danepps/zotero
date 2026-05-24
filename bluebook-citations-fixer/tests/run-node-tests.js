@@ -463,6 +463,59 @@ function eligibleRun(initialCitationsByIndex, items) {
 }
 
 {
+    // Regression: editing a short title in Zotero and refreshing the doc must
+    // use the new title even though the field-code snapshot still has the old
+    // one. _build must prefer a fresh Zotero.Items fetch over ci_.itemData.
+    const staleData = { author: [{ family: "Epps" }], "title-short": "OldShort", title: "Checks and Balances" };
+    const freshData = { author: [{ family: "Epps" }], "title-short": "NewShort", title: "Checks and Balances" };
+    const otherData = { author: [{ family: "Epps" }], "title-short": "Asymmetry", title: "Adversarial Asymmetry" };
+    const aStale = { id: 8001, uris: ["http://zotero.org/users/local/items/ST1"], itemData: staleData, position: 0 };
+    const bOther = { id: 8002, uris: ["http://zotero.org/users/local/items/ST2"], itemData: otherData, position: 0 };
+
+    const savedItems = Zotero.Items;
+    const savedUtils = Zotero.Utilities;
+    Zotero.Items = {
+        get: function (id) {
+            if (id === 8001) return { id: 8001 };
+            if (id === 8002) return { id: 8002 };
+            return null;
+        }
+    };
+    Zotero.Utilities = {
+        itemToCSLJSON: function (item) {
+            if (item.id === 8001) return freshData;
+            if (item.id === 8002) return otherData;
+            return null;
+        }
+    };
+
+    const run = BCF.run.forSession({
+        citationsByIndex: {
+            1: citation(1, [aStale, bOther]),
+            2: citation(2, [aStale]),
+            3: citation(3, [bOther])
+        },
+        outputFormat: "rtf"
+    });
+
+    Zotero.Items = savedItems;
+    Zotero.Utilities = savedUtils;
+
+    assert.strictEqual(BCF.run.itemData(run, aStale)["title-short"], "NewShort");
+
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [aStale] },
+        run,
+        text: "Dan Epps, Checks and Balances",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Dan Epps, Checks and Balances [hereinafter Epps, {\\i{}NewShort}]"
+    );
+}
+
+{
     assert.strictEqual(
         BCF.cite.shortTitle({
             "title-short": "<i>Katz</i> as Originalism",
@@ -675,6 +728,44 @@ function eligibleRun(initialCitationsByIndex, items) {
     assert.strictEqual(
         out,
         "Mary Jones, Some Title 1900, at 45 (Sarah Smith ed., 2010)"
+    );
+}
+
+{
+    // Regression: pincite "403-07" must get ", at" even when the CSL style
+    // renders the range separator as an en-dash. In RTF the en-dash is the
+    // control sequence \uc0\u8211{}; plainish decodes it so the action
+    // check sees an en-dash while escapedLocator had a plain hyphen.
+    const book = cit(
+        "BA_endash",
+        "Jones",
+        "Short",
+        "Some Title Ending in 1900",
+        undefined, undefined,
+        { type: "book" }
+    );
+    book.locator = "403-07";
+    book.label = "page";
+    const run = buildRun({ 1: citation(1, [book]) });
+    const rtfWithEndash = "Mary Jones, Some Title Ending in 1900 403\\uc0\\u8211{}07 (2006)";
+    assert.strictEqual(
+        BCF.features.bookAt.rewrite({
+            codeJson: { citationItems: [book] },
+            run,
+            text: rtfWithEndash,
+            rtf: BCF.rtf
+        }),
+        "Mary Jones, Some Title Ending in 1900, at 403\\uc0\\u8211{}07 (2006)"
+    );
+    // Hyphen form (CSL style preserves hyphen) also works.
+    assert.strictEqual(
+        BCF.features.bookAt.rewrite({
+            codeJson: { citationItems: [book] },
+            run,
+            text: "Mary Jones, Some Title Ending in 1900 403-07 (2006)",
+            rtf: BCF.rtf
+        }),
+        "Mary Jones, Some Title Ending in 1900, at 403-07 (2006)"
     );
 }
 
