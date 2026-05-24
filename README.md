@@ -1,6 +1,6 @@
 # Zotero Plugins — Dan Epps
 
-Zotero plugins designed to improve functionality for legal scholars. Maintained by Dan Epps, Washington University School of Law.
+Zotero plugins designed to improve functionality for legal scholars. Maintained by Dan Epps, Washington University School of Law. For questions and suggestions: epps@wustl.edu
 
 ## Bluebook Signals
 
