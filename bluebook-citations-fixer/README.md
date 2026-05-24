@@ -20,12 +20,16 @@ that are awkward or impossible to express cleanly in CSL alone.
     and B14; "et al." stays italic
   - `Id.` cites, including signal-prefixed forms such as `See id.`, should
     never get a hereinafter append
+  - Editing a short title in the Zotero library is picked up on the next
+    document refresh without needing to re-insert the citation
 - Suppress the trailing year parenthetical for journal articles when the
   volume itself is a four-digit year-like number
 - Insert `, at` for qualifying citations when a title ends in a numeral and
   the rendered cite would otherwise look like `... 1868 45 (2006)`. Works
   regardless of what follows the pincite — `(YYYY)`, `(rev. ed. 2005)`,
   `(Sarah Smith ed., 2010)`, citing-parentheticals, or nothing at all.
+  Handles compressed page ranges like `403-07` whether the CSL style renders
+  the separator as a hyphen or en-dash.
 
 ## Compatibility
 
@@ -57,6 +61,6 @@ only — Word and LibreOffice work; Google Docs is not yet supported.
 
 ## Latest Released Version
 
-- `0.1.14`
-- Git tag: `bluebook-citations-fixer-v0.1.14`
-- GitHub release asset: [Bluebook_Citations_Fixer_v0.1.14.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.1.14/Bluebook_Citations_Fixer_v0.1.14.xpi)
+- `0.1.16`
+- Git tag: `bluebook-citations-fixer-v0.1.16`
+- GitHub release asset: [Bluebook_Citations_Fixer_v0.1.16.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.1.16/Bluebook_Citations_Fixer_v0.1.16.xpi)
