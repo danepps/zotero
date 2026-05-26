@@ -132,7 +132,7 @@ Zotero hands RTF to the integration bridge using citeproc-js's RTF output format
 
 `BCF.rtf.italic(s)`, `BCF.rtf.smallCaps(s)`, and `BCF.rtf.escape(s)` produce the right fragments. `BCF.rtf.plainish(rtf)` collapses RTF to a plain-text projection for idempotency checks and anchor matching (e.g. finding `, supra note`). `BCF.rtf.findPlainOffset(rtf, re)` gives the RTF index corresponding to the first plainish-projection match, so injections land at the correct character even when there are `\uNNNN{}` escapes or italic groups before the match.
 
-Hereinafter uses small caps for book-like items (`BCF.cite.isBookLike` → `book`, `chapter`, `entry-encyclopedia`, etc.) and italics for everything else, per Bluebook rules 15.1, 16, and B14. "Et al." stays italic in both cases.
+Hereinafter uses small caps for book-like items (`BCF.cite.isBookLike` → `book`, `entry-encyclopedia`, `entry-dictionary`, etc.) and italics for everything else, per Bluebook rules 15.1, 16, and B14. Chapters are the exception: although `isBookLike` includes them, the chapter title is italic and the chapter author is roman in long form (Rule 15.5/B14), so a hereinafter naming the chapter renders like an article. "Et al." stays italic in both cases.
 
 ### Idempotency
 

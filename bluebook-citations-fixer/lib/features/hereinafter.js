@@ -9,7 +9,10 @@
 //
 // For book-like items the author surname and short title are rendered in
 // large-and-small capitals (`{\scaps ...}`) instead of italics, per Bluebook
-// rules 15.1 and 16. "Et al." remains italic in both cases.
+// rules 15.1 and 16. "Et al." remains italic in both cases. Chapters are an
+// exception: the chapter title itself is italic (only the containing book
+// takes small caps under Rule 15.5/B14), so a hereinafter that names the
+// chapter is rendered like an article.
 //
 // Operates on the RTF string Zotero is about to write for a single cluster.
 // Multi-item clusters ("A; B") are split on "; " so each hereinafter lands
@@ -65,7 +68,9 @@ BCF.features.hereinafter = {
             }
 
             var seg = segments[j];
-            var isBook = BCF.cite.isBookLike(data);
+            // Chapters take italics, not small caps — see header comment.
+            var isBook = BCF.cite.isBookLike(data) &&
+                BCF.cite.itemType(data) !== "chapter";
             var newSeg = BCF.features.hereinafter._rewriteSegment(
                 seg.text, item, data, shortTitle, isBook
             );

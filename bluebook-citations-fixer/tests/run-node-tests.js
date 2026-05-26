@@ -463,6 +463,68 @@ function eligibleRun(initialCitationsByIndex, items) {
 }
 
 {
+    // Chapters are book-like in structure (the containing book is in small
+    // caps in long form) but the chapter title itself is italic and the
+    // chapter author is roman. A hereinafter naming the chapter follows the
+    // chapter, not the book — so both the author and the short title render
+    // like an article, not like a book.
+    const a = cit(
+        "ChapA", "Merrill", "Private and Public Law",
+        "Private and Public Law",
+        undefined, undefined, { type: "chapter" }
+    );
+    const b = cit(
+        "ChapB", "Merrill", "Property and the Right to Exclude",
+        "Property and the Right to Exclude",
+        undefined, undefined, { type: "chapter" }
+    );
+    const run = eligibleRun({
+        1: citation(1, [a]),
+        2: citation(1, [b])
+    }, [a, b]);
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: "Thomas W. Merrill, Private and Public Law",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Thomas W. Merrill, Private and Public Law " +
+            "[hereinafter Merrill, {\\i{}Private and Public Law}]"
+    );
+}
+
+{
+    // Chapter subsequent cite: short title injected in italics before
+    // ", supra note", and the existing author surname (roman) is left alone.
+    const a = cit(
+        "ChapSA", "Merrill", "Private and Public Law",
+        "Private and Public Law",
+        1, undefined, { type: "chapter" }
+    );
+    const b = cit(
+        "ChapSB", "Merrill", "Property and the Right to Exclude",
+        "Property and the Right to Exclude",
+        undefined, undefined, { type: "chapter" }
+    );
+    const run = eligibleRun({
+        1: citation(1, [a]),
+        2: citation(1, [b])
+    }, [a, b]);
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: "Merrill, supra note 4",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Merrill, {\\i{}Private and Public Law}, supra note 4"
+    );
+}
+
+{
     // Regression: editing a short title in Zotero and refreshing the doc must
     // use the new title even though the field-code snapshot still has the old
     // one. _build must prefer a fresh Zotero.Items fetch over ci_.itemData.
