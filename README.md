@@ -30,7 +30,7 @@ Rewrites Zotero's citation output inside the integration pipeline to apply
 Bluebook rules that CSL alone can't express cleanly. Runs automatically on
 every insert/refresh.
 
-**Install:** Download [Bluebook_Citations_Fixer_v0.1.16.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.1.16/Bluebook_Citations_Fixer_v0.1.16.xpi)
+**Install:** Download [Bluebook_Citations_Fixer_v0.1.17.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.1.17/Bluebook_Citations_Fixer_v0.1.17.xpi)
 
 **Current rules:**
 
@@ -41,7 +41,9 @@ every insert/refresh.
   title (e.g. `Epps, supra note 1` →
   `Epps, <i>Adversarial Asymmetry</i>, supra note 1`). Books render the
   author surname and short title in large-and-small caps (per Bluebook
-  rules 15.1, 16, B14) instead of italics; "et al." stays italic. Skips
+  rules 15.1, 16, B14) instead of italics; chapters follow the article
+  form (italic title, roman author) since only the containing book takes
+  small caps under Rule 15.5/B14; "et al." stays italic. Skips
   `Id.` cites, including signal-prefixed forms like `See id.` Editing a
   short title in the Zotero library is picked up on the next refresh
   without re-inserting the citation.

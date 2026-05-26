@@ -17,7 +17,9 @@ that are awkward or impossible to express cleanly in CSL alone.
     `[hereinafter Short]` tags on works that are never referenced again
   - Book-like items render the author surname and short title in
     large-and-small caps (`{\scaps ...}`) per Bluebook rules 15.1, 16,
-    and B14; "et al." stays italic
+    and B14; chapters are the exception and render like articles
+    (italic title, roman author) since only the containing book takes
+    small caps under Rule 15.5/B14; "et al." stays italic
   - `Id.` cites, including signal-prefixed forms such as `See id.`, should
     never get a hereinafter append
   - Editing a short title in the Zotero library is picked up on the next
@@ -61,6 +63,6 @@ only — Word and LibreOffice work; Google Docs is not yet supported.
 
 ## Latest Released Version
 
-- `0.1.16`
-- Git tag: `bluebook-citations-fixer-v0.1.16`
-- GitHub release asset: [Bluebook_Citations_Fixer_v0.1.16.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.1.16/Bluebook_Citations_Fixer_v0.1.16.xpi)
+- `0.1.17`
+- Git tag: `bluebook-citations-fixer-v0.1.17`
+- GitHub release asset: [Bluebook_Citations_Fixer_v0.1.17.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.1.17/Bluebook_Citations_Fixer_v0.1.17.xpi)
