@@ -21,6 +21,33 @@ BCF.run = {};
 BCF.run.KEY = "__bluebookCitationsFixer";
 BCF.run.FREQUENCY_THRESHOLD = 3;
 
+BCF.run.PREF_CROSS_FOOTNOTE = "extensions.bluebook-citations-fixer.hereinafter.crossFootnote";
+BCF.run.PREF_THRESHOLD = "extensions.bluebook-citations-fixer.hereinafter.frequencyThreshold";
+
+// User-tunable hereinafter options, read from Zotero prefs with safe fallbacks.
+// Mirrors the try/catch pattern in lib/diag.js so the Node test harness (which
+// does not stub Zotero.Prefs) keeps the historical defaults: cross-footnote on,
+// threshold 3.
+//   - crossFootnote: when false, the frequency path (thresholdKeys) no longer
+//     contributes to eligibleKeys, so only works that first appear together in
+//     the same footnote get hereinafter treatment.
+//   - threshold: replaces FREQUENCY_THRESHOLD; floored at 2 because eligibleKeys
+//     already requires a work to be cited at least twice.
+BCF.run.options = function () {
+    var crossFootnote = true;
+    var threshold = BCF.run.FREQUENCY_THRESHOLD;
+    try {
+        var v = Zotero.Prefs.get(BCF.run.PREF_CROSS_FOOTNOTE, true);
+        if (v !== undefined && v !== null) crossFootnote = !!v;
+    } catch (_) {}
+    try {
+        var n = parseInt(Zotero.Prefs.get(BCF.run.PREF_THRESHOLD, true), 10);
+        if (!isNaN(n)) threshold = n;
+    } catch (_) {}
+    if (threshold < 2) threshold = 2;
+    return { crossFootnote: crossFootnote, threshold: threshold };
+};
+
 BCF.run.clearSession = function (session) {
     if (!session) return;
     try {
@@ -91,6 +118,7 @@ BCF.run._build = function (session) {
     var enriched = 0;
     var liveHadData = 0;
     var noData = 0;
+    var opts = BCF.run.options();
 
     var citations = BCF.run.citationsInOrder(session);
     for (var i = 0; i < citations.length; i++) {
@@ -156,7 +184,7 @@ BCF.run._build = function (session) {
     authorBuckets.forEach(function (keys) {
         var qualifying = [];
         keys.forEach(function (key) {
-            if ((itemCounts.get(key) || 0) >= BCF.run.FREQUENCY_THRESHOLD) {
+            if ((itemCounts.get(key) || 0) >= opts.threshold) {
                 qualifying.push(key);
             }
         });
@@ -170,15 +198,20 @@ BCF.run._build = function (session) {
     // A work is only eligible for hereinafter treatment if it actually has a
     // subsequent cite (count >= 2). Otherwise the `[hereinafter Short]` tag
     // attaches to a first-and-only cite that nothing ever references — pure
-    // noise. (thresholdKeys requires count >= 3 so the filter is a no-op for
-    // those, but apply it uniformly for clarity.)
+    // noise. (thresholdKeys requires count >= threshold (>= 2) so the filter is
+    // a no-op for those, but apply it uniformly for clarity.)
+    //
+    // The frequency path (thresholdKeys) only folds in when the user leaves the
+    // cross-footnote option on; the same-footnote path always applies.
     var eligibleKeys = new Set();
     sameFootnoteKeys.forEach(function (key) {
         if ((itemCounts.get(key) || 0) >= 2) eligibleKeys.add(key);
     });
-    thresholdKeys.forEach(function (key) {
-        if ((itemCounts.get(key) || 0) >= 2) eligibleKeys.add(key);
-    });
+    if (opts.crossFootnote) {
+        thresholdKeys.forEach(function (key) {
+            if ((itemCounts.get(key) || 0) >= 2) eligibleKeys.add(key);
+        });
+    }
 
     var ctx = {
         session: session,
@@ -201,7 +234,9 @@ BCF.run._build = function (session) {
         ambiguous: ambiguousKeys.size,
         sameFootnote: sameFootnoteKeys.size,
         threshold: thresholdKeys.size,
-        eligible: eligibleKeys.size
+        eligible: eligibleKeys.size,
+        crossFootnote: opts.crossFootnote,
+        thresholdN: opts.threshold
     });
     return ctx;
 };

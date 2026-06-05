@@ -10,6 +10,7 @@ zip -r "$OUT" \
     manifest.json \
     chrome.manifest \
     prefs.js \
+    prefs.xhtml \
     bootstrap.js \
     locale \
     lib \

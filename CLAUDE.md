@@ -28,7 +28,7 @@ At the repo root, `update-*.json` files are the Zotero auto-update manifests, se
 
 ## Build / release
 
-Each plugin is a zip of its root files (`manifest.json`, `chrome.manifest`, `bootstrap.js`, and — for `bluebook-citations-fixer` — `prefs.js`, `locale/`, and the `lib/` tree) with a `.xpi` extension. Plugins with a `build.sh` use it:
+Each plugin is a zip of its root files (`manifest.json`, `chrome.manifest`, `bootstrap.js`, and — for `bluebook-citations-fixer` — `prefs.js`, `prefs.xhtml`, `locale/`, and the `lib/` tree) with a `.xpi` extension. Plugins with a `build.sh` use it:
 
 ```
 ./bluebook-citations-fixer/build.sh <version>
@@ -73,7 +73,8 @@ bluebook-citations-fixer/
 ├── manifest.json
 ├── chrome.manifest
 ├── build.sh
-├── prefs.js                      # default diag pref
+├── prefs.js                      # default diag + hereinafter prefs
+├── prefs.xhtml                   # Settings pane (hereinafter options)
 ├── locale/en-US/bluebook-citations-fixer.ftl
 ├── tests/run-node-tests.js       # pure helper tests for ambiguity + rewrites
 └── lib/
@@ -120,7 +121,9 @@ Returning a string replaces `ctx.text`; returning undefined is a pass-through. F
 
 `BCF.run.forSession(session)` lazily walks `session.citationsByIndex` once per run and caches `{ items, authorBuckets, itemCounts, itemFirstNotes, ambiguousKeys, sameFootnoteKeys, thresholdKeys, eligibleKeys, log }` on the session object under a non-enumerable `__bluebookCitationsFixer` key. Zotero's `citationsByIndex` is an object keyed by field index, not necessarily an array, so iterate it with `BCF.run.citationsInOrder(session)`.
 
-Hereinafter-specific eligibility triggers (`BCF.run.shouldUseHereinafter` → `eligibleKeys`): a work qualifies when either (1) two or more works with the same author list first appear in the same footnote (`sameFootnoteKeys`), or (2) at least two works with that author list are each cited `BCF.run.FREQUENCY_THRESHOLD` (3) or more times in the document (`thresholdKeys`). In **both** cases the work must itself appear more than once in the document (`itemCounts >= 2`) — `[hereinafter Short]` on a work that's never cited again is noise. Other features should consult their own predicates and must not gate on `eligibleKeys`.
+Hereinafter-specific eligibility triggers (`BCF.run.shouldUseHereinafter` → `eligibleKeys`): a work qualifies when either (1) two or more works with the same author list first appear in the same footnote (`sameFootnoteKeys`), or (2) at least two works with that author list are each cited at the frequency threshold or more in the document (`thresholdKeys`). In **both** cases the work must itself appear more than once in the document (`itemCounts >= 2`) — `[hereinafter Short]` on a work that's never cited again is noise. Other features should consult their own predicates and must not gate on `eligibleKeys`.
+
+Two user prefs (read in `BCF.run.options()`, defaults preserve historical behavior) tune path (2), the "not in the same footnote" case: `extensions.bluebook-citations-fixer.hereinafter.crossFootnote` (bool, default `true`) — when `false`, `thresholdKeys` no longer folds into `eligibleKeys`, so only the same-footnote path fires; and `…hereinafter.frequencyThreshold` (int, default `3`, floored at 2) replaces the hardcoded `BCF.run.FREQUENCY_THRESHOLD` cutoff. Both are surfaced in the Settings pane (`prefs.xhtml`, registered from `bootstrap.js`).
 
 ### RTF conventions
 
