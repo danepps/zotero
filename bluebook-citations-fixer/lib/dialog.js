@@ -120,9 +120,9 @@ BCF.dialog._inject = function (doc, omitBox) {
     // produce a non-functional checkbox that renders but won't toggle.
     var row = doc.createElementNS(XHTML, "div");
     row.id = BCF.dialog.ROW_ID;
-    // Copy the Omit Author row's class (layout only — NOT the checkbox's own
-    // appearance class) so our row lines up in the same column above it.
-    if (omitRow && omitRow.className) row.className = omitRow.className;
+    row.style.display = "flex";
+    row.style.alignItems = "center";
+    row.style.gap = "6px";
     row.style.marginTop = "6px";
     row.title = BCF.dialog.TITLE;
 
@@ -134,7 +134,6 @@ BCF.dialog._inject = function (doc, omitBox) {
     var label = doc.createElementNS(XHTML, "label");
     label.setAttribute("for", BCF.dialog.CHECKBOX_ID);
     label.style.cursor = "pointer";
-    label.style.marginLeft = "6px";
     label.appendChild(doc.createTextNode("Break "));
     var em = doc.createElementNS(XHTML, "i");
     em.textContent = "id.";
@@ -158,6 +157,14 @@ BCF.dialog._inject = function (doc, omitBox) {
     if (parent) parent.insertBefore(row, omitRow.nextSibling);
     else if (omitRow) omitRow.appendChild(row);
     else return null;
+
+    // "Omit Author" is indented because it lives in the Prefix/Suffix grid's
+    // input column; our row is a sibling outside that grid, so match the column
+    // by measuring the Omit Author checkbox's left edge and shifting ours to it.
+    try {
+        var delta = omitBox.getBoundingClientRect().left - box.getBoundingClientRect().left;
+        if (delta > 0 && delta < 800) row.style.marginLeft = delta + "px";
+    } catch (_) {}
 
     BCF.diag.event("dialog", "break-id row injected after omit-author");
     return box;
