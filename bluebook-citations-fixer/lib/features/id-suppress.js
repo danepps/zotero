@@ -61,13 +61,17 @@ BCF.features.idSuppress = {
             return BCF.cite.stripNoId(text);
         }
 
+        // Note index of this cluster (from the field-code / live citation
+        // properties), used to reject self/forward `supra` references.
+        var currentNote = BCF.cite.noteIndexOf(codeJson);
+
         var rewrote = false;
         for (var i = 0; i < items.length; i++) {
             var item = items[i];
             if (!BCF.cite.hasNoId(item && item.prefix)) continue;
 
             var seg = segments[i];
-            var newSeg = BCF.features.idSuppress._rewriteSegment(seg.text, item, run);
+            var newSeg = BCF.features.idSuppress._rewriteSegment(seg.text, item, run, currentNote);
             if (newSeg !== null && newSeg !== seg.text) {
                 seg.text = newSeg;
                 rewrote = true;
@@ -84,7 +88,7 @@ BCF.features.idSuppress = {
         return out;
     },
 
-    _rewriteSegment: function (segRtf, item, run) {
+    _rewriteSegment: function (segRtf, item, run, currentNote) {
         var data = BCF.run.itemData(run, item);
         var plain = BCF.rtf.plainish(segRtf);
 
@@ -130,10 +134,20 @@ BCF.features.idSuppress = {
                 BCF.rtf.escape(vol) + " " + BCF.rtf.escape(reporter) +
                 (locator ? " at " + BCF.rtf.escape(locator) : "");
         } else if (BCF.cite.isBookLike(data) || BCF.cite.isJournalArticleLike(data)) {
-            var firstNote = (run && run.itemFirstNotes)
-                ? run.itemFirstNotes.get(BCF.cite.itemKey(item)) : undefined;
+            var firstNote = BCF.run.firstNoteFor(run, item, data);
             if (firstNote == null) {
                 BCF.diag.event("skip:id-suppress", "no first-note for " + BCF.cite.itemKey(item));
+                return BCF.cite.stripNoId(segRtf);
+            }
+            // A `supra` must point to an EARLIER note. If the earliest known
+            // appearance is this note or later (e.g. the prior cite of this
+            // source is hand-typed / invisible to Zotero, or this is genuinely
+            // the first cite), we can't synthesize a valid target — leave the
+            // "Id." rather than emit a self-reference.
+            if (currentNote > 0 && firstNote >= currentNote) {
+                BCF.diag.event("skip:id-suppress",
+                    "self/forward supra (first=" + firstNote + " cur=" + currentNote + ") " +
+                    BCF.cite.itemKey(item));
                 return BCF.cite.stripNoId(segRtf);
             }
             // Chapters render like articles (roman author, italic title) — same

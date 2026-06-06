@@ -1179,6 +1179,44 @@ const NOID = String.fromCharCode(0x200B);
     assert.strictEqual(out, "{\\i{}See }Kerr, supra note 1, at 5");
 }
 
+{
+    // Signature fallback: the earlier cite (note 2) and the flagged repeat
+    // (note 12) are the same source but resolve to DIFFERENT item keys
+    // (duplicate library item / URI variance). The URI map would make note 12
+    // point at itself; the author+title signature recovers the real target,
+    // note 2.
+    const early = cit("URI_A", "Merrill", "Common Law", "The Common Law Powers",
+        undefined, undefined, { type: "chapter" });
+    const flagged = cit("URI_B", "Merrill", "Common Law", "The Common Law Powers",
+        undefined, undefined, { type: "chapter" });
+    flagged.prefix = NOID;
+    const run = buildRun({ 1: citation(2, [early]), 2: citation(12, [flagged]) });
+    const out = BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [flagged], properties: { noteIndex: 12 } },
+        run,
+        text: NOID_RTF + "{\\i{}Id.}",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "{\\i{}}Merrill, supra note 2");
+}
+
+{
+    // Self/forward guard: the earliest known appearance is this very note (the
+    // prior same-source cite is invisible to Zotero, or this is the first cite).
+    // We can't form a valid supra, so leave the "Id." (sentinel stripped).
+    const flagged = cit("URI_SELF", "Kerr", "Theory", "An Equilibrium Theory",
+        undefined, undefined, { type: "article-journal" });
+    flagged.prefix = NOID;
+    const run = buildRun({ 1: citation(5, [flagged]) });
+    const out = BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [flagged], properties: { noteIndex: 5 } },
+        run,
+        text: NOID_RTF + "{\\i{}Id.} at 9",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "{\\i{}Id.} at 9");
+}
+
 (async function () {
     {
         const journal = cit(
