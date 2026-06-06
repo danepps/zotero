@@ -1006,7 +1006,7 @@ const NOID = String.fromCharCode(0x200B);
         text: NOID_RTF + "See id. at 526-27",
         rtf: BCF.rtf
     });
-    assert.strictEqual(out, "See Kerr, supra note 1, at 526-27");
+    assert.strictEqual(out, "See Kerr, {\\i{}supra} note 1, at 526-27");
 
     // Idempotency: feeding the output back through is a no-op even though the
     // sentinel still rides on the prefix.
@@ -1158,7 +1158,7 @@ const NOID = String.fromCharCode(0x200B);
         text: NOID_RTF + "{\\i{}Id.}",
         rtf: BCF.rtf
     });
-    assert.strictEqual(out, "{\\i{}}Merrill, supra note 1");
+    assert.strictEqual(out, "{\\i{}}Merrill, {\\i{}supra} note 1");
 }
 
 {
@@ -1176,7 +1176,7 @@ const NOID = String.fromCharCode(0x200B);
         text: NOID_RTF + "{\\i{}See id.} at 5",
         rtf: BCF.rtf
     });
-    assert.strictEqual(out, "{\\i{}See }Kerr, supra note 1, at 5");
+    assert.strictEqual(out, "{\\i{}See }Kerr, {\\i{}supra} note 1, at 5");
 }
 
 {
@@ -1197,7 +1197,7 @@ const NOID = String.fromCharCode(0x200B);
         text: NOID_RTF + "{\\i{}Id.}",
         rtf: BCF.rtf
     });
-    assert.strictEqual(out, "{\\i{}}Merrill, supra note 2");
+    assert.strictEqual(out, "{\\i{}}Merrill, {\\i{}supra} note 2");
 }
 
 {

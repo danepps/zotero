@@ -161,11 +161,12 @@ BCF.features.idSuppress = {
             // exception hereinafter makes. _authorPrefix renders the surname(s).
             var isBook = BCF.cite.isBookLike(data) && t !== "chapter";
             var authorPrefix = BCF.features.hereinafter._authorPrefix(data, isBook);
-            // Surface form "supra note N" (regular space) so hereinafter's
+            // "supra" is italicized (Bluebook); "note N" stays roman. The
+            // plainish projection still reads "supra note N", so hereinafter's
             // _hasSupraNote / _rewriteSubsequent recognize it and inject the
-            // short title when the work is ambiguous.
+            // short title before it when the work is ambiguous.
             shortForm = (authorPrefix ? authorPrefix + ", " : "") +
-                "supra note " + firstNote +
+                BCF.rtf.italic("supra") + " note " + firstNote +
                 (locator ? ", at " + BCF.rtf.escape(locator) : "");
         } else {
             BCF.diag.event("skip:id-suppress", "unsupported-type " + t + " " + BCF.cite.itemKey(item));

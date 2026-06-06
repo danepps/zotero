@@ -96,6 +96,8 @@ BCF.dialog._tryInject = function (doc) {
         // Don't fight the user: while our checkbox is focused (just clicked),
         // leave its state alone — otherwise an observer pass triggered by the
         // click's own DOM mutation would revert the check before it shows.
+        var row = doc.getElementById(BCF.dialog.ROW_ID);
+        if (row) BCF.dialog._align(row, box, omitBox);
         if (box === doc.activeElement) return;
         var prefix = doc.getElementById("prefix");
         if (prefix) BCF.dialog._sync(box, prefix);
@@ -158,14 +160,7 @@ BCF.dialog._inject = function (doc, omitBox) {
     else if (omitRow) omitRow.appendChild(row);
     else return null;
 
-    // "Omit Author" is indented because it lives in the Prefix/Suffix grid's
-    // input column; our row is a sibling outside that grid, so match the column
-    // by measuring the Omit Author checkbox's left edge and shifting ours to it.
-    try {
-        var delta = omitBox.getBoundingClientRect().left - box.getBoundingClientRect().left;
-        if (delta > 0 && delta < 800) row.style.marginLeft = delta + "px";
-    } catch (_) {}
-
+    BCF.dialog._align(row, box, omitBox);
     BCF.diag.event("dialog", "break-id row injected after omit-author");
     return box;
 };
@@ -226,6 +221,21 @@ BCF.dialog._setReactValue = function (el, value) {
         try { el.value = value; el.dispatchEvent(new el.ownerDocument.defaultView.Event("input", { bubbles: true })); } catch (_) {}
         BCF.diag.err("dialog.setReactValue", e);
     }
+};
+
+// "Omit Author" is indented because it lives in the Prefix/Suffix grid's input
+// column; our row is a sibling outside that grid, so match the column by
+// shifting our row by the gap between the two checkboxes' left edges. Retries
+// across observer passes until layout yields a usable measurement, then locks.
+BCF.dialog._align = function (row, box, omitBox) {
+    try {
+        if (row.getAttribute("data-bcf-aligned") === "1") return;
+        var delta = omitBox.getBoundingClientRect().left - box.getBoundingClientRect().left;
+        if (delta > 0 && delta < 800) {
+            row.style.marginLeft = delta + "px";
+            row.setAttribute("data-bcf-aligned", "1");
+        }
+    } catch (_) {}
 };
 
 // Re-derive the checkbox state from the field (the popup is rebuilt per bubble).
