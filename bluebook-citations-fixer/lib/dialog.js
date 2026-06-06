@@ -92,6 +92,10 @@ BCF.dialog._tryInject = function (doc) {
             box = BCF.dialog._inject(doc, omitBox);
             if (!box) return;
         }
+        // Don't fight the user: while our checkbox is focused (just clicked),
+        // leave its state alone — otherwise an observer pass triggered by the
+        // click's own DOM mutation would revert the check before it shows.
+        if (box === doc.activeElement) return;
         var prefix = doc.getElementById("prefix");
         if (prefix) BCF.dialog._sync(box, prefix);
     } catch (e) {
@@ -99,30 +103,34 @@ BCF.dialog._tryInject = function (doc) {
     }
 };
 
-// Build the HTML control, copying the Omit Author pieces' classes so it matches,
-// and insert it as its own row right after the Omit Author row.
+// Build the control as a plain native HTML checkbox + label and insert it as
+// its own row right after the Omit Author row. We deliberately do NOT copy
+// Zotero's checkbox class onto the <input>: that class sets `appearance: none`
+// and custom-draws the box for a specific DOM structure, which on a bare input
+// just suppresses the native checkbox so it can't render or toggle. A native
+// checkbox already matches the OS-styled "Omit Author" box.
 BCF.dialog._inject = function (doc, omitBox) {
-    var omitLabel = BCF.dialog._labelFor(doc, omitBox);
     var omitRow = (omitBox.closest && (omitBox.closest("div") || omitBox.closest("tr"))) ||
         omitBox.parentNode;
 
     var row = doc.createElement("div");
     row.id = BCF.dialog.ROW_ID;
-    if (omitRow && omitRow.className) row.className = omitRow.className;
+    row.style.display = "flex";
+    row.style.alignItems = "center";
+    row.style.gap = "6px";
     row.style.marginTop = "6px";
+    row.title = BCF.dialog.TITLE;
 
     var box = doc.createElement("input");
     box.type = "checkbox";
     box.id = BCF.dialog.CHECKBOX_ID;
-    if (omitBox.className) box.className = omitBox.className;
     box.addEventListener("change", function () { BCF.dialog._toggle(doc, box); });
 
     var label = doc.createElement("label");
     label.setAttribute("for", BCF.dialog.CHECKBOX_ID);
     label.textContent = BCF.dialog.LABEL;
-    if (omitLabel && omitLabel.className) label.className = omitLabel.className;
+    label.style.cursor = "pointer";
 
-    row.title = BCF.dialog.TITLE;
     row.appendChild(box);
     row.appendChild(label);
 
@@ -133,23 +141,6 @@ BCF.dialog._inject = function (doc, omitBox) {
 
     BCF.diag.event("dialog", "break-id row injected after omit-author");
     return box;
-};
-
-// The label paired with the Omit Author checkbox, for class-matching.
-BCF.dialog._labelFor = function (doc, omitBox) {
-    try {
-        if (omitBox.id) {
-            var byFor = doc.querySelector('label[for="' + omitBox.id + '"]');
-            if (byFor) return byFor;
-        }
-        if (omitBox.closest) {
-            var wrap = omitBox.closest("label");
-            if (wrap) return wrap;
-        }
-        var p = omitBox.parentNode;
-        if (p && p.querySelector) return p.querySelector("label");
-    } catch (_) {}
-    return null;
 };
 
 // Locate the "Omit Author" checkbox: known ids first, then scan checkboxes for
