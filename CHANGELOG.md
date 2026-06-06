@@ -5,6 +5,27 @@ prefix in each section header identifies which plugin shipped.
 
 ## bluebook-citations-fixer
 
+### v0.2.0 — 2026-06-06
+
+- **Manual "Break id." toggle.** A new checkbox in the citation dialog's
+  bubble settings (under *Omit Author*) lets you flag a cite whose
+  immediately preceding same-source citation is **hand-typed** — and
+  therefore invisible to Zotero/citeproc, which then wrongly renders the
+  cite as `Id.` When flagged, the plugin rewrites that wrong `Id.` into the
+  correct Bluebook short form:
+  - secondary sources → `Author, supra note N` (with italic *supra*;
+    composes with the hereinafter rule, which inserts the short title when
+    the author is ambiguous);
+  - cases → `Short, Vol Reporter at Pincite` (short name italic, from the
+    item's Short Title field or the full case name).
+  The flag is stored as an invisible zero-width sentinel on the cite's
+  prefix, so it round-trips across Refresh and document reopen. The `supra`
+  target is resolved by the earliest note the source appears in, combining
+  the item URI with an author+title signature so a duplicate library item or
+  URI mismatch can't make a repeat cite point at itself. First-cite long
+  forms, statutes, and cases missing the reporter/volume are detected, the
+  sentinel stripped, and the text left untouched.
+
 ### v0.1.18 — 2026-06-06
 
 - **Hereinafter options + Settings pane:** the "hereinafter" rule can now be

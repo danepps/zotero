@@ -114,6 +114,7 @@ BCF.run._build = function (session) {
     var authorBuckets = new Map();      // authorKey -> Set<itemKey>
     var itemCounts = new Map();         // itemKey -> count
     var itemFirstNotes = new Map();     // itemKey -> first note index
+    var itemFirstNotesBySig = new Map();// author+title signature -> earliest note
     var noteFirstBuckets = new Map();   // authorKey -> Map<groupKey, Set<itemKey>>
     var enriched = 0;
     var liveHadData = 0;
@@ -162,6 +163,18 @@ BCF.run._build = function (session) {
                 var byNote = noteFirstBuckets.get(authorKey);
                 if (!byNote.has(groupKey)) byNote.set(groupKey, new Set());
                 byNote.get(groupKey).add(key);
+            }
+
+            // Track earliest note by author+title signature too, so two cites
+            // of the same source that resolve to different item keys (duplicate
+            // library items, or URI variance across insertions) still share a
+            // first-note target for `supra`. Records the minimum note index.
+            var sig = BCF.run._sigFor(data);
+            if (sig) {
+                var prevSig = itemFirstNotesBySig.get(sig);
+                if (prevSig == null || noteIndex < prevSig) {
+                    itemFirstNotesBySig.set(sig, noteIndex);
+                }
             }
         }
     }
@@ -219,6 +232,7 @@ BCF.run._build = function (session) {
         authorBuckets: authorBuckets,
         itemCounts: itemCounts,
         itemFirstNotes: itemFirstNotes,
+        itemFirstNotesBySig: itemFirstNotesBySig,
         ambiguousKeys: ambiguousKeys,
         sameFootnoteKeys: sameFootnoteKeys,
         thresholdKeys: thresholdKeys,
@@ -268,6 +282,37 @@ BCF.run.isAmbiguous = function (ctx, citItem) {
 BCF.run.shouldUseHereinafter = function (ctx, citItem) {
     if (!ctx || !ctx.eligibleKeys) return false;
     return ctx.eligibleKeys.has(BCF.cite.itemKey(citItem));
+};
+
+// Author+title signature for an itemData. Lets two cites of the same source
+// that resolve to different item keys still be recognized as the same work.
+BCF.run._sigFor = function (data) {
+    if (!data) return "";
+    var ak = BCF.cite.authorKey(data);
+    var title = BCF.cite.fullTitle(data).toLowerCase().replace(/\s+/g, " ").trim();
+    if (!ak && !title) return "";
+    return ak + "||" + title;
+};
+
+// Earliest note index at which a work first appears, for `supra note N`.
+// Combines the URI-keyed first-note map with the author+title signature map and
+// returns the smaller, so a duplicate library item / URI mismatch can't make a
+// repeat cite point at itself. Returns undefined when the work isn't tracked.
+BCF.run.firstNoteFor = function (ctx, citItem, data) {
+    if (!ctx) return undefined;
+    var notes = [];
+    var key = BCF.cite.itemKey(citItem);
+    if (ctx.itemFirstNotes && key != null && ctx.itemFirstNotes.has(key)) {
+        notes.push(ctx.itemFirstNotes.get(key));
+    }
+    if (ctx.itemFirstNotesBySig) {
+        var sig = BCF.run._sigFor(data || BCF.run.itemData(ctx, citItem));
+        if (sig && ctx.itemFirstNotesBySig.has(sig)) {
+            notes.push(ctx.itemFirstNotesBySig.get(sig));
+        }
+    }
+    if (!notes.length) return undefined;
+    return Math.min.apply(null, notes);
 };
 
 BCF.run.itemData = function (ctx, citItem) {

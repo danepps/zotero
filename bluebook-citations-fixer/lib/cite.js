@@ -160,3 +160,37 @@ BCF.cite.noteIndexOf = function (citOrJson) {
 BCF.cite.escapeRegex = function (s) {
     return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 };
+
+// "Break id." sentinel. The citation-dialog checkbox stores this character at
+// the head of a cite's `prefix` to flag "do not let this render as Id." (used
+// when a hand-typed citation citeproc can't see intervenes between two Zotero
+// cites of the same source). `prefix` round-trips reliably in the field code,
+// so the flag persists across Refresh. U+200B (ZERO WIDTH SPACE) is used so the
+// flag is invisible in the prefix box and the citation bubble even if a strip
+// step is ever missed — a Private-Use-Area char would render as a visible
+// .notdef box. It is category Cf (not whitespace), so Zotero won't trim it. The
+// id-suppress feature detects it on the citationItem and strips it from the
+// rendered RTF so it never reaches the document.
+BCF.NOID_CP = 0x200B;
+BCF.NOID_SENTINEL = String.fromCharCode(BCF.NOID_CP);
+
+// True when a citationItem's prefix carries the sentinel.
+BCF.cite.hasNoId = function (prefix) {
+    return typeof prefix === "string" && prefix.indexOf(BCF.NOID_SENTINEL) !== -1;
+};
+
+// Remove every form of the sentinel from an RTF (or plain) string: the raw
+// character, and citeproc-js's RTF escape for it (\uc0\uNNNN{}). Idempotent.
+BCF.cite.stripNoId = function (rtf) {
+    if (rtf == null) return rtf;
+    var s = String(rtf);
+    if (s.indexOf(BCF.NOID_SENTINEL) !== -1) {
+        s = s.split(BCF.NOID_SENTINEL).join("");
+    }
+    var cp = BCF.NOID_CP;
+    // citeproc-js RTF escape for a non-ASCII char (see lib/rtf.js escape()).
+    s = s.replace(new RegExp("\\\\uc0\\\\u" + cp + "\\{\\}", "g"), "");
+    // Defensive: a bare \uNNNN with optional trailing space / empty group.
+    s = s.replace(new RegExp("\\\\u" + cp + "\\b\\s?(?:\\{\\})?", "g"), "");
+    return s;
+};

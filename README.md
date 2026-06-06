@@ -30,7 +30,7 @@ Rewrites Zotero's citation output inside the integration pipeline to apply
 Bluebook rules that CSL alone can't express cleanly. Runs automatically on
 every insert/refresh.
 
-**Install:** Download [Bluebook_Citations_Fixer_v0.1.18.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.1.18/Bluebook_Citations_Fixer_v0.1.18.xpi)
+**Install:** Download [Bluebook_Citations_Fixer_v0.2.0.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.2.0/Bluebook_Citations_Fixer_v0.2.0.xpi)
 
 **Current rules:**
 
@@ -56,6 +56,11 @@ every insert/refresh.
   (`(YYYY)`, `(rev. ed. 2005)`, `(Sarah Smith ed., 2010)`, etc.). Handles
   compressed page ranges like `403-07` whether the CSL style renders the
   separator as a hyphen or en-dash.
+- **Manual "Break id."** — A checkbox in the citation dialog (under *Omit
+  Author*) flags a cite whose preceding same-source citation is hand-typed
+  (invisible to Zotero), which otherwise renders wrongly as `Id.` The plugin
+  rewrites it into the correct short form — `Author, supra note N` for
+  secondary sources or `Short, Vol Reporter at Pincite` for cases.
 
 **Platform:** Word and LibreOffice (RTF output) on Zotero 7 and Zotero 10
 beta. Google Docs not yet supported.

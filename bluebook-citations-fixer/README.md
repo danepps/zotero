@@ -32,6 +32,16 @@ that are awkward or impossible to express cleanly in CSL alone.
   `(Sarah Smith ed., 2010)`, citing-parentheticals, or nothing at all.
   Handles compressed page ranges like `403-07` whether the CSL style renders
   the separator as a hyphen or en-dash.
+- Manual **"Break id."** toggle. A checkbox in the citation dialog's bubble
+  settings (under *Omit Author*) flags a cite whose immediately preceding
+  same-source citation is hand-typed — invisible to Zotero, so citeproc
+  wrongly renders the cite as `Id.` When flagged, the plugin rewrites that
+  `Id.` into the correct Bluebook short form: `Author, supra note N` for
+  secondary sources (italic *supra*; the hereinafter rule adds the short
+  title when the author is ambiguous), or `Short, Vol Reporter at Pincite`
+  for cases. The flag is stored invisibly on the cite's prefix and persists
+  across refreshes. First-cite long forms, statutes, and cases missing the
+  reporter/volume are detected and left untouched.
 
 ## Compatibility
 
@@ -63,13 +73,24 @@ only — Word and LibreOffice work; Google Docs is not yet supported.
 
 ## Latest Released Version
 
-- `0.1.18`
-- Git tag: `bluebook-citations-fixer-v0.1.18`
-- GitHub release asset: [Bluebook_Citations_Fixer_v0.1.18.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.1.18/Bluebook_Citations_Fixer_v0.1.18.xpi)
+- `0.2.0`
+- Git tag: `bluebook-citations-fixer-v0.2.0`
+- GitHub release asset: [Bluebook_Citations_Fixer_v0.2.0.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.2.0/Bluebook_Citations_Fixer_v0.2.0.xpi)
 
 ## Release History
 
 See [`../CHANGELOG.md`](../CHANGELOG.md) for the full history. Recent releases:
+
+### v0.2.0
+
+- **Manual "Break id." toggle.** New checkbox in the citation dialog (under
+  *Omit Author*) flags a cite whose preceding same-source citation is
+  hand-typed and therefore invisible to Zotero, which otherwise renders the
+  cite as `Id.` The plugin rewrites the wrong `Id.` into the correct short
+  form — `Author, supra note N` for secondary sources (italic *supra*,
+  composing with hereinafter when the author is ambiguous) or
+  `Short, Vol Reporter at Pincite` for cases. First-cite long forms,
+  statutes, and cases missing reporter/volume are detected and skipped.
 
 ### v0.1.18
 
