@@ -224,15 +224,17 @@ BCF.dialog._setReactValue = function (el, value) {
 };
 
 // "Omit Author" is indented because it lives in the Prefix/Suffix grid's input
-// column; our row is a sibling outside that grid, so match the column by
-// shifting our row by the gap between the two checkboxes' left edges. Retries
+// column; our row is a sibling outside that grid. Align by translating our row
+// to the Omit Author checkbox's left edge. We use `transform` (not margin) so
+// the shift is purely visual and doesn't widen the row — a wider row would
+// enlarge the content-sized, centered dialog and push every field over. Retries
 // across observer passes until layout yields a usable measurement, then locks.
 BCF.dialog._align = function (row, box, omitBox) {
     try {
         if (row.getAttribute("data-bcf-aligned") === "1") return;
         var delta = omitBox.getBoundingClientRect().left - box.getBoundingClientRect().left;
-        if (delta > 0 && delta < 800) {
-            row.style.marginLeft = delta + "px";
+        if (Math.abs(delta) > 0.5 && Math.abs(delta) < 800) {
+            row.style.transform = "translateX(" + delta + "px)";
             row.setAttribute("data-bcf-aligned", "1");
         }
     } catch (_) {}
