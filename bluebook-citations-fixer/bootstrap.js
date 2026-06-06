@@ -111,7 +111,6 @@ async function startup(data) {
         load("lib/rtf.js");
         load("lib/cite.js");
         load("lib/diag.js");
-        load("lib/ui.js");
         load("lib/session-run.js");
         load("lib/features/hereinafter.js");
         load("lib/features/journal-volume-year.js");
@@ -120,7 +119,6 @@ async function startup(data) {
         load("lib/patch.js");
 
         BCF.diag.init();
-        BCF.ui.install();
         BCF.diag.event("startup", "loaded");
         BCF.patch.install();
         _registerPrefsPane(Zot, rootURI);
@@ -158,7 +156,6 @@ async function startup(data) {
 }
 
 function shutdown() {
-    try { if (BCF && BCF.ui) BCF.ui.uninstall(); } catch (_) {}
     try { if (BCF && BCF.patch) BCF.patch.uninstall(); } catch (_) {}
     try {
         if (BCF && BCF.prefsPaneID && BCF.Zotero && BCF.Zotero.PreferencePanes &&

@@ -42,7 +42,7 @@ Shipping a real release requires three things in lock-step:
 2. Update `update-bluebook-citations.json` at the repo root with the new version + download link.
 3. Push to main so GitHub Pages serves the updated JSON.
 
-There is no CI. `bluebook-citations-fixer` has a small Node helper test harness at `bluebook-citations-fixer/tests/run-node-tests.js`; broader validation is manual: install the XPI in Zotero, run the feature, read the diagnostic written to `/tmp/bluebook-citations-fixer-diag.txt` (enabled via the `extensions.bluebook-citations-fixer.diag` pref in about:config), and use Tools -> Bluebook Citations Fixer: Status for recent hook events.
+There is no CI. `bluebook-citations-fixer` has a small Node helper test harness at `bluebook-citations-fixer/tests/run-node-tests.js`; broader validation is manual: install the XPI in Zotero, run the feature, and read the diagnostic written to `/tmp/bluebook-citations-fixer-diag.txt` (enabled via the `extensions.bluebook-citations-fixer.diag` pref in about:config). Errors also surface in the Error Console regardless of the pref.
 
 ## bluebook-citations-fixer architecture
 
@@ -81,7 +81,6 @@ bluebook-citations-fixer/
     ├── rtf.js                    # escape, italic(), plainish projection, findPlainOffset, segments
     ├── cite.js                   # CSL_CITATION parse, authorKey, shortTitle, position, item-type predicates
     ├── diag.js                   # /tmp log, gated on extensions.bluebook-citations-fixer.diag pref
-    ├── ui.js                     # Tools-menu status popup + recent event buffer
     ├── session-run.js            # per-run context cached on currentSession (eligibility maps)
     ├── patch.js                  # patch Session/Field integration seams + run feature chain
     └── features/
@@ -143,7 +142,7 @@ Every feature must be idempotent — both the `_updateDocument` prewrite pass an
 
 ### Diagnostics
 
-Off by default via root `prefs.js`. Set `extensions.bluebook-citations-fixer.diag = true` in about:config, restart Zotero, and lines appear in `/tmp/bluebook-citations-fixer-diag.txt`. Errors always surface via `Components.utils.reportError` regardless of the pref. The status menu item records recent startup, patch, setText, skip, and rewrite events even when file diagnostics are disabled.
+Off by default via root `prefs.js`. Set `extensions.bluebook-citations-fixer.diag = true` in about:config, restart Zotero, and lines appear in `/tmp/bluebook-citations-fixer-diag.txt`. Errors always surface via `Components.utils.reportError` (Error Console) regardless of the pref.
 
 ### Known limitations
 
