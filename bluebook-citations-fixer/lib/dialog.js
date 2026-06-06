@@ -120,9 +120,9 @@ BCF.dialog._inject = function (doc, omitBox) {
     // produce a non-functional checkbox that renders but won't toggle.
     var row = doc.createElementNS(XHTML, "div");
     row.id = BCF.dialog.ROW_ID;
-    row.style.display = "flex";
-    row.style.alignItems = "center";
-    row.style.gap = "6px";
+    // Copy the Omit Author row's class (layout only — NOT the checkbox's own
+    // appearance class) so our row lines up in the same column above it.
+    if (omitRow && omitRow.className) row.className = omitRow.className;
     row.style.marginTop = "6px";
     row.title = BCF.dialog.TITLE;
 
@@ -130,10 +130,15 @@ BCF.dialog._inject = function (doc, omitBox) {
     box.setAttribute("type", "checkbox");
     box.id = BCF.dialog.CHECKBOX_ID;
 
+    // Label reads "Break id." with "id." italicized (Bluebook term).
     var label = doc.createElementNS(XHTML, "label");
     label.setAttribute("for", BCF.dialog.CHECKBOX_ID);
-    label.textContent = BCF.dialog.LABEL;
     label.style.cursor = "pointer";
+    label.style.marginLeft = "6px";
+    label.appendChild(doc.createTextNode("Break "));
+    var em = doc.createElementNS(XHTML, "i");
+    em.textContent = "id.";
+    label.appendChild(em);
 
     // Drive the toggle from a click (deriving the new state from the prefix,
     // not the checkbox's native state) so it works regardless of whether the
