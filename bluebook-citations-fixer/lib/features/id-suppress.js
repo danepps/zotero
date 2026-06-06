@@ -46,10 +46,17 @@ BCF.features.idSuppress = {
         var items = BCF.cite.itemsOf(codeJson);
         if (!items.length) return text;
 
-        // Cheap gate: only touch clusters that actually carry the flag.
+        // Cheap gate: only touch clusters that actually carry the flag. Also
+        // surface any prefix carrying a non-ASCII char (diagnostic): lets us
+        // confirm whether the sentinel actually reached the field code.
         var anyFlagged = false;
         for (var f = 0; f < items.length; f++) {
-            if (BCF.cite.hasNoId(items[f] && items[f].prefix)) { anyFlagged = true; break; }
+            var pre = items[f] && items[f].prefix;
+            if (pre && /[^\x20-\x7E]/.test(pre)) {
+                BCF.diag.event("id-suppress:prefix", Array.prototype.map.call(
+                    String(pre), function (c) { return c.charCodeAt(0); }).join(","));
+            }
+            if (BCF.cite.hasNoId(pre)) anyFlagged = true;
         }
         if (!anyFlagged) return text;
 
