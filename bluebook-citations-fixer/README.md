@@ -63,6 +63,30 @@ only — Word and LibreOffice work; Google Docs is not yet supported.
 
 ## Latest Released Version
 
-- `0.1.17`
-- Git tag: `bluebook-citations-fixer-v0.1.17`
-- GitHub release asset: [Bluebook_Citations_Fixer_v0.1.17.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.1.17/Bluebook_Citations_Fixer_v0.1.17.xpi)
+- `0.1.18`
+- Git tag: `bluebook-citations-fixer-v0.1.18`
+- GitHub release asset: [Bluebook_Citations_Fixer_v0.1.18.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.1.18/Bluebook_Citations_Fixer_v0.1.18.xpi)
+
+## Release History
+
+See [`../CHANGELOG.md`](../CHANGELOG.md) for the full history. Recent releases:
+
+### v0.1.18
+
+- **Hereinafter options + Settings pane.** The hereinafter rule is now
+  configurable from Zotero's Settings under **BB Citations Fixer**:
+  - A checkbox toggles whether same-author works that do *not* first appear in
+    the same footnote still get hereinafter treatment (the frequency path).
+  - A numeric field sets how many times each such work must be cited for that
+    path to apply (default `3`, minimum `2`).
+  - Defaults preserve the prior behavior; works that first appear together in
+    the same footnote always receive hereinafter treatment.
+- **Removed the Tools → "Bluebook Citations Fixer: Status" menu item** (a
+  testing aid). File diagnostics (`/tmp/bluebook-citations-fixer-diag.txt`,
+  enabled via the `…diag` pref) and Error Console reporting are unchanged.
+
+### v0.1.17
+
+- Chapters now render like articles instead of books: only the containing
+  book takes small caps (Rule 15.5/B14), so a hereinafter naming a chapter
+  uses an italic title and roman author.
