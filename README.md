@@ -30,7 +30,7 @@ Rewrites Zotero's citation output inside the integration pipeline to apply
 Bluebook rules that CSL alone can't express cleanly. Runs automatically on
 every insert/refresh.
 
-**Install:** Download [Bluebook_Citations_Fixer_v0.1.17.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.1.17/Bluebook_Citations_Fixer_v0.1.17.xpi)
+**Install:** Download [Bluebook_Citations_Fixer_v0.1.18.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.1.18/Bluebook_Citations_Fixer_v0.1.18.xpi)
 
 **Current rules:**
 

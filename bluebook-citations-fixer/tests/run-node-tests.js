@@ -186,6 +186,79 @@ async function runPatch(session, codeJson, text) {
     assert(!BCF.run.shouldUseHereinafter(run, c));
 }
 
+// Temporarily stub Zotero.Prefs so BCF.run.options() reads the supplied values.
+// Unknown pref reads throw, which BCF.run.options() catches and falls back from.
+function withPrefs(prefs, fn) {
+    const prev = Zotero.Prefs;
+    Zotero.Prefs = {
+        get(name) {
+            if (Object.prototype.hasOwnProperty.call(prefs, name)) return prefs[name];
+            throw new Error("unset pref " + name);
+        }
+    };
+    try { return fn(); } finally { Zotero.Prefs = prev; }
+}
+
+{
+    // crossFootnote = false: the frequency path is disabled, so a same-author
+    // pair cited 3x each across different footnotes is NOT eligible...
+    const a = cit("A", "Epps", "Checks", "Checks and Balances");
+    const b = cit("B", "Epps", "Asymmetry", "Adversarial Asymmetry");
+    withPrefs({ [BCF.run.PREF_CROSS_FOOTNOTE]: false }, () => {
+        const run = buildRun({
+            1: citation(1, [a]),
+            2: citation(2, [b]),
+            3: citation(3, [a]),
+            4: citation(4, [b]),
+            5: citation(5, [a]),
+            6: citation(6, [b])
+        });
+        assert.strictEqual(run.thresholdKeys.size, 2);
+        assert.strictEqual(run.eligibleKeys.size, 0);
+        assert(!BCF.run.shouldUseHereinafter(run, a));
+        assert(!BCF.run.shouldUseHereinafter(run, b));
+    });
+}
+
+{
+    // ...but with crossFootnote off, a same-footnote pair (with subsequent
+    // cites) is still eligible — that path always applies.
+    const a = cit("A2", "Epps", "Checks", "Checks and Balances");
+    const b = cit("B2", "Epps", "Asymmetry", "Adversarial Asymmetry");
+    withPrefs({ [BCF.run.PREF_CROSS_FOOTNOTE]: false }, () => {
+        const run = buildRun({
+            1: citation(1, [a, b]),
+            2: citation(2, [a]),
+            3: citation(3, [b])
+        });
+        assert(BCF.run.shouldUseHereinafter(run, a));
+        assert(BCF.run.shouldUseHereinafter(run, b));
+    });
+}
+
+{
+    // frequencyThreshold = 2: a same-author pair cited only twice each across
+    // different footnotes now qualifies (the default of 3 would exclude them).
+    const a = cit("A", "Epps", "Checks", "Checks and Balances");
+    const b = cit("B", "Epps", "Asymmetry", "Adversarial Asymmetry");
+    const byIndex = {
+        1: citation(1, [a]),
+        2: citation(2, [b]),
+        3: citation(3, [a]),
+        4: citation(4, [b])
+    };
+    // Default threshold (3): not eligible.
+    const baseline = buildRun(byIndex);
+    assert.strictEqual(baseline.eligibleKeys.size, 0);
+    // Lowered threshold (2): eligible.
+    withPrefs({ [BCF.run.PREF_THRESHOLD]: 2 }, () => {
+        const run = buildRun(byIndex);
+        assert.strictEqual(run.thresholdKeys.size, 2);
+        assert(BCF.run.shouldUseHereinafter(run, a));
+        assert(BCF.run.shouldUseHereinafter(run, b));
+    });
+}
+
 // Helper: build a session where each work in `items` has at least one
 // subsequent cite (so all are hereinafter-eligible under the count>=2 rule).
 // Extra subsequent cites land in successive footnotes after the supplied

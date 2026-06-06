@@ -1,0 +1,26 @@
+<!-- Bluebook Citations Fixer settings pane. Registered from bootstrap.js via
+     Zotero.PreferencePanes.register (src is relative to the plugin root).
+     Elements with a `preference` attribute are auto-bound by Zotero to the
+     named pref (read on open, written on change). Plain English labels are
+     used intentionally (see lib/ui.js) to avoid FTL registration. -->
+<vbox xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+      xmlns:html="http://www.w3.org/1999/xhtml">
+  <groupbox>
+    <label><html:h2>Hereinafter (Bluebook Rule 4.2(b))</html:h2></label>
+    <description>
+      Controls when a short-form "[hereinafter ...]" tag is added to repeated
+      same-author sources. Sources that first appear together in the same
+      footnote always receive hereinafter treatment; the options below govern
+      sources that first appear in different footnotes.
+    </description>
+    <checkbox id="bcf-cross-footnote"
+              preference="extensions.bluebook-citations-fixer.hereinafter.crossFootnote"
+              label="Also add hereinafter for same-author sources that do not first appear in the same footnote"/>
+    <hbox align="center">
+      <label control="bcf-threshold"
+             value="Minimum times each such source must be cited:"/>
+      <html:input id="bcf-threshold" type="number" min="2" size="4"
+                  preference="extensions.bluebook-citations-fixer.hereinafter.frequencyThreshold"/>
+    </hbox>
+  </groupbox>
+</vbox>

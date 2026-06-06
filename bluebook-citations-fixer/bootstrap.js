@@ -55,6 +55,31 @@ function _resolveZotero() {
     throw new Error("Zotero global is unavailable in the bootstrap scope");
 }
 
+// Register the Settings pane (Zotero 7+). Best-effort: if the API is missing or
+// throws we just skip it — the prefs still work via about:config and their
+// defaults in prefs.js. `src` is resolved relative to the plugin root by Zotero,
+// so it must NOT be prefixed with rootURI. register() may return the pane id
+// directly or a promise resolving to it; capture it so shutdown() can unregister.
+function _registerPrefsPane(Zot, rootURI) {
+    try {
+        if (!Zot.PreferencePanes || typeof Zot.PreferencePanes.register !== "function") {
+            return;
+        }
+        var ret = Zot.PreferencePanes.register({
+            pluginID: BCF.id,
+            src: "prefs.xhtml",
+            label: "BB Citations Fixer"
+        });
+        if (ret && typeof ret.then === "function") {
+            ret.then(function (id) { BCF.prefsPaneID = id; }, function () {});
+        } else {
+            BCF.prefsPaneID = ret;
+        }
+    } catch (e) {
+        try { if (BCF.diag) BCF.diag.err("registerPrefsPane", e); } catch (_) {}
+    }
+}
+
 async function startup(data) {
     var rootURI = data.rootURI;
     try {
@@ -64,7 +89,7 @@ async function startup(data) {
         BCF = {
             rootURI: rootURI,
             id: data.id || "bluebook-citations-fixer@danepps.com",
-            version: data.version || "0.1.14",
+            version: data.version || "0.1.18",
             features: {},
             startupError: null,
             Zotero: Zot
@@ -86,7 +111,6 @@ async function startup(data) {
         load("lib/rtf.js");
         load("lib/cite.js");
         load("lib/diag.js");
-        load("lib/ui.js");
         load("lib/session-run.js");
         load("lib/features/hereinafter.js");
         load("lib/features/journal-volume-year.js");
@@ -95,9 +119,9 @@ async function startup(data) {
         load("lib/patch.js");
 
         BCF.diag.init();
-        BCF.ui.install();
         BCF.diag.event("startup", "loaded");
         BCF.patch.install();
+        _registerPrefsPane(Zot, rootURI);
 
         try { Zot.debug("[bluebook-citations-fixer] startup complete"); } catch (_) {}
     } catch (e) {
@@ -132,7 +156,12 @@ async function startup(data) {
 }
 
 function shutdown() {
-    try { if (BCF && BCF.ui) BCF.ui.uninstall(); } catch (_) {}
     try { if (BCF && BCF.patch) BCF.patch.uninstall(); } catch (_) {}
+    try {
+        if (BCF && BCF.prefsPaneID && BCF.Zotero && BCF.Zotero.PreferencePanes &&
+                typeof BCF.Zotero.PreferencePanes.unregister === "function") {
+            BCF.Zotero.PreferencePanes.unregister(BCF.prefsPaneID);
+        }
+    } catch (_) {}
     BCF = null;
 }

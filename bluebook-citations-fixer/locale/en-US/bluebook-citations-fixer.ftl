@@ -1,2 +1,2 @@
-bluebook-citations-fixer-status-menuitem =
-    .label = Bluebook Citations Fixer: Status
+# Reserved for future localized strings. The plugin currently uses static
+# labels (Settings pane, etc.); no FTL messages are registered at present.

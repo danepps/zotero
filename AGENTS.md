@@ -28,7 +28,7 @@ At the repo root, `update-*.json` files are the Zotero auto-update manifests, se
 
 ## Build / release
 
-Each plugin is a zip of its root files (`manifest.json`, `chrome.manifest`, `bootstrap.js`, and — for `bluebook-citations-fixer` — `prefs.js`, `locale/`, and the `lib/` tree) with a `.xpi` extension. Plugins with a `build.sh` use it:
+Each plugin is a zip of its root files (`manifest.json`, `chrome.manifest`, `bootstrap.js`, and — for `bluebook-citations-fixer` — `prefs.js`, `prefs.xhtml`, `locale/`, and the `lib/` tree) with a `.xpi` extension. Plugins with a `build.sh` use it:
 
 ```
 ./bluebook-citations-fixer/build.sh <version>
@@ -42,7 +42,7 @@ Shipping a real release requires three things in lock-step:
 2. Update `update-bluebook-citations.json` at the repo root with the new version + download link.
 3. Push to main so GitHub Pages serves the updated JSON.
 
-There is no CI. `bluebook-citations-fixer` has a small Node helper test harness at `bluebook-citations-fixer/tests/run-node-tests.js`; broader validation is manual: install the XPI in Zotero, run the feature, read the diagnostic written to `/tmp/bluebook-citations-fixer-diag.txt` (enabled via the `extensions.bluebook-citations-fixer.diag` pref in about:config), and use Tools -> Bluebook Citations Fixer: Status for recent hook events.
+There is no CI. `bluebook-citations-fixer` has a small Node helper test harness at `bluebook-citations-fixer/tests/run-node-tests.js`; broader validation is manual: install the XPI in Zotero, run the feature, and read the diagnostic written to `/tmp/bluebook-citations-fixer-diag.txt` (enabled via the `extensions.bluebook-citations-fixer.diag` pref in about:config). Errors also surface in the Error Console regardless of the pref.
 
 ## bluebook-citations-fixer architecture
 
@@ -68,14 +68,14 @@ bluebook-citations-fixer/
 ├── manifest.json
 ├── chrome.manifest
 ├── build.sh
-├── prefs.js                      # default diag pref
+├── prefs.js                      # default diag + hereinafter prefs
+├── prefs.xhtml                   # Settings pane (hereinafter options)
 ├── locale/en-US/bluebook-citations-fixer.ftl
 ├── tests/run-node-tests.js       # pure helper tests for ambiguity + rewrites
 └── lib/
     ├── rtf.js                    # escape, italic(), plainish projection, findPlainOffset
     ├── cite.js                   # CSL_CITATION parse, authorKey, shortTitle, position
     ├── diag.js                   # /tmp log, gated on extensions.bluebook-citations-fixer.diag pref
-    ├── ui.js                     # Tools-menu status popup + recent event buffer
     ├── session-run.js            # per-run context cached on currentSession (ambiguity map)
     ├── patch.js                  # patch Session/Field integration seams + run feature chain
     └── features/
@@ -106,7 +106,9 @@ Returning a string replaces `ctx.text`; returning undefined is a pass-through. F
 
 ### Per-run ambiguity map
 
-`BCF.run.forSession(session)` lazily walks `session.citationsByIndex` once per run and caches `{ items, authorBuckets, itemCounts, itemFirstNotes, ambiguousKeys, sameFootnoteKeys, thresholdKeys, eligibleKeys, log }` on the session object under a non-enumerable `__bluebookCitationsFixer` key. Zotero's `citationsByIndex` is an object keyed by field index, not necessarily an array, so iterate it with `BCF.run.citationsInOrder(session)`. `eligibleKeys` is specific to `hereinafter`; other features should consult their own predicates. A work is added to `eligibleKeys` only if its `itemCounts` is >= 2 — a `[hereinafter Short]` on a work that's never cited again is noise.
+`BCF.run.forSession(session)` lazily walks `session.citationsByIndex` once per run and caches `{ items, authorBuckets, itemCounts, itemFirstNotes, ambiguousKeys, sameFootnoteKeys, thresholdKeys, eligibleKeys, log }` on the session object under a non-enumerable `__bluebookCitationsFixer` key. Zotero's `citationsByIndex` is an object keyed by field index, not necessarily an array, so iterate it with `BCF.run.citationsInOrder(session)`. `eligibleKeys` is specific to `hereinafter`; other features should consult their own predicates. A work is added to `eligibleKeys` only if its `itemCounts` is >= 2 — a `[hereinafter Short]` on a work that's never cited again is noise. A work qualifies via either the same-footnote path (`sameFootnoteKeys`) or the frequency path (`thresholdKeys`).
+
+Two user prefs (read in `BCF.run.options()`, defaults preserve historical behavior) tune the frequency path — the "not in the same footnote" case: `extensions.bluebook-citations-fixer.hereinafter.crossFootnote` (bool, default `true`) — when `false`, `thresholdKeys` no longer folds into `eligibleKeys`; and `…hereinafter.frequencyThreshold` (int, default `3`, floored at 2) replaces the hardcoded `BCF.run.FREQUENCY_THRESHOLD` cutoff. Both are exposed in the Settings pane (`prefs.xhtml`, registered from `bootstrap.js`).
 
 ### RTF conventions
 
@@ -126,7 +128,7 @@ Every feature must be idempotent — both the `_updateDocument` prewrite pass an
 
 ### Diagnostics
 
-Off by default via root `prefs.js`. Set `extensions.bluebook-citations-fixer.diag = true` in about:config, restart Zotero, and lines appear in `/tmp/bluebook-citations-fixer-diag.txt`. Errors always surface via `Components.utils.reportError` regardless of the pref. The status menu item records recent startup, patch, setText, skip, and rewrite events even when file diagnostics are disabled.
+Off by default via root `prefs.js`. Set `extensions.bluebook-citations-fixer.diag = true` in about:config, restart Zotero, and lines appear in `/tmp/bluebook-citations-fixer-diag.txt`. Errors always surface via `Components.utils.reportError` (Error Console) regardless of the pref.
 
 ### Known limitations
 

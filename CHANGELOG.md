@@ -5,6 +5,18 @@ prefix in each section header identifies which plugin shipped.
 
 ## bluebook-citations-fixer
 
+### v0.1.18 — 2026-06-06
+
+- **Hereinafter options + Settings pane:** the "hereinafter" rule can now be
+  tuned from Zotero's Settings under **BB Citations Fixer**. A checkbox
+  controls whether same-author works that do *not* first appear in the same
+  footnote still receive hereinafter treatment (the frequency path), and a
+  numeric field sets how many times each such work must be cited for it to
+  apply (default 3, minimum 2). Defaults preserve the previous behavior.
+- **Removed the Tools → "Bluebook Citations Fixer: Status" menu item**, a
+  testing aid. File diagnostics (`/tmp/bluebook-citations-fixer-diag.txt`,
+  enabled via the `…diag` pref) and Error Console reporting are unchanged.
+
 ### v0.1.17 — 2026-05-26
 
 - **Hereinafter:** chapters now render like articles instead of books.
