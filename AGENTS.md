@@ -76,10 +76,12 @@ bluebook-citations-fixer/
     ├── rtf.js                    # escape, italic(), plainish projection, findPlainOffset
     ├── cite.js                   # CSL_CITATION parse, authorKey, shortTitle, position
     ├── diag.js                   # /tmp log, gated on extensions.bluebook-citations-fixer.diag pref
+    ├── dialog.js                 # citation-dialog "Break id." checkbox (NOID sentinel on prefix)
     ├── session-run.js            # per-run context cached on currentSession (ambiguity map)
     ├── patch.js                  # patch Session/Field integration seams + run feature chain
     └── features/
         ├── registry.js           # ordered list of features
+        ├── id-suppress.js        # manual "Break id." -> correct short form (supra / reporter)
         ├── hereinafter.js        # Rule 4.2(b): [hereinafter Short] + supra-cite rewrite
         ├── journal-volume-year.js# suppress redundant trailing year when volume is year-like
         └── book-at.js            # insert ", at" when numeral-ending titles make locators ambiguous
@@ -102,7 +104,11 @@ ctx = {
 }
 ```
 
-Returning a string replaces `ctx.text`; returning undefined is a pass-through. Features run in `registry.list` order, each seeing the previous feature's output. The current order is `journal-volume-year` -> `book-at` -> `hereinafter`. **Hereinafter runs last on purpose:** it appends `[hereinafter ...]` to the end of a segment, and both `journal-volume-year` (strips trailing `(YYYY)`) and `book-at` (rewrites trailing `<numeral> <locator>`) anchor on `$` — they must see the un-bracketed tail first. **To add a new Bluebook rule: create `lib/features/<id>.js`, load it in `bootstrap.js`, and append it to `registry.list`.**
+Returning a string replaces `ctx.text`; returning undefined is a pass-through. Features run in `registry.list` order, each seeing the previous feature's output. The current order is `id-suppress` -> `journal-volume-year` -> `book-at` -> `hereinafter`. **`id-suppress` runs first on purpose:** it corrects a wrongly-rendered `Id.` into the proper short form so every later feature sees the corrected text (and `hereinafter` can then inject a short title before its `supra note`). **Hereinafter runs last on purpose:** it appends `[hereinafter ...]` to the end of a segment, and both `journal-volume-year` (strips trailing `(YYYY)`) and `book-at` (rewrites trailing `<numeral> <locator>`) anchor on `$` — they must see the un-bracketed tail first. **To add a new Bluebook rule: create `lib/features/<id>.js`, load it in `bootstrap.js`, and append it to `registry.list`.**
+
+#### Dialog UI surface
+
+`bluebook-citations-fixer` is not pipeline-only. `lib/dialog.js` (`BCF.dialog`, installed from `bootstrap.js`) injects a **"Break id."** checkbox into Zotero's citation dialog, modeled on `bluebook-signals/bootstrap.js` (same `#prefix` anchor + native `input` dispatch; static label, no FTL). Ticking it stores `BCF.NOID_SENTINEL` (a U+E000 sentinel) at the head of the active cite's `prefix`, which round-trips in the field code. The `id-suppress` feature (`lib/features/id-suppress.js`) detects that flag and rewrites the `Id.` citeproc emits — for the case where a hand-typed citation citeproc can't see intervenes between two Zotero cites — into the correct short form: `<Author>, supra note N, at <loc>` for secondary sources (`hereinafter` then adds the short title when the author is ambiguous), or `<Short>, <Vol> <Reporter> at <loc>` for cases (short name from `title-short` / Case Name; Reporter emitted verbatim). It strips the sentinel from the RTF in the same pass (`BCF.cite.stripNoId`) so it never reaches the document. First-cite long forms, statutes, and cases missing Reporter/Volume are detected, the sentinel stripped, the text left intact, and a `skip:id-suppress` diag recorded.
 
 ### Per-run ambiguity map
 
@@ -135,4 +141,6 @@ Off by default via root `prefs.js`. Set `extensions.bluebook-citations-fixer.dia
 - RTF output only — Google Docs (HTML output format) is not yet covered. Adding it is a branch on `session.outputFormat` inside `lib/rtf.js` + feature code that consults it.
 - Multi-cite splitting relies on the `; ` literal separator in the RTF. If a user's CSL style uses a different `cite-group-delimiter`, multi-item clusters will fall back to pass-through.
 - Ambiguity grouping is by author-surname list only — no handling of editor-as-author or institutional authors yet.
+- `id-suppress` (manual "Break id.") covers secondary sources (via `supra`) and cases (via the reporter short form). **Out of scope:** a flagged cite that is the document's first real cite (no earlier note to reference, and faithful long-form rendering would mean reproducing citeproc), and statutes (their own short-form template + variable field coverage). These are detected and skipped, not silently mis-rendered. "First cite vs repeat" is inferred from whether citeproc rendered an `Id.`; the `supra note N` target comes from `itemFirstNotes`, built only from Zotero-visible cites.
+- The "Break id." checkbox state-sync (`lib/dialog.js`) rides Zotero's reused item-details panel; if it proves fragile, the fallback is a menu-item/keystroke that just injects the sentinel.
 - The test harness is Node-only and mocks Zotero's integration layer. It now covers the patch pipeline for regression purposes, but it is still not a substitute for manual Zotero document testing.

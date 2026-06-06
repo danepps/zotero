@@ -111,16 +111,19 @@ async function startup(data) {
         load("lib/rtf.js");
         load("lib/cite.js");
         load("lib/diag.js");
+        load("lib/dialog.js");
         load("lib/session-run.js");
         load("lib/features/hereinafter.js");
         load("lib/features/journal-volume-year.js");
         load("lib/features/book-at.js");
+        load("lib/features/id-suppress.js");
         load("lib/features/registry.js");
         load("lib/patch.js");
 
         BCF.diag.init();
         BCF.diag.event("startup", "loaded");
         BCF.patch.install();
+        BCF.dialog.install();
         _registerPrefsPane(Zot, rootURI);
 
         try { Zot.debug("[bluebook-citations-fixer] startup complete"); } catch (_) {}
@@ -156,6 +159,7 @@ async function startup(data) {
 }
 
 function shutdown() {
+    try { if (BCF && BCF.dialog) BCF.dialog.uninstall(); } catch (_) {}
     try { if (BCF && BCF.patch) BCF.patch.uninstall(); } catch (_) {}
     try {
         if (BCF && BCF.prefsPaneID && BCF.Zotero && BCF.Zotero.PreferencePanes &&

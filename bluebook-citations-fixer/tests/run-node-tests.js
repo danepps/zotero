@@ -36,6 +36,7 @@ load("lib/session-run.js");
 load("lib/features/hereinafter.js");
 load("lib/features/journal-volume-year.js");
 load("lib/features/book-at.js");
+load("lib/features/id-suppress.js");
 load("lib/features/registry.js");
 load("lib/patch.js");
 
@@ -971,6 +972,174 @@ function eligibleRun(initialCitationsByIndex, items) {
         out,
         "Francis N. Stites, Private Interest and Public Gain: The Dartmouth College Case, 1819, at 78"
     );
+}
+
+// ---------------------------------------------------------------------------
+// id-suppress: manual "Break id." correction.
+// ---------------------------------------------------------------------------
+
+// RTF escape citeproc-js emits for the U+E000 sentinel, and the raw character
+// the dialog stores in the cite's prefix.
+const NOID_RTF = "\\uc0\\u57344{}";
+const NOID = String.fromCharCode(0xE000);
+
+{
+    // Secondary source: wrong "Id." -> "Author, supra note N, at <loc>".
+    // The flag rides on the prefix; the escaped sentinel rides at the head of
+    // the rendered RTF. Both must be gone from the output.
+    const a = cit("IDsupra", "Kerr", "Theory", "An Equilibrium Theory",
+        undefined, undefined, { type: "article-journal" });
+    const aFlag = cit("IDsupra", "Kerr", "Theory", "An Equilibrium Theory",
+        undefined, undefined, { type: "article-journal" });
+    aFlag.prefix = NOID;
+    aFlag.locator = "526-27";
+    const b = cit("IDsupraB", "Brown", "Other", "Other Piece",
+        undefined, undefined, { type: "article-journal" });
+    const run = buildRun({
+        1: citation(1, [a]),
+        2: citation(2, [b]),
+        3: citation(3, [aFlag])
+    });
+    const out = BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [aFlag] },
+        run,
+        text: NOID_RTF + "See id. at 526-27",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "See Kerr, supra note 1, at 526-27");
+
+    // Idempotency: feeding the output back through is a no-op even though the
+    // sentinel still rides on the prefix.
+    assert.strictEqual(BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [aFlag] },
+        run,
+        text: out,
+        rtf: BCF.rtf
+    }), out);
+}
+
+{
+    // Same input WITHOUT the flag: untouched.
+    const a = cit("IDsupra2", "Kerr", "Theory", "An Equilibrium Theory",
+        undefined, undefined, { type: "article-journal" });
+    const run = buildRun({ 1: citation(1, [a]), 2: citation(2, [a]) });
+    const text = "See id. at 33";
+    assert.strictEqual(BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text,
+        rtf: BCF.rtf
+    }), text);
+}
+
+{
+    // Composition: id-suppress output feeds hereinafter, which injects the
+    // short title before "supra note" when the work is ambiguous.
+    const a = cit("IDcomp", "Kerr", "Theory", "An Equilibrium Theory",
+        undefined, undefined, { type: "article-journal" });
+    const a2 = cit("IDcompB", "Kerr", "History", "A Curious History",
+        undefined, undefined, { type: "article-journal" });
+    const run = eligibleRun({ 1: citation(1, [a, a2]) }, [a, a2]);
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: "See Kerr, supra note 1, at 526-27",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "See Kerr, {\\i{}Theory}, supra note 1, at 526-27");
+}
+
+{
+    // Case WITH a Short Title: "Id." -> "<i>Iqbal</i>, 556 U.S. at 678".
+    const c = cit("IDcase", null, "Iqbal", "Ashcroft v. Iqbal", undefined, [],
+        { type: "legal_case", volume: "556", "container-title": "U.S." });
+    const cFlag = cit("IDcase", null, "Iqbal", "Ashcroft v. Iqbal", undefined, [],
+        { type: "legal_case", volume: "556", "container-title": "U.S." });
+    cFlag.prefix = NOID;
+    cFlag.locator = "678";
+    const run = buildRun({ 1: citation(1, [c]), 2: citation(2, [cFlag]) });
+    const out = BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [cFlag] },
+        run,
+        text: NOID_RTF + "See id. at 678",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "See {\\i{}Iqbal}, 556 U.S. at 678");
+}
+
+{
+    // Case WITHOUT a Short Title: falls back to the full Case Name (italic).
+    const cFlag = cit("IDcase2", null, undefined, "Ashcroft v. Iqbal", undefined, [],
+        { type: "legal_case", volume: "556", "container-title": "U.S." });
+    cFlag.prefix = NOID;
+    cFlag.locator = "678";
+    const run = buildRun({ 1: citation(1, [cFlag]) });
+    const out = BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [cFlag] },
+        run,
+        text: NOID_RTF + "Id. at 678",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "{\\i{}Ashcroft v. Iqbal}, 556 U.S. at 678");
+}
+
+{
+    // Case missing Reporter Volume: can't build a reporter cite -> leave the
+    // text (sentinel stripped) and skip.
+    const cFlag = cit("IDcase3", null, "Iqbal", "Ashcroft v. Iqbal", undefined, [],
+        { type: "legal_case", "container-title": "U.S." });
+    cFlag.prefix = NOID;
+    cFlag.locator = "678";
+    const run = buildRun({ 1: citation(1, [cFlag]) });
+    const out = BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [cFlag] },
+        run,
+        text: NOID_RTF + "See id. at 678",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "See id. at 678");
+}
+
+{
+    // Statute (deferred type): leave the text, strip the sentinel.
+    const sFlag = cit("IDstat", null, "Short", "Some Act", undefined, [],
+        { type: "legislation" });
+    sFlag.prefix = NOID;
+    const run = buildRun({ 1: citation(1, [sFlag]) });
+    const out = BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [sFlag] },
+        run,
+        text: NOID_RTF + "See id. at 5",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "See id. at 5");
+}
+
+{
+    // Flagged but renders the long form (it's the first real cite): nothing to
+    // suppress; strip the sentinel and leave the long form intact.
+    const aFlag = cit("IDfirst", "Kerr", "Theory", "An Equilibrium Theory",
+        undefined, undefined, { type: "article-journal" });
+    aFlag.prefix = NOID;
+    const run = buildRun({ 1: citation(1, [aFlag]) });
+    const out = BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [aFlag] },
+        run,
+        text: NOID_RTF + "Orin S. Kerr, An Equilibrium Theory, 125 Harv. L. Rev. 476 (2011)",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Orin S. Kerr, An Equilibrium Theory, 125 Harv. L. Rev. 476 (2011)"
+    );
+}
+
+{
+    // Sentinel-strip robustness: raw character form and the RTF-escape form.
+    assert.strictEqual(BCF.cite.stripNoId(NOID + "See id."), "See id.");
+    assert.strictEqual(BCF.cite.stripNoId(NOID_RTF + "See id."), "See id.");
+    assert.strictEqual(BCF.cite.hasNoId(NOID + "See"), true);
+    assert.strictEqual(BCF.cite.hasNoId("See"), false);
 }
 
 (async function () {
