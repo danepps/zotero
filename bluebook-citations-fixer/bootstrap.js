@@ -57,8 +57,9 @@ function _resolveZotero() {
 
 // Register the Settings pane (Zotero 7+). Best-effort: if the API is missing or
 // throws we just skip it — the prefs still work via about:config and their
-// defaults in prefs.js. register() may return the pane id directly or a promise
-// resolving to it; capture it either way so shutdown() can unregister.
+// defaults in prefs.js. `src` is resolved relative to the plugin root by Zotero,
+// so it must NOT be prefixed with rootURI. register() may return the pane id
+// directly or a promise resolving to it; capture it so shutdown() can unregister.
 function _registerPrefsPane(Zot, rootURI) {
     try {
         if (!Zot.PreferencePanes || typeof Zot.PreferencePanes.register !== "function") {
@@ -66,8 +67,8 @@ function _registerPrefsPane(Zot, rootURI) {
         }
         var ret = Zot.PreferencePanes.register({
             pluginID: BCF.id,
-            src: rootURI + "prefs.xhtml",
-            label: "Bluebook Citations Fixer"
+            src: "prefs.xhtml",
+            label: "BB Citations Fixer"
         });
         if (ret && typeof ret.then === "function") {
             ret.then(function (id) { BCF.prefsPaneID = id; }, function () {});
