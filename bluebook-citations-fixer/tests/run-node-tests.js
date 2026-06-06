@@ -978,10 +978,10 @@ function eligibleRun(initialCitationsByIndex, items) {
 // id-suppress: manual "Break id." correction.
 // ---------------------------------------------------------------------------
 
-// RTF escape citeproc-js emits for the U+E000 sentinel, and the raw character
+// RTF escape citeproc-js emits for the U+200B sentinel, and the raw character
 // the dialog stores in the cite's prefix.
-const NOID_RTF = "\\uc0\\u57344{}";
-const NOID = String.fromCharCode(0xE000);
+const NOID_RTF = "\\uc0\\u8203{}";
+const NOID = String.fromCharCode(0x200B);
 
 {
     // Secondary source: wrong "Id." -> "Author, supra note N, at <loc>".
@@ -1140,6 +1140,43 @@ const NOID = String.fromCharCode(0xE000);
     assert.strictEqual(BCF.cite.stripNoId(NOID_RTF + "See id."), "See id.");
     assert.strictEqual(BCF.cite.hasNoId(NOID + "See"), true);
     assert.strictEqual(BCF.cite.hasNoId("See"), false);
+}
+
+{
+    // Regression: citeproc italicizes "Id." per Bluebook ("{\\i{}Id.}"). The
+    // rewrite must close that italic group so the short form renders roman, not
+    // leave it open and italicize the whole cite. (No signal here.)
+    const a = cit("IDital", "Merrill", "Common Law", "The Common Law Powers",
+        undefined, undefined, { type: "chapter" });
+    const aFlag = cit("IDital", "Merrill", "Common Law", "The Common Law Powers",
+        undefined, undefined, { type: "chapter" });
+    aFlag.prefix = NOID;
+    const run = buildRun({ 1: citation(1, [a]), 2: citation(2, [aFlag]) });
+    const out = BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [aFlag] },
+        run,
+        text: NOID_RTF + "{\\i{}Id.}",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "{\\i{}}Merrill, supra note 1");
+}
+
+{
+    // Italic signal + italic "Id." in one group ("{\\i{}See id.} at 5"): the
+    // signal stays italic (group closed after it), the short form roman.
+    const a = cit("IDital2", "Kerr", "Theory", "An Equilibrium Theory",
+        undefined, undefined, { type: "article-journal" });
+    const aFlag = cit("IDital2", "Kerr", "Theory", "An Equilibrium Theory",
+        undefined, undefined, { type: "article-journal" });
+    aFlag.prefix = NOID;
+    const run = buildRun({ 1: citation(1, [a]), 2: citation(2, [aFlag]) });
+    const out = BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [aFlag] },
+        run,
+        text: NOID_RTF + "{\\i{}See id.} at 5",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "{\\i{}See }Kerr, supra note 1, at 5");
 }
 
 (async function () {

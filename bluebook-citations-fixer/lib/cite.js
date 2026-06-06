@@ -165,11 +165,13 @@ BCF.cite.escapeRegex = function (s) {
 // the head of a cite's `prefix` to flag "do not let this render as Id." (used
 // when a hand-typed citation citeproc can't see intervenes between two Zotero
 // cites of the same source). `prefix` round-trips reliably in the field code,
-// so the flag persists across Refresh. A Private-Use-Area codepoint is used so
-// that, if a strip step is ever missed, the leak is at least invisible-ish
-// rather than a visible token. The id-suppress feature both detects it on the
-// citationItem and strips it from the rendered RTF so it never reaches the doc.
-BCF.NOID_CP = 0xE000;
+// so the flag persists across Refresh. U+200B (ZERO WIDTH SPACE) is used so the
+// flag is invisible in the prefix box and the citation bubble even if a strip
+// step is ever missed — a Private-Use-Area char would render as a visible
+// .notdef box. It is category Cf (not whitespace), so Zotero won't trim it. The
+// id-suppress feature detects it on the citationItem and strips it from the
+// rendered RTF so it never reaches the document.
+BCF.NOID_CP = 0x200B;
 BCF.NOID_SENTINEL = String.fromCharCode(BCF.NOID_CP);
 
 // True when a citationItem's prefix carries the sentinel.

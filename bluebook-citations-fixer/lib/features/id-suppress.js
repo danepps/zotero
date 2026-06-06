@@ -101,7 +101,13 @@ BCF.features.idSuppress = {
         // and replace from there to the end of the segment.
         var idOffset = BCF.rtf.findPlainOffset(segRtf, /\bid\./i);
         if (idOffset < 0) return BCF.cite.stripNoId(segRtf);
-        var prefixRtf = segRtf.slice(0, idOffset);
+        // citeproc italicizes "Id." per Bluebook, so the RTF up to "Id." can end
+        // inside an open group (e.g. "{\i{}" from "{\i{}Id.}"). Slicing there
+        // leaves that group unclosed, which would italicize the whole rewritten
+        // cite. Close any groups still open at the cut so the short form we
+        // append renders roman; an introductory signal keeps its own formatting
+        // because its group opened and closed before "Id.".
+        var prefixRtf = BCF.features.idSuppress._closeOpenGroups(segRtf.slice(0, idOffset));
 
         var locator = BCF.features.idSuppress._locator(item, plain);
 
@@ -152,6 +158,22 @@ BCF.features.idSuppress = {
             after: BCF.rtf.plainish(rebuilt)
         });
         return rebuilt;
+    },
+
+    // Append a closing brace for every RTF group still open at the end of the
+    // string (escaped "\{" / "\}" don't count). Used to repair the prefix slice
+    // when it cuts inside citeproc's italic wrapper around "Id.".
+    _closeOpenGroups: function (rtf) {
+        var depth = 0;
+        for (var i = 0; i < rtf.length; i++) {
+            var ch = rtf.charAt(i);
+            if (ch === "\\") { i++; continue; }
+            else if (ch === "{") depth++;
+            else if (ch === "}") depth--;
+        }
+        var out = rtf;
+        while (depth-- > 0) out += "}";
+        return out;
     },
 
     // Pin locator for the rewritten short form. Prefer the citationItem's own
