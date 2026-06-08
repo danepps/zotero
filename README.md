@@ -17,6 +17,7 @@ Prefix field is focused to insert a Bluebook signal (*See*, *E.g.*, *Accord*,
 etc.).
 
 🌐 [Project page & install →](https://danepps.github.io/zotero/bluebook-signals/)
+
 📖 **[Documentation](bluebook-signals/README.md)** ·
 
 ### Bluebook Citations Fixer
@@ -31,6 +32,7 @@ plugin dormant under any style but your own). Runs automatically on every
 insert/refresh.
 
 🌐 [Project page & install →](https://danepps.github.io/zotero/bluebook-citations-fixer/)
+
 📖 **[Documentation](bluebook-citations-fixer/README.md)** ·
 
 ## Installing a plugin
