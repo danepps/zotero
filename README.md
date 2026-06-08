@@ -16,7 +16,7 @@ A signal picker for the citation-dialog prefix field. Press **Ctrl+S** while the
 Prefix field is focused to insert a Bluebook signal (*See*, *E.g.*, *Accord*,
 etc.).
 
-🌐 [[Project page & install →](https://danepps.github.io/zotero/bluebook-signals/)
+🌐 [Project page & install →](https://danepps.github.io/zotero/bluebook-signals/)
 📖 **[Documentation](bluebook-signals/README.md)** ·
 
 ### Bluebook Citations Fixer
