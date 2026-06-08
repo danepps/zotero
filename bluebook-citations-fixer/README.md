@@ -12,6 +12,14 @@ description: Bluebook rule fixes for Zotero citations
 Zotero plugin that rewrites rendered citation text to apply Bluebook rules
 that are awkward or impossible to express cleanly in CSL alone.
 
+## Install
+
+Download [Bluebook_Citations_Fixer_v1.1.0.1.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.1.0.1/Bluebook_Citations_Fixer_v1.1.0.1.xpi)
+and install it via **Zotero → Tools → Plugins → gear menu → Install Plugin From File**.
+
+> 💡 Pairs with [Bluebook Signals](../bluebook-signals/README.md) —
+> [installing both](#companion-plugin) is recommended.
+
 ## Current Features
 
 - Hereinafter support for ambiguous same-author works

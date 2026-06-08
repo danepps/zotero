@@ -9,6 +9,9 @@ Bluebook signals and insert the chosen one.
 Download [Bluebook_Signals_v3.0.0.xpi](https://github.com/danepps/zotero/releases/download/bluebook-signals-v3.0.0/Bluebook_Signals_v3.0.0.xpi)
 and install it via **Zotero → Tools → Plugins → gear menu → Install Plugin From File**.
 
+> 💡 Pairs with [Bluebook Citations Fixer](../bluebook-citations-fixer/README.md) —
+> [installing both](#companion-plugin) is recommended.
+
 ## Usage
 
 1. Open the Add Citation dialog in your word processor.
