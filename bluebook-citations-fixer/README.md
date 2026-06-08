@@ -1,3 +1,8 @@
+---
+title: Bluebook Citations Fixer
+description: Bluebook rule fixes for Zotero citations
+---
+
 # Bluebook Citations Fixer
 
 > ⚠️ **Beta / experimental.** This plugin is in active development and
