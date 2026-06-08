@@ -1,8 +1,7 @@
 # Bluebook Citations Fixer
 
-> ⚠️ **Beta / experimental.** This plugin is in active development and
-> likely buggy. Install only if you want to help beta test and are
-> comfortable reporting issues. Back up any document you run it against.
+> ⚠️ This plugin is in active development and could be likely buggy. It appears to be working well, but
+> use at your own risk.
 
 Zotero plugin that rewrites rendered citation text to apply Bluebook rules
 that are awkward or impossible to express cleanly in CSL alone.
@@ -46,7 +45,7 @@ that are awkward or impossible to express cleanly in CSL alone.
 ## Compatibility
 
 Zotero 7 and Zotero 10 beta on macOS, Windows, and Linux. RTF output
-only — Word and LibreOffice work; Google Docs is not yet supported.
+only — Word and (at least in theory) LibreOffice work; Google Docs is not yet supported.
 
 ## Architecture
 
