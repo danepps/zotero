@@ -5,13 +5,12 @@ description: Bluebook rule fixes for Zotero citations
 
 # Bluebook Citations Fixer
 
+Zotero plugin that rewrites rendered citation text to apply Bluebook rules
+that are awkward or impossible to express cleanly in CSL alone.
 
 > ⚠️ This plugin is in active development and possibly buggy.
 > It seems to be working well, but use at your own risk. 
 
-
-Zotero plugin that rewrites rendered citation text to apply Bluebook rules
-that are awkward or impossible to express cleanly in CSL alone.
 
 > ## 🚨 Requires the Epps Bluebook CSL style
 >
