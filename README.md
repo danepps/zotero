@@ -16,8 +16,8 @@ A signal picker for the citation-dialog prefix field. Press **Ctrl+S** while the
 Prefix field is focused to insert a Bluebook signal (*See*, *E.g.*, *Accord*,
 etc.).
 
-📖 **[Documentation & install →](bluebook-signals/README.md)** ·
-🌐 [Project page](https://danepps.github.io/zotero/bluebook-signals/)
+🌐 [[Project page & install →]](https://danepps.github.io/zotero/bluebook-signals/)
+📖 **[Documentation](bluebook-signals/README.md)** ·
 
 ### Bluebook Citations Fixer
 
@@ -30,14 +30,14 @@ volume/year, book pincites, manual "Break id.", and a style gate that keeps the
 plugin dormant under any style but your own). Runs automatically on every
 insert/refresh.
 
-📖 **[Documentation & install →](bluebook-citations-fixer/README.md)** ·
-🌐 [Project page](https://danepps.github.io/zotero/bluebook-citations-fixer/)
+🌐 [Project page & install →](https://danepps.github.io/zotero/bluebook-citations-fixer/)
+📖 **[Documentation](bluebook-citations-fixer/README.md)** ·
 
 ## Installing a plugin
 
 Every plugin installs the same way:
 
-1. Download the plugin's `.xpi` from its documentation page (linked above).
+1. Download the plugin's `.xpi` from its project page (linked above).
 2. In Zotero, go to **Tools → Plugins → gear menu → Install Plugin From File**.
 3. Select the downloaded `.xpi`.
 
