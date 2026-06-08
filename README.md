@@ -64,4 +64,6 @@ every insert/refresh.
 **Platform:** Word on Zotero 7 through Zotero 10
 beta. LibreOffice may work but has not been tested. Google Docs not supported.
 
+**Original author:** Daniel Epps. 
+
 ---
