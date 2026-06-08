@@ -12,6 +12,20 @@ description: Bluebook rule fixes for Zotero citations
 Zotero plugin that rewrites rendered citation text to apply Bluebook rules
 that are awkward or impossible to express cleanly in CSL alone.
 
+> ## 🚨 Requires the Epps Bluebook CSL style
+>
+> Out of the box this plugin **only runs when your document uses Dan Epps's
+> Bluebook style** — under any other citation style it stays completely
+> dormant and changes nothing. You must install and select that style for the
+> fixer to do anything.
+>
+> - **Get the style:** [BluebookDSEStyle.csl](https://danepps.github.io/bluebook/BluebookDSEStyle.csl)
+> - **More info:** [danepps.github.io/bluebook](https://danepps.github.io/bluebook/)
+>
+> (Advanced: the style requirement is a configurable "style gate" — see
+> [Current Features](#current-features). You can clear it in Settings to apply
+> the rules under any style, but the default expects the Epps Bluebook style.)
+
 ## Install
 
 Download [Bluebook_Citations_Fixer_v1.1.0.1.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.1.0.1/Bluebook_Citations_Fixer_v1.1.0.1.xpi)
