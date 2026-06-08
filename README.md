@@ -22,11 +22,10 @@ while the prefix field is focused to insert a Bluebook signal
 
 ## Bluebook Citations Fixer
 
-> ⚠️ **Beta / experimental.** This plugin is in active development and
-> likely buggy. Install only if you want to help beta test and are
-> comfortable reporting issues. Back up any document you run it against.
+> ⚠️ This plugin is in active development and could be could be buggy. While it appears to be
+> working well, use it at your own risk.
 
-Rewrites Zotero's citation output inside the integration pipeline to apply
+This plugin rewrites Zotero's citation output inside the integration pipeline to apply
 Bluebook rules that CSL alone can't express cleanly. Runs automatically on
 every insert/refresh.
 
@@ -57,14 +56,12 @@ every insert/refresh.
   compressed page ranges like `403-07` whether the CSL style renders the
   separator as a hyphen or en-dash.
 - **Manual "Break id."** — A checkbox in the citation dialog (under *Omit
-  Author*) flags a cite whose preceding same-source citation is hand-typed
-  (invisible to Zotero), which otherwise renders wrongly as `Id.` The plugin
-  rewrites it into the correct short form — `Author, supra note N` for
-  secondary sources or `Short, Vol Reporter at Pincite` for cases.
+  Author*) should be used to flag a cite where the preceding same-source citation is
+  separated by another citation that is hand-typed (and thus invisible to Zotero),
+  which otherwise renders wrongly as `Id.` The plugin rewrites it into the correct 
+  short form — `Author, supra note N` for secondary sources or `Short, Vol Reporter at Pincite` for cases.
 
-**Platform:** Word and LibreOffice (RTF output) on Zotero 7 and Zotero 10
-beta. Google Docs not yet supported.
+**Platform:** Word on Zotero 7 through Zotero 10
+beta. LibreOffice may work but has not been tested. Google Docs not supported.
 
 ---
-
-*More plugins coming soon.*
