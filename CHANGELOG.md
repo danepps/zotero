@@ -5,6 +5,16 @@ prefix in each section header identifies which plugin shipped.
 
 ## bluebook-citations-fixer
 
+### v1.0.0 — 2026-06-08
+
+- **First stable release.** Promotes the 0.2.x line to 1.0 with no
+  behavioral changes since v0.2.0 — the manual "Break id." toggle, the
+  hereinafter / id-suppress / journal-volume-year / book-at feature chain,
+  and the citation-dialog checkbox are all carried forward as-is.
+- **Relicensed under the GNU General Public License v3 (GPLv3).** `COPYING.txt`
+  now carries the full GPLv3 text (previously AGPLv3), and the Settings → About
+  pane states the license.
+
 ### v0.2.0 — 2026-06-06
 
 - **Manual "Break id." toggle.** A new checkbox in the citation dialog's
