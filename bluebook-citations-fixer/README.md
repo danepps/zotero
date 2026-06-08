@@ -33,6 +33,24 @@ and install it via **Zotero → Tools → Plugins → gear menu → Install Plug
 > [Current Features](#current-features). You can clear it in Settings to apply
 > the rules under any style, but the default expects the Epps Bluebook style.)
 
+> ## 🔄 Run a full refresh to apply the rules
+>
+> The document-aware rules don't update as you type — you must run a **full
+> Zotero refresh** (the **Refresh** button in the Zotero tab of your word
+> processor) after adding, editing, or removing citations. Adding or deleting
+> one cite changes what *other* cites should say, and only a full refresh
+> re-runs every citation in the document.
+>
+> - **Need a refresh:** the *hereinafter* rule and the *"Break id."* short-form
+>   fix — both depend on the whole document (who shares an author, how often a
+>   work is cited, which footnote a source first appears in).
+> - **Apply on insert too:** the *journal volume/year* and *book ", at"* fixes
+>   are local to a single cite, so they take effect immediately — but a refresh
+>   never hurts.
+>
+> When in doubt, **refresh** — it's the only way to guarantee every rule is
+> applied consistently across the document.
+
 ## Current Features
 
 - Hereinafter support for ambiguous same-author works
