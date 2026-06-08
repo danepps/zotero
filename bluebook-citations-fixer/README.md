@@ -106,16 +106,6 @@ meant to be used together — **installing both is recommended.**
 Zotero 7 and Zotero 10 beta on macOS, Windows, and Linux. RTF output
 only — Word and LibreOffice work; Google Docs is not yet supported.
 
-## Architecture
-
-- `bootstrap.js` loads shared helpers and feature modules
-- `lib/patch.js` intercepts Zotero integration output before it is written
-  into the document
-- `lib/features/registry.js` defines feature order
-- `lib/features/*.js` holds individual rewrite features
-- `tests/run-node-tests.js` contains focused regression tests for rewrite
-  behavior
-
 ## Latest Released Version
 
 - `1.1.0.1`
