@@ -73,13 +73,20 @@ only — Word and LibreOffice work; Google Docs is not yet supported.
 
 ## Latest Released Version
 
-- `0.2.0`
-- Git tag: `bluebook-citations-fixer-v0.2.0`
-- GitHub release asset: [Bluebook_Citations_Fixer_v0.2.0.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v0.2.0/Bluebook_Citations_Fixer_v0.2.0.xpi)
+- `1.0.0`
+- Git tag: `bluebook-citations-fixer-v1.0.0`
+- GitHub release asset: [Bluebook_Citations_Fixer_v1.0.0.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.0.0/Bluebook_Citations_Fixer_v1.0.0.xpi)
 
 ## Release History
 
 See [`../CHANGELOG.md`](../CHANGELOG.md) for the full history. Recent releases:
+
+### v1.0.0
+
+- **First stable release.** Promotes the 0.2.x line to 1.0 with no behavioral
+  changes since v0.2.0.
+- **Relicensed under GPLv3** (was AGPLv3) — full text in `COPYING.txt`, with the
+  license surfaced in the Settings → About pane.
 
 ### v0.2.0
 
