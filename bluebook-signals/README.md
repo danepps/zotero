@@ -22,6 +22,15 @@ and install it via **Zotero → Tools → Plugins → gear menu → Install Plug
 `e.g.,`, `accord`, `see`, `see also`, `see, e.g.,`, `cf.`, `contra`,
 `but see`, `see generally`
 
+## Companion plugin
+
+This plugin pairs with
+**[Bluebook Citations Fixer](../bluebook-citations-fixer/README.md)**, which
+rewrites Zotero's citation output to apply Bluebook rules CSL can't express
+cleanly (hereinafter, journal volume/year, book pincites, and a manual
+"Break id." fix). The two are built for the same law-review workflow and are
+meant to be used together — **installing both is recommended.**
+
 ## Credits
 
 Original author: Frank Bennett. Updated for Zotero 9 by Dan Epps, 2026.

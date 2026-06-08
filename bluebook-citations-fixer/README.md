@@ -47,6 +47,20 @@ that are awkward or impossible to express cleanly in CSL alone.
   for cases. The flag is stored invisibly on the cite's prefix and persists
   across refreshes. First-cite long forms, statutes, and cases missing the
   reporter/volume are detected and left untouched.
+- **Style gate.** By default the plugin only rewrites citations when the open
+  document uses Dan Epps's Bluebook CSL style — under every other style it
+  stays completely dormant, so it never touches a document formatted in some
+  other style. Configurable in Settings: clear the style-ID box to apply the
+  rules under all styles (the old behavior), or point it at a different style's
+  ID. If the active style can't be read for any reason, it fails open so the
+  plugin never silently stops working.
+
+## Companion plugin
+
+This plugin pairs with **[Bluebook Signals](../bluebook-signals/README.md)**, a
+Ctrl+S signal picker for the citation-dialog Prefix field (*See*, *E.g.*,
+*Accord*, etc.). The two are built for the same law-review workflow and are
+meant to be used together — **installing both is recommended.**
 
 ## Compatibility
 
@@ -78,13 +92,22 @@ only — Word and LibreOffice work; Google Docs is not yet supported.
 
 ## Latest Released Version
 
-- `1.0.0`
-- Git tag: `bluebook-citations-fixer-v1.0.0`
-- GitHub release asset: [Bluebook_Citations_Fixer_v1.0.0.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.0.0/Bluebook_Citations_Fixer_v1.0.0.xpi)
+- `1.1.0.1`
+- Git tag: `bluebook-citations-fixer-v1.1.0.1`
+- GitHub release asset: [Bluebook_Citations_Fixer_v1.1.0.1.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.1.0.1/Bluebook_Citations_Fixer_v1.1.0.1.xpi)
 
 ## Release History
 
 See [`../CHANGELOG.md`](../CHANGELOG.md) for the full history. Recent releases:
+
+### v1.1.0.1
+
+- **Style gate.** The fixer now checks the document's active CSL style and only
+  rewrites citations when it matches the configured style ID (default: Dan
+  Epps's Bluebook style), so it stays dormant under every other style. Surfaced
+  in Settings; clearing the box restores the old "apply under all styles"
+  behavior, and an unreadable style fails open so the plugin never goes silently
+  dark.
 
 ### v1.0.0
 
