@@ -60,12 +60,12 @@ and install it via **Zotero → Tools → Plugins → gear menu → Install Plug
   - Only fires when the work actually has a subsequent cite — no
     `[hereinafter Short]` tags on works that are never referenced again
   - Book-like items render the author surname and short title in
-    large-and-small caps (`{\scaps ...}`) per Bluebook rules 15.1, 16,
-    and B14; chapters are the exception and render like articles
-    (italic title, roman author) since only the containing book takes
-    small caps under Rule 15.5/B14; "et al." stays italic
-  - `Id.` cites, including signal-prefixed forms such as `See id.`, should
-    never get a hereinafter append
+    large-and-small caps per Bluebook rules 15.1, 16, and B14; chapters
+    are the exception and render like articles (italic title, roman author)
+    since only the containing book takes small caps under Rule 15.5/B14;
+    "et al." stays italic
+  - `Id.` cites, including signal-prefixed forms such as `See id.`, are
+    never given a `[hereinafter ...]` tag
   - Editing a short title in the Zotero library is picked up on the next
     document refresh without needing to re-insert the citation
 - Suppress the trailing year parenthetical for journal articles when the
@@ -78,14 +78,14 @@ and install it via **Zotero → Tools → Plugins → gear menu → Install Plug
   the separator as a hyphen or en-dash.
 - Manual **"Break id."** toggle. A checkbox in the citation dialog's bubble
   settings (under *Omit Author*) flags a cite whose immediately preceding
-  same-source citation is hand-typed — invisible to Zotero, so citeproc
+  same-source citation is hand-typed — invisible to Zotero, which then
   wrongly renders the cite as `Id.` When flagged, the plugin rewrites that
   `Id.` into the correct Bluebook short form: `Author, supra note N` for
   secondary sources (italic *supra*; the hereinafter rule adds the short
   title when the author is ambiguous), or `Short, Vol Reporter at Pincite`
-  for cases. The flag is stored invisibly on the cite's prefix and persists
-  across refreshes. First-cite long forms, statutes, and cases missing the
-  reporter/volume are detected and left untouched.
+  for cases. The flag is invisible and persists across refreshes. First-cite
+  long forms, statutes, and cases missing the reporter/volume are detected
+  and left untouched.
 - **Style gate.** By default the plugin only rewrites citations when the open
   document uses Dan Epps's Bluebook CSL style — under every other style it
   stays completely dormant, so it never touches a document formatted in some
