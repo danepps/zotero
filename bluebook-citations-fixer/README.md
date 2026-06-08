@@ -116,19 +116,6 @@ only — Word and LibreOffice work; Google Docs is not yet supported.
 - `tests/run-node-tests.js` contains focused regression tests for rewrite
   behavior
 
-## Release Notes
-
-- Every installable test cut should get a fresh version number
-  - Do not rebuild different behavior under the same published version
-- Keep these three files in sync on each version bump:
-  - `manifest.json`
-  - `bootstrap.js`
-  - `build.sh`
-- The plugin manifest includes an `update_url`, so releases also require
-  updating `../update-bluebook-citations.json`
-- The update feed should point to the matching GitHub release asset
-  `Bluebook_Citations_Fixer_v<version>.xpi`
-
 ## Latest Released Version
 
 - `1.1.0.1`
