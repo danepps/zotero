@@ -21,8 +21,8 @@ etc.).
 
 ### Bluebook Citations Fixer
 
-> ⚠️ **Beta / experimental.** In active development and possibly buggy. Use at
-> your own risk and back up any document you run it against.
+> ⚠️ In active development and possibly buggy. It seems to work well, but use at
+> your own risk.
 
 Rewrites Zotero's citation output inside the integration pipeline to apply
 Bluebook rules that CSL alone can't express cleanly (hereinafter, journal
