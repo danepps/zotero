@@ -26,8 +26,8 @@ etc.).
 Rewrites Zotero's citation output inside the integration pipeline to apply
 Bluebook rules that CSL alone can't express cleanly (hereinafter, journal
 volume/year, book pincites, manual "Break id.", and a style gate that keeps the
-plugin dormant under any style but your own). Runs automatically on every
-insert/refresh.
+plugin dormant under any style but your own). The document-aware rules
+(hereinafter and "Break id.") apply on a full Zotero refresh.
 
 🌐 [Project page & install →](https://danepps.github.io/zotero/bluebook-citations-fixer/)
 
