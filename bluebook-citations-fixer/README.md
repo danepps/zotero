@@ -11,6 +11,13 @@ that are awkward or impossible to express cleanly in CSL alone.
 > ⚠️ This plugin is in active development and possibly buggy.
 > It seems to be working well, but use at your own risk. 
 
+## Install
+
+Download [Bluebook_Citations_Fixer_v1.1.0.1.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.1.0.1/Bluebook_Citations_Fixer_v1.1.0.1.xpi)
+and install it via **Zotero → Tools → Plugins → gear menu → Install Plugin From File**.
+
+> 💡 Pairs with [Bluebook Signals](../bluebook-signals/README.md) —
+> [installing both](#companion-plugin) is recommended.
 
 > ## 🚨 Requires the Epps Bluebook CSL style
 >
@@ -25,14 +32,6 @@ that are awkward or impossible to express cleanly in CSL alone.
 > (Advanced: the style requirement is a configurable "style gate" — see
 > [Current Features](#current-features). You can clear it in Settings to apply
 > the rules under any style, but the default expects the Epps Bluebook style.)
-
-## Install
-
-Download [Bluebook_Citations_Fixer_v1.1.0.1.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.1.0.1/Bluebook_Citations_Fixer_v1.1.0.1.xpi)
-and install it via **Zotero → Tools → Plugins → gear menu → Install Plugin From File**.
-
-> 💡 Pairs with [Bluebook Signals](../bluebook-signals/README.md) —
-> [installing both](#companion-plugin) is recommended.
 
 ## Current Features
 
