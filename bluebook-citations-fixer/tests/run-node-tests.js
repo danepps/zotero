@@ -1324,6 +1324,70 @@ const NOID = String.fromCharCode(0x200B);
         );
     }
 
+    {
+        // Style gate: the fixer only rewrites under the configured style ID.
+        // Reuse journal-volume-year (strips a trailing "(YYYY)" when the volume
+        // is itself that year) as an observable rewrite to gate on.
+        const STYLE = "https://danepps.github.io/bluebook/BluebookDSEStyle.csl";
+        const PREF = "extensions.bluebook-citations-fixer.styleID";
+
+        function journalSession(styleID) {
+            const journal = cit(
+                "SG1", "Lopez", "Gate Piece", "Gate Piece",
+                undefined, undefined, { type: "article-journal", volume: "2024" }
+            );
+            const session = {
+                outputFormat: "rtf",
+                citationsByIndex: { 1: citation(1, [journal]) }
+            };
+            if (styleID !== undefined) session.data = { style: { styleID } };
+            session.citationsByIndex[1].text =
+                "Maria Lopez, Gate Piece, 2024 Yale L.J. 5 (2024)";
+            return session;
+        }
+        const GATED = "Maria Lopez, Gate Piece, 2024 Yale L.J. 5";       // (2024) stripped
+        const RAW = "Maria Lopez, Gate Piece, 2024 Yale L.J. 5 (2024)";  // untouched
+
+        // (a) Matching style -> rewrite applies.
+        withPrefs({ [PREF]: STYLE }, () => {
+            const s = journalSession(STYLE);
+            BCF.patch._prepareCitationTexts(s);
+            assert.strictEqual(s.citationsByIndex[1].text, GATED);
+        });
+
+        // (b) Different style -> cluster left untouched.
+        withPrefs({ [PREF]: STYLE }, () => {
+            const s = journalSession("http://www.zotero.org/styles/apa");
+            BCF.patch._prepareCitationTexts(s);
+            assert.strictEqual(s.citationsByIndex[1].text, RAW);
+        });
+
+        // (c) Empty pref disables the gate -> rewrite under any style.
+        withPrefs({ [PREF]: "" }, () => {
+            const s = journalSession("http://www.zotero.org/styles/apa");
+            BCF.patch._prepareCitationTexts(s);
+            assert.strictEqual(s.citationsByIndex[1].text, GATED);
+        });
+
+        // (d) Style unreadable -> fail open (rewrite), never silently dark.
+        withPrefs({ [PREF]: STYLE }, () => {
+            const s = journalSession(undefined); // no session.data.style
+            BCF.patch._prepareCitationTexts(s);
+            assert.strictEqual(s.citationsByIndex[1].text, GATED);
+        });
+
+        // Direct predicate checks, including the fallback styleID locations.
+        withPrefs({ [PREF]: STYLE }, () => {
+            assert(BCF.patch._styleAllowed({ data: { style: { styleID: STYLE } } }));
+            assert(!BCF.patch._styleAllowed({ data: { style: { styleID: "x" } } }));
+            assert(BCF.patch._styleAllowed({}));                  // unknown -> fail open
+            assert(BCF.patch._styleAllowed({ styleID: STYLE }));  // session.styleID fallback
+        });
+        withPrefs({ [PREF]: "" }, () => {
+            assert(BCF.patch._styleAllowed({ data: { style: { styleID: "anything" } } }));
+        });
+    }
+
     console.log("bluebook-citations-fixer node tests passed");
 })().catch((err) => {
     console.error(err);

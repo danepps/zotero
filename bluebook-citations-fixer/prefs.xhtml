@@ -6,6 +6,20 @@
 <vbox xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
       xmlns:html="http://www.w3.org/1999/xhtml">
   <groupbox>
+    <label><html:h2>Style gate</html:h2></label>
+    <description>
+      Bluebook Citations Fixer only rewrites citations when the document's
+      active citation style matches the style ID below. Leave it set to your
+      Bluebook style so the plugin stays dormant under every other style. Clear
+      the box to apply the rules under all styles.
+    </description>
+    <vbox>
+      <label control="bcf-style-id" value="Apply only to this style ID:"/>
+      <html:input id="bcf-style-id" type="text" size="60"
+                  preference="extensions.bluebook-citations-fixer.styleID"/>
+    </vbox>
+  </groupbox>
+  <groupbox>
     <label><html:h2>Hereinafter (Bluebook Rule 4.2(b))</html:h2></label>
     <description>
       Controls when a short-form "[hereinafter ...]" tag is added to repeated

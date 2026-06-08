@@ -54,6 +54,10 @@ The plugin rewrites Zotero's citation output *inside* the integration pipeline, 
 
 The primary seam is `Zotero.Integration.Field.prototype.setText` (in Zotero's `chrome/content/zotero/xpcom/integration.js`), which sits downstream of citeproc and upstream of every word-processor-specific field implementation. The plugin also patches `Session._updateDocument` to rewrite `citation.text` earlier in the run, before Zotero fans those strings back out to concrete field writes.
 
+### Style gate
+
+Both hook paths consult `BCF.patch._styleAllowed(session)` before running the feature chain (`patch.run` for `setText`, `_prepareCitationTexts` for the prewrite pass). It compares the document's active style — `session.data.style.styleID`, falling back to `session.styleID` / `session.style.styleID` — against the `extensions.bluebook-citations-fixer.styleID` pref, which **defaults to the Epps Bluebook style** (`https://danepps.github.io/bluebook/BluebookDSEStyle.csl`) so the plugin stays dormant under every other style out of the box. Matching is **exact**; an **empty pref disables the gate** (rewrite under all styles), and an **unreadable styleID fails open** so the plugin never goes silently dark. The pref is surfaced in the Settings pane (`prefs.xhtml`).
+
 Key facts that anchor the design:
 
 - **`Zotero.Integration.currentSession`** is set on every `execCommand` and cleared in its `finally`. Full document-global knowledge (every cluster's `citationItems`, their citeproc `position`, author / short-title metadata) is available on `session.citationsByIndex` during a setText call.
@@ -70,8 +74,8 @@ bluebook-citations-fixer/
 ├── manifest.json
 ├── chrome.manifest
 ├── build.sh
-├── prefs.js                      # default diag + hereinafter prefs
-├── prefs.xhtml                   # Settings pane (hereinafter options)
+├── prefs.js                      # default diag + style-gate + hereinafter prefs
+├── prefs.xhtml                   # Settings pane (style gate + hereinafter options)
 ├── locale/en-US/bluebook-citations-fixer.ftl
 ├── tests/run-node-tests.js       # pure helper tests for ambiguity + rewrites
 └── lib/

@@ -9,6 +9,9 @@ Bluebook signals and insert the chosen one.
 Download [Bluebook_Signals_v3.0.0.xpi](https://github.com/danepps/zotero/releases/download/bluebook-signals-v3.0.0/Bluebook_Signals_v3.0.0.xpi)
 and install it via **Zotero → Tools → Plugins → gear menu → Install Plugin From File**.
 
+> 💡 Pairs with [Bluebook Citations Fixer](../bluebook-citations-fixer/README.md) —
+> [installing both](#companion-plugin) is recommended.
+
 ## Usage
 
 1. Open the Add Citation dialog in your word processor.
@@ -21,6 +24,15 @@ and install it via **Zotero → Tools → Plugins → gear menu → Install Plug
 
 `e.g.,`, `accord`, `see`, `see also`, `see, e.g.,`, `cf.`, `contra`,
 `but see`, `see generally`
+
+## Companion plugin
+
+This plugin pairs with
+**[Bluebook Citations Fixer](../bluebook-citations-fixer/README.md)**, which
+rewrites Zotero's citation output to apply Bluebook rules CSL can't express
+cleanly (hereinafter, journal volume/year, book pincites, and a manual
+"Break id." fix). The two are built for the same law-review workflow and are
+meant to be used together — **installing both is recommended.**
 
 ## Credits
 

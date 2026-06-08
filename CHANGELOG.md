@@ -5,6 +5,21 @@ prefix in each section header identifies which plugin shipped.
 
 ## bluebook-citations-fixer
 
+### v1.1.0.1 — 2026-06-08
+
+- **Style gate.** The fixer now reads the document's active CSL style (from the
+  integration session's `data.style.styleID`, with fallbacks) and only runs its
+  rewrite chain when that style matches a configured style ID. The new pref
+  `extensions.bluebook-citations-fixer.styleID` **defaults to Dan Epps's
+  Bluebook style** (`https://danepps.github.io/bluebook/BluebookDSEStyle.csl`),
+  so out of the box the plugin stays completely dormant under every other style.
+  - Matching is exact and applies to **both** hook paths (the `Field.setText`
+    patch and the `Session._updateDocument` prewrite pass).
+  - **Empty pref disables the gate** — rewrite under all styles, the prior
+    behavior — and an **unreadable styleID fails open** (rewrite + diagnostic)
+    so the plugin never silently stops working.
+  - Surfaced in **Settings → Bluebook Citations Fixer → Style gate**.
+
 ### v1.0.0 — 2026-06-08
 
 - **First stable release.** Promotes the 0.2.x line to 1.0 with no

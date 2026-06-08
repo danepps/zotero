@@ -1,69 +1,48 @@
 # Zotero Plugins — Dan Epps
 
-Zotero plugins designed to improve functionality for legal scholars. Maintained by Dan Epps, Washington University School of Law. For questions and suggestions: epps@wustl.edu
+Zotero plugins designed to improve functionality for legal scholars writing in
+law reviews. Maintained by Dan Epps, Washington University School of Law.
+Questions and suggestions: epps@wustl.edu
 
-## Bluebook Signals
+Each plugin is self-contained and independently installable. Pick the one you
+want below, then follow the link to its own README for features, install steps,
+and usage.
 
-A signal picker for the citation dialog prefix field. Press **Ctrl+S** 
-while the prefix field is focused to insert a Bluebook signal 
-(*See*, *E.g.*, *Accord*, etc.).
+## Plugins
 
-**More info and install:** [danepps.github.io/zotero/bluebook-signals](https://danepps.github.io/zotero/bluebook-signals/)
+### Bluebook Signals
 
-**Usage:**
-1. Open the Add Citation dialog in your word processor
-2. Search for and select a citation
-3. Click into the Prefix field
-4. Press Ctrl+S to open the signal picker
+A signal picker for the citation-dialog prefix field. Press **Ctrl+S** while the
+Prefix field is focused to insert a Bluebook signal (*See*, *E.g.*, *Accord*,
+etc.).
 
-**Original author:** Frank Bennett. Updated for Zotero 9 by Dan Epps, 2026.
+🌐 [Project page & install →](https://danepps.github.io/zotero/bluebook-signals/)
 
----
+📖 **[Documentation](bluebook-signals/README.md)**
 
-## Bluebook Citations Fixer
+### Bluebook Citations Fixer
 
-> ⚠️ This plugin is in active development and could be could be buggy. While it appears to be
-> working well, use it at your own risk.
 
-This plugin rewrites Zotero's citation output inside the integration pipeline to apply
-Bluebook rules that CSL alone can't express cleanly. Runs automatically on
-every insert/refresh.
+Rewrites Zotero's citation output inside the integration pipeline to apply
+Bluebook rules that CSL alone can't express cleanly (hereinafter, journal
+volume/year, book pincites, manual "Break id.", and a style gate that keeps the
+plugin dormant under any style but your own). Runs automatically on every
+insert/refresh.
 
-**Install:** Download [Bluebook_Citations_Fixer_v1.0.0.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.0.0/Bluebook_Citations_Fixer_v1.0.0.xpi)
+🌐 [Project page & install →](https://danepps.github.io/zotero/bluebook-citations-fixer/)
 
-**Current rules:**
+📖 **[Documentation](bluebook-citations-fixer/README.md)**
 
-- **Hereinafter (Rule 4.2(b))** — When a document cites multiple works by
-  the same author *and* at least one of them is referenced subsequently,
-  appends `[hereinafter Author, <i>Short Title</i>]` to the first full
-  cite and rewrites subsequent `supra note` cites to include the short
-  title (e.g. `Epps, supra note 1` →
-  `Epps, <i>Adversarial Asymmetry</i>, supra note 1`). Books render the
-  author surname and short title in large-and-small caps (per Bluebook
-  rules 15.1, 16, B14) instead of italics; chapters follow the article
-  form (italic title, roman author) since only the containing book takes
-  small caps under Rule 15.5/B14; "et al." stays italic. Skips
-  `Id.` cites, including signal-prefixed forms like `See id.` Editing a
-  short title in the Zotero library is picked up on the next refresh
-  without re-inserting the citation.
-- **Journal volume/year** — Suppresses the trailing `(YYYY)` parenthetical
-  for journal articles when the volume number itself is a four-digit
-  year-like value.
-- **Book `, at`** — When a book title ends in a numeral, rewrites bare page
-  locators into the Bluebook `, at <page>` form to avoid ambiguous output
-  like `... 1868 45 (2006)`. Works regardless of what follows the pincite
-  (`(YYYY)`, `(rev. ed. 2005)`, `(Sarah Smith ed., 2010)`, etc.). Handles
-  compressed page ranges like `403-07` whether the CSL style renders the
-  separator as a hyphen or en-dash.
-- **Manual "Break id."** — A checkbox in the citation dialog (under *Omit
-  Author*) should be used to flag a cite where the preceding same-source citation is
-  separated by another citation that is hand-typed (and thus invisible to Zotero),
-  which otherwise renders wrongly as `Id.` The plugin rewrites it into the correct 
-  short form — `Author, supra note N` for secondary sources or `Short, Vol Reporter at Pincite` for cases.
+## Installing a plugin
 
-**Platform:** Word on Zotero 7 through Zotero 10
-beta. LibreOffice may work but has not been tested. Google Docs not supported.
+Every plugin installs the same way:
 
-**Original author:** Daniel Epps. 
+1. Download the plugin's `.xpi` from its project page (linked above).
+2. In Zotero, go to **Tools → Plugins → gear menu → Install Plugin From File**.
+3. Select the downloaded `.xpi`.
 
----
+## License
+
+Each plugin carries its own license; see the `COPYING.txt` (or equivalent) in
+the plugin's directory. Bluebook Citations Fixer is licensed under the GNU
+General Public License v3.

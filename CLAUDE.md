@@ -59,6 +59,10 @@ Two patches, run in order:
 
 `execCommand`, `Session.updateDocument`, and `Session.writeDelayedCitation` are also wrapped but only for diagnostics.
 
+### Style gate
+
+Both hook paths consult `BCF.patch._styleAllowed(session)` before running the feature chain (`patch.run` for `setText`, `_prepareCitationTexts` for the prewrite pass). It compares the document's active style — read from `session.data.style.styleID`, falling back to `session.styleID` / `session.style.styleID` — against the `extensions.bluebook-citations-fixer.styleID` pref. The pref **defaults to the Epps Bluebook style** (`https://danepps.github.io/bluebook/BluebookDSEStyle.csl`), so out of the box the plugin stays dormant under every other style. Matching is **exact**. Two escape hatches keep it from going silently dark: an **empty pref disables the gate** (rewrite under all styles — the old behavior), and an **unreadable styleID fails open** (allow + log `style: unknown styleID`). Mismatches log `skip: style mismatch`. The pref is surfaced in the Settings pane (`prefs.xhtml`). The Node harness leaves `Zotero.Prefs` unstubbed, so `_configuredStyleID()` throws → caught → returns `""` → gate disabled, preserving historical test behavior.
+
 Key facts that anchor the design:
 
 - **`Zotero.Integration.currentSession`** is set on every `execCommand` and cleared in its `finally`. Full document-global knowledge (every cluster's `citationItems`, their citeproc `position`, author / short-title metadata) is available on `session.citationsByIndex` during a setText call.
@@ -75,8 +79,8 @@ bluebook-citations-fixer/
 ├── manifest.json
 ├── chrome.manifest
 ├── build.sh
-├── prefs.js                      # default diag + hereinafter prefs
-├── prefs.xhtml                   # Settings pane (hereinafter options)
+├── prefs.js                      # default diag + style-gate + hereinafter prefs
+├── prefs.xhtml                   # Settings pane (style gate + hereinafter options)
 ├── locale/en-US/bluebook-citations-fixer.ftl
 ├── tests/run-node-tests.js       # pure helper tests for ambiguity + rewrites
 └── lib/

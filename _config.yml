@@ -1,3 +1,12 @@
 title: Zotero Plugins — Dan Epps
 description: Zotero plugins designed to improve functionality for legal scholars.
 theme: jekyll-theme-cayman
+
+# GitHub Pages bundles the jekyll-readme-index plugin, which promotes each
+# directory's README.md to that directory's index.html. By default it skips
+# READMEs that carry YAML front matter — which is why
+# /bluebook-citations-fixer/ (whose README has a title/description block) 404s
+# while the front-matter-less plugin READMEs resolve. Opt in so front-matter
+# READMEs are indexed too, keeping their title/description.
+readme_index:
+  with_frontmatter: true

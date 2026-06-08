@@ -9,6 +9,7 @@
 // Hook seam established by the recon report — see CLAUDE.md.
 
 BCF.patch = {};
+BCF.patch.PREF_STYLE_ID = "extensions.bluebook-citations-fixer.styleID";
 BCF.patch._orig = null;
 BCF.patch._retryTimer = null;
 BCF.patch._origExecCommand = null;
@@ -211,8 +212,60 @@ BCF.patch._instrumentField = function (field, tag) {
     }
 };
 
+// The exact CSL style ID this gate is allowed to rewrite under, read from the
+// styleID pref. Empty/whitespace turns the gate off (rewrite under every style).
+BCF.patch._configuredStyleID = function () {
+    try {
+        var v = Zotero.Prefs.get(BCF.patch.PREF_STYLE_ID, true);
+        if (v == null) return "";
+        return String(v).trim();
+    } catch (_) {
+        return "";
+    }
+};
+
+// The styleID of the document's active citation style. Zotero hangs the active
+// style off the integration session's document data; fall back through a couple
+// of known locations so a Zotero layout change doesn't silently break us.
+BCF.patch._sessionStyleID = function (session) {
+    if (!session) return "";
+    try {
+        if (session.data && session.data.style && session.data.style.styleID) {
+            return String(session.data.style.styleID);
+        }
+    } catch (_) {}
+    try {
+        if (session.styleID) return String(session.styleID);
+    } catch (_) {}
+    try {
+        if (session.style && session.style.styleID) return String(session.style.styleID);
+    } catch (_) {}
+    return "";
+};
+
+// Gate: when a style ID is configured (default = the Epps Bluebook style), only
+// rewrite when the document's active style matches it exactly. An empty pref
+// disables the gate. If the active style can't be read at all, fail open and
+// log — the plugin should never go silently dark if Zotero moves the styleID.
+BCF.patch._styleAllowed = function (session) {
+    var want = BCF.patch._configuredStyleID();
+    if (!want) return true; // gate disabled
+    var have = BCF.patch._sessionStyleID(session);
+    if (!have) {
+        BCF.diag.event("style", "unknown styleID; allowing (configured=" + want + ")");
+        return true;
+    }
+    var ok = (have === want);
+    if (!ok) BCF.diag.event("skip", "style mismatch: have=" + have + " want=" + want);
+    return ok;
+};
+
 BCF.patch._prepareCitationTexts = function (session) {
     if (!session || !session.citationsByIndex) return;
+    if (!BCF.patch._styleAllowed(session)) {
+        BCF.diag.event("prepare:skip", "style gate");
+        return;
+    }
     BCF.run.clearSession(session);
     var run = BCF.run.forSession(session);
     if (!run) return;
@@ -280,6 +333,10 @@ BCF.patch.run = async function (field, text) {
     var session = Zotero.Integration.currentSession;
     if (!session) {
         BCF.diag.event("skip", "no currentSession");
+        return text;
+    }
+
+    if (!BCF.patch._styleAllowed(session)) {
         return text;
     }
 
