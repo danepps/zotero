@@ -129,8 +129,6 @@ See [`../CHANGELOG.md`](../CHANGELOG.md) for the full history. Recent releases:
 
 - **First stable release.** Promotes the 0.2.x line to 1.0 with no behavioral
   changes since v0.2.0.
-- **Relicensed under GPLv3** (was AGPLv3) — full text in `COPYING.txt`, with the
-  license surfaced in the Settings → About pane.
 
 ### v0.2.0
 
