@@ -1217,6 +1217,173 @@ const NOID = String.fromCharCode(0x200B);
     assert.strictEqual(out, "{\\i{}Id.} at 9");
 }
 
+{
+    // Suffix preservation: everything after the "Id. [at <loc>]" span — e.g.
+    // a user-typed explanatory parenthetical — survives the rewrite.
+    const a = cit("IDsfx", "Kerr", "Theory", "An Equilibrium Theory",
+        undefined, undefined, { type: "article-journal" });
+    const aFlag = cit("IDsfx", "Kerr", "Theory", "An Equilibrium Theory",
+        undefined, undefined, { type: "article-journal" });
+    aFlag.prefix = NOID;
+    const run = buildRun({ 1: citation(1, [a]), 2: citation(2, [aFlag]) });
+    const out = BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [aFlag] },
+        run,
+        text: NOID_RTF + "See id. at 5 (discussing X)",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "See Kerr, {\\i{}supra} note 1, at 5 (discussing X)");
+
+    // Idempotency even when the kept suffix itself contains "id.": the
+    // supra-note guard recognizes the rewritten form and no-ops.
+    const rewritten = "See Kerr, {\\i{}supra} note 1, at 5 (discussing id.)";
+    assert.strictEqual(BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [aFlag] },
+        run,
+        text: rewritten,
+        rtf: BCF.rtf
+    }), rewritten);
+}
+
+{
+    // Multi-pincite scrape: "Id. at 12, 15" keeps both pages, with no stray
+    // trailing punctuation captured into the locator.
+    const a = cit("IDmp", "Kerr", "Theory", "An Equilibrium Theory",
+        undefined, undefined, { type: "article-journal" });
+    const aFlag = cit("IDmp", "Kerr", "Theory", "An Equilibrium Theory",
+        undefined, undefined, { type: "article-journal" });
+    aFlag.prefix = NOID;
+    const run = buildRun({ 1: citation(1, [a]), 2: citation(2, [aFlag]) });
+    const out = BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [aFlag] },
+        run,
+        text: NOID_RTF + "Id. at 12, 15",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "Kerr, {\\i{}supra} note 1, at 12, 15");
+}
+
+{
+    // Case rewrite keeps the suffix, and an "id." inside that suffix doesn't
+    // retrigger on a later pass (the "<Vol> <Reporter>" guard catches it).
+    const c = cit("IDcsfx", null, "Iqbal", "Ashcroft v. Iqbal", undefined, [],
+        { type: "legal_case", volume: "556", "container-title": "U.S." });
+    const cFlag = cit("IDcsfx", null, "Iqbal", "Ashcroft v. Iqbal", undefined, [],
+        { type: "legal_case", volume: "556", "container-title": "U.S." });
+    cFlag.prefix = NOID;
+    cFlag.locator = "678";
+    const run = buildRun({ 1: citation(1, [c]), 2: citation(2, [cFlag]) });
+    const out = BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [cFlag] },
+        run,
+        text: NOID_RTF + "Id. at 678 (overruling id.)",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "{\\i{}Iqbal}, 556 U.S. at 678 (overruling id.)");
+    assert.strictEqual(BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [cFlag] },
+        run,
+        text: out,
+        rtf: BCF.rtf
+    }), out);
+}
+
+{
+    // Authorless secondary source (e.g. a student note): cited by title, so
+    // the synthesized short form is "<i>Short Title</i>, supra note N" — the
+    // same shape the style itself renders for its ordinary supra cites.
+    const early = cit("NoAuth", null, "Promise", "Originalism's Promise",
+        undefined, [], { type: "article-journal" });
+    const flagged = cit("NoAuth", null, "Promise", "Originalism's Promise",
+        undefined, [], { type: "article-journal" });
+    flagged.prefix = NOID;
+    flagged.locator = "30";
+    const run = buildRun({ 1: citation(2, [early]), 2: citation(12, [flagged]) });
+    const out = BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [flagged], properties: { noteIndex: 12 } },
+        run,
+        text: NOID_RTF + "Id. at 30",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "{\\i{}Promise}, {\\i{}supra} note 2, at 30");
+}
+
+{
+    // Never "supra note 0": when note numbering is unavailable (noteIndex 0,
+    // e.g. an in-text document), leave the "Id." (sentinel stripped).
+    const early = cit("Note0", "Kerr", "Theory", "An Equilibrium Theory",
+        undefined, undefined, { type: "article-journal" });
+    const flagged = cit("Note0", "Kerr", "Theory", "An Equilibrium Theory",
+        undefined, undefined, { type: "article-journal" });
+    flagged.prefix = NOID;
+    const run = buildRun({ 1: citation(0, [early]), 2: citation(0, [flagged]) });
+    const out = BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [flagged], properties: { noteIndex: 0 } },
+        run,
+        text: NOID_RTF + "Id. at 9",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "Id. at 9");
+}
+
+{
+    // repairGroups: closes groups left open, drops unmatched closers, leaves
+    // escaped braces alone.
+    assert.strictEqual(BCF.rtf.repairGroups("{\\i{}abc"), "{\\i{}abc}");
+    assert.strictEqual(BCF.rtf.repairGroups("abc}"), "abc");
+    assert.strictEqual(BCF.rtf.repairGroups("a\\}b\\{c"), "a\\}b\\{c");
+    assert.strictEqual(BCF.rtf.repairGroups("{\\i{}a}b"), "{\\i{}a}b");
+}
+
+{
+    // book-at with the comma inside the italic group ("{\i{}Title 2,} 45"):
+    // the splice must not eat the closing brace. repairGroups keeps the RTF
+    // well-formed (at worst the italic span grows — never corrupt output).
+    const book = cit("B5", "Epps", "Title 2", "Title 2",
+        undefined, undefined, { type: "book" });
+    book.locator = "45";
+    const run = buildRun({ 1: citation(1, [book]) });
+    const out = BCF.features.bookAt.rewrite({
+        codeJson: { citationItems: [book] },
+        run,
+        text: "Dan Epps, {\\i{}Title 2,} 45",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "Dan Epps, {\\i{}Title 2, at 45}");
+}
+
+{
+    // Rule 4.2(b) placement: the [hereinafter ...] bracket lands before the
+    // cite's explanatory-parenthetical suffix, not after it.
+    const a = cit("SfxA", "Epps", "Checks", "Checks and Balances");
+    const b = cit("SfxB", "Epps", "Asymmetry", "Adversarial Asymmetry");
+    a.suffix = "(discussing X)";
+    const run = eligibleRun({
+        1: citation(1, [a]),
+        2: citation(1, [b])
+    }, [a, b]);
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: "Dan Epps, Checks and Balances (discussing X)",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Dan Epps, Checks and Balances [hereinafter Epps, {\\i{}Checks}] (discussing X)"
+    );
+}
+
+{
+    // Authorless works still land in the first-note map (id-suppress needs a
+    // supra target even though they can't join the author-ambiguity buckets).
+    const noAuth = cit("NAmap", null, "Promise", "Originalism's Promise",
+        undefined, [], { type: "article-journal" });
+    const run = buildRun({ 1: citation(3, [noAuth]) });
+    assert.strictEqual(run.itemFirstNotes.get(BCF.cite.itemKey(noAuth)), 3);
+    assert.strictEqual(run.itemCounts.get(BCF.cite.itemKey(noAuth)), 1);
+}
+
 (async function () {
     {
         const journal = cit(
@@ -1322,6 +1489,41 @@ const NOID = String.fromCharCode(0x200B);
             "Andrew E. Taslitz, Reconstructing the Fourth Amendment: A History of Search & Seizure, 1789-1868, at 59 (2006) " +
                 "[hereinafter {\\scaps Taslitz}, {\\scaps Reconstructing}]"
         );
+    }
+
+    {
+        // Output-format gate on the prewrite pass: HTML (Google Docs) and
+        // plain-text sessions must pass through untouched — the chain emits
+        // RTF fragments.
+        const journal = cit(
+            "HG1", "Smith", "Gate Piece", "Gate Piece",
+            undefined, undefined, { type: "article-journal", volume: "2024" }
+        );
+        const RAW = "John Smith, Gate Piece, 2024 Yale L.J. 55 (2024)";
+        const s = {
+            outputFormat: "html",
+            citationsByIndex: { 1: citation(1, [journal]) }
+        };
+        s.citationsByIndex[1].text = RAW;
+        BCF.patch._prepareCitationTexts(s);
+        assert.strictEqual(s.citationsByIndex[1].text, RAW);
+    }
+
+    {
+        // While _updateDocument's prewrite pass is active, the setText hook
+        // short-circuits (the cluster text was already rewritten upstream).
+        const journal = cit(
+            "PA1", "Smith", "Active Piece", "Active Piece",
+            undefined, undefined, { type: "article-journal", volume: "2024" }
+        );
+        const RAW = "John Smith, Active Piece, 2024 Yale L.J. 55 (2024)";
+        const session = {
+            outputFormat: "rtf",
+            __bcfPrewriteActive: true,
+            citationsByIndex: { 1: citation(1, [journal]) }
+        };
+        const out = await runPatch(session, session.citationsByIndex[1], RAW);
+        assert.strictEqual(out, RAW);
     }
 
     {

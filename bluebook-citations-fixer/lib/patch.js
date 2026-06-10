@@ -17,6 +17,7 @@ BCF.patch._origSessionUpdateDocument = null;
 BCF.patch._origSessionWriteDelayedCitation = null;
 BCF.patch._origSessionInternalUpdateDocument = null;
 BCF.patch._instrumentedFieldProtos = new WeakSet();
+BCF.patch._wrappedFieldProtos = [];
 
 BCF.patch.install = function () {
     BCF.patch._installExecCommandPatch();
@@ -37,8 +38,18 @@ BCF.patch.install = function () {
     }
     var Field = Zotero.Integration.Field;
     if (Field.prototype.__lcfPatched) {
-        BCF.patch._orig = Field.prototype.setText;
-        return;
+        // A previous plugin instance patched setText and its uninstall never
+        // ran (crash, upgrade-in-place). Recover the true original it stashed
+        // on the prototype rather than adopting the stale wrapper as ours.
+        if (typeof Field.prototype.__bcfOrigSetText === "function") {
+            Field.prototype.setText = Field.prototype.__bcfOrigSetText;
+            delete Field.prototype.__lcfPatched;
+            delete Field.prototype.__bcfOrigSetText;
+            BCF.diag.event("patch", "recovered original setText from stale patch");
+        } else {
+            BCF.patch._orig = Field.prototype.setText;
+            return;
+        }
     }
     BCF.patch._orig = Field.prototype.setText;
     Field.prototype.setText = function (text) {
@@ -51,6 +62,7 @@ BCF.patch.install = function () {
             .catch(function (e) { BCF.diag.err("patch.run", e); return text; })
             .then(function (rewritten) { return origCall(rewritten); });
     };
+    Field.prototype.__bcfOrigSetText = BCF.patch._orig;
     Field.prototype.__lcfPatched = true;
     BCF.diag.event("patch", "installed on Zotero.Integration.Field.prototype.setText");
 };
@@ -62,11 +74,13 @@ BCF.patch.uninstall = function () {
             BCF.patch._retryTimer = null;
         }
     } catch (_) {}
+    BCF.patch._uninstrumentFields();
     if (!BCF.patch._orig) return;
     try {
         var Field = Zotero.Integration.Field;
         Field.prototype.setText = BCF.patch._orig;
         delete Field.prototype.__lcfPatched;
+        delete Field.prototype.__bcfOrigSetText;
     } catch (_) {}
     BCF.patch._orig = null;
     if (BCF.patch._origExecCommand) {
@@ -135,6 +149,10 @@ BCF.patch._installSessionPatches = function () {
                 citationID: citation && citation.citationID ? citation.citationID : "",
                 hasField: !!field
             });
+            // The cached run context predates this citation (it was built
+            // during the last full update); rebuild so eligibility and
+            // first-note maps see the document as it now stands.
+            try { BCF.run.clearSession(this); } catch (_) {}
             BCF.patch._instrumentField(field, "writeDelayedCitation");
             return await BCF.patch._origSessionWriteDelayedCitation.apply(this, arguments);
         };
@@ -143,8 +161,22 @@ BCF.patch._installSessionPatches = function () {
     if (!BCF.patch._origSessionInternalUpdateDocument && typeof proto._updateDocument === "function") {
         BCF.patch._origSessionInternalUpdateDocument = proto._updateDocument;
         proto._updateDocument = async function () {
-            BCF.patch._prepareCitationTexts(this);
-            return await BCF.patch._origSessionInternalUpdateDocument.apply(this, arguments);
+            // Never let a bug in the prewrite pass break document updates.
+            try {
+                BCF.patch._prepareCitationTexts(this);
+            } catch (e) {
+                BCF.diag.err("prepareCitationTexts", e);
+            }
+            // While the original _updateDocument fans the (already rewritten)
+            // cluster texts out to field writes, the setText hook would re-run
+            // the whole chain — including a getCode() round trip to the word
+            // processor per field. Flag the session so patch.run can skip.
+            try { this.__bcfPrewriteActive = true; } catch (_) {}
+            try {
+                return await BCF.patch._origSessionInternalUpdateDocument.apply(this, arguments);
+            } finally {
+                try { this.__bcfPrewriteActive = false; } catch (_) {}
+            }
         };
         BCF.diag.event("patch", "installed on Session._updateDocument");
     }
@@ -206,10 +238,34 @@ BCF.patch._instrumentField = function (field, tag) {
                 return orig.apply(this, arguments);
             };
             proto["__bcfWrapped_" + name] = true;
+            proto["__bcfOrig_" + name] = orig;
+            if (BCF.patch._wrappedFieldProtos.indexOf(proto) === -1) {
+                BCF.patch._wrappedFieldProtos.push(proto);
+            }
         });
     } catch (e) {
         BCF.diag.err("instrumentField", e);
     }
+};
+
+// Undo every diagnostic wrapper _instrumentField installed, so a disabled or
+// upgraded plugin doesn't leave stale closures on the word-processor field
+// prototypes.
+BCF.patch._uninstrumentFields = function () {
+    var protos = BCF.patch._wrappedFieldProtos;
+    for (var i = 0; i < protos.length; i++) {
+        var proto = protos[i];
+        ["setText", "setCode", "getText", "getCode", "delete", "removeCode"].forEach(function (name) {
+            try {
+                if (proto["__bcfWrapped_" + name] && typeof proto["__bcfOrig_" + name] === "function") {
+                    proto[name] = proto["__bcfOrig_" + name];
+                }
+                delete proto["__bcfWrapped_" + name];
+                delete proto["__bcfOrig_" + name];
+            } catch (_) {}
+        });
+    }
+    BCF.patch._wrappedFieldProtos = [];
 };
 
 // The exact CSL style ID this gate is allowed to rewrite under, read from the
@@ -260,8 +316,27 @@ BCF.patch._styleAllowed = function (session) {
     return ok;
 };
 
+// The session's output format ("rtf", "html", "text"), best-effort.
+BCF.patch._sessionOutputFormat = function (session) {
+    if (!session) return "";
+    if (session.outputFormat) return String(session.outputFormat);
+    try {
+        if (session.data && session.data.prefs && session.data.prefs.outputFormat) {
+            return String(session.data.prefs.outputFormat);
+        }
+    } catch (_) {}
+    return "";
+};
+
 BCF.patch._prepareCitationTexts = function (session) {
     if (!session || !session.citationsByIndex) return;
+    // RTF only: the feature chain injects RTF fragments, which would land as
+    // literal garbage in HTML (Google Docs) or plain-text output.
+    var fmt = BCF.patch._sessionOutputFormat(session);
+    if (fmt && fmt !== "rtf") {
+        BCF.diag.event("prepare:skip", "non-RTF output: " + fmt);
+        return;
+    }
     if (!BCF.patch._styleAllowed(session)) {
         BCF.diag.event("prepare:skip", "style gate");
         return;
@@ -336,12 +411,22 @@ BCF.patch.run = async function (field, text) {
         return text;
     }
 
+    // The _updateDocument prewrite pass already ran the chain on every
+    // cluster this update will write; re-running it here would only burn a
+    // getCode() round trip per field. Delayed citations and any other write
+    // outside _updateDocument still take the full path below.
+    if (session.__bcfPrewriteActive) {
+        BCF.diag.event("skip", "prewrite pass handled this update");
+        return text;
+    }
+
     if (!BCF.patch._styleAllowed(session)) {
         return text;
     }
 
-    if (session.outputFormat && session.outputFormat !== "rtf") {
-        BCF.diag.event("skip", "non-RTF output: " + session.outputFormat);
+    var fmt = BCF.patch._sessionOutputFormat(session);
+    if (fmt && fmt !== "rtf") {
+        BCF.diag.event("skip", "non-RTF output: " + fmt);
         return text;
     }
 

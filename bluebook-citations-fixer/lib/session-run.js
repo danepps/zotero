@@ -149,20 +149,33 @@ BCF.run._build = function (session) {
                 data = {};
             }
             var key = BCF.cite.itemKey(ci_);
+            if (!key) continue;
             var authorKey = BCF.cite.authorKey(data);
-            if (!key || !authorKey) continue;
 
-            if (!items.has(key)) items.set(key, data);
-            if (!authorBuckets.has(authorKey)) authorBuckets.set(authorKey, new Set());
-            authorBuckets.get(authorKey).add(key);
+            // Counts, first notes, and signatures are tracked for EVERY keyed
+            // item — authorless works (student notes, unsigned pieces) still
+            // need a `supra note N` target for id-suppress. Only the
+            // author-ambiguity buckets below require an authorKey. Don't
+            // cache empty data in the items map: itemData() must stay free to
+            // pick up a late-populated citItem.itemData / library fetch.
+            if (!items.has(key) && data && Object.keys(data).length) {
+                items.set(key, data);
+            }
             itemCounts.set(key, (itemCounts.get(key) || 0) + 1);
 
             if (!itemFirstNotes.has(key)) {
                 itemFirstNotes.set(key, noteIndex);
-                if (!noteFirstBuckets.has(authorKey)) noteFirstBuckets.set(authorKey, new Map());
-                var byNote = noteFirstBuckets.get(authorKey);
-                if (!byNote.has(groupKey)) byNote.set(groupKey, new Set());
-                byNote.get(groupKey).add(key);
+                if (authorKey) {
+                    if (!noteFirstBuckets.has(authorKey)) noteFirstBuckets.set(authorKey, new Map());
+                    var byNote = noteFirstBuckets.get(authorKey);
+                    if (!byNote.has(groupKey)) byNote.set(groupKey, new Set());
+                    byNote.get(groupKey).add(key);
+                }
+            }
+
+            if (authorKey) {
+                if (!authorBuckets.has(authorKey)) authorBuckets.set(authorKey, new Set());
+                authorBuckets.get(authorKey).add(key);
             }
 
             // Track earliest note by author+title signature too, so two cites

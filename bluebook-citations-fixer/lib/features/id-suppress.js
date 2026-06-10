@@ -95,6 +95,11 @@ BCF.features.idSuppress = {
         return out;
     },
 
+    // Plain-text span of the rendered "Id." short form: "Id." plus its
+    // optional " at <pincite>" (digits with internal ., , : and dash/en-dash —
+    // ends on a digit so trailing punctuation stays in the tail).
+    ID_SPAN_RE: /\bid\.(?:\s+at\s+\d(?:[\d.,:–\- ]*\d)?)?/i,
+
     _rewriteSegment: function (segRtf, item, run, currentNote) {
         var data = BCF.run.itemData(run, item);
         var plain = BCF.rtf.plainish(segRtf);
@@ -107,18 +112,6 @@ BCF.features.idSuppress = {
             BCF.diag.event("skip:id-suppress", "no id. form (first-cite or already short)");
             return BCF.cite.stripNoId(segRtf);
         }
-
-        // Keep everything before "Id." (any introductory signal the user typed)
-        // and replace from there to the end of the segment.
-        var idOffset = BCF.rtf.findPlainOffset(segRtf, /\bid\./i);
-        if (idOffset < 0) return BCF.cite.stripNoId(segRtf);
-        // citeproc italicizes "Id." per Bluebook, so the RTF up to "Id." can end
-        // inside an open group (e.g. "{\i{}" from "{\i{}Id.}"). Slicing there
-        // leaves that group unclosed, which would italicize the whole rewritten
-        // cite. Close any groups still open at the cut so the short form we
-        // append renders roman; an introductory signal keeps its own formatting
-        // because its group opened and closed before "Id.".
-        var prefixRtf = BCF.features.idSuppress._closeOpenGroups(segRtf.slice(0, idOffset));
 
         var locator = BCF.features.idSuppress._locator(item, plain);
 
@@ -133,6 +126,15 @@ BCF.features.idSuppress = {
                 BCF.diag.event("skip:id-suppress", "case-reporter-missing " + BCF.cite.itemKey(item));
                 return BCF.cite.stripNoId(segRtf);
             }
+            // Idempotency for id.-bearing suffixes: once rewritten, the
+            // segment shows "<Vol> <Reporter>" — don't let an "id." inside a
+            // kept suffix (e.g. "(overruling id.)") trigger a second rewrite.
+            if (new RegExp(
+                    BCF.cite.escapeRegex(vol) + "\\s+" + BCF.cite.escapeRegex(reporter), "i"
+                ).test(plain)) {
+                BCF.diag.event("skip:id-suppress", "already in reporter short form");
+                return BCF.cite.stripNoId(segRtf);
+            }
             // Reporter is emitted verbatim — Zotero's Reporter field already
             // holds the abbreviation (e.g. "U.S."). Short name comes from the
             // Short Title field (title-short), else the full Case Name.
@@ -141,16 +143,26 @@ BCF.features.idSuppress = {
                 BCF.rtf.escape(vol) + " " + BCF.rtf.escape(reporter) +
                 (locator ? " at " + BCF.rtf.escape(locator) : "");
         } else if (BCF.cite.isBookLike(data) || BCF.cite.isJournalArticleLike(data)) {
+            // A flagged secondary source rendered as "Id." never contains
+            // "supra note"; if the segment already has one, it's either the
+            // proper short form or our own earlier rewrite (possibly with an
+            // "id." inside a kept suffix) — leave it alone.
+            if (/\bsupra\s+note\b/i.test(plain)) {
+                BCF.diag.event("skip:id-suppress", "already in supra short form");
+                return BCF.cite.stripNoId(segRtf);
+            }
             var firstNote = BCF.run.firstNoteFor(run, item, data);
-            if (firstNote == null) {
+            // A `supra` must point to an EARLIER, NUMBERED note. firstNote < 1
+            // means note numbering is unavailable (in-text style, or noteIndex
+            // unreadable) — never emit "supra note 0".
+            if (firstNote == null || firstNote < 1) {
                 BCF.diag.event("skip:id-suppress", "no first-note for " + BCF.cite.itemKey(item));
                 return BCF.cite.stripNoId(segRtf);
             }
-            // A `supra` must point to an EARLIER note. If the earliest known
-            // appearance is this note or later (e.g. the prior cite of this
-            // source is hand-typed / invisible to Zotero, or this is genuinely
-            // the first cite), we can't synthesize a valid target — leave the
-            // "Id." rather than emit a self-reference.
+            // If the earliest known appearance is this note or later (e.g. the
+            // prior cite of this source is hand-typed / invisible to Zotero,
+            // or this is genuinely the first cite), we can't synthesize a
+            // valid target — leave the "Id." rather than emit a self-reference.
             if (currentNote > 0 && firstNote >= currentNote) {
                 BCF.diag.event("skip:id-suppress",
                     "self/forward supra (first=" + firstNote + " cur=" + currentNote + ") " +
@@ -161,11 +173,22 @@ BCF.features.idSuppress = {
             // exception hereinafter makes. _authorPrefix renders the surname(s).
             var isBook = BCF.cite.isBookLike(data) && t !== "chapter";
             var authorPrefix = BCF.features.hereinafter._authorPrefix(data, isBook);
+            // Authorless works (student notes, unsigned pieces) are cited by
+            // title: "<Short Title>, supra note N" — the same form the style
+            // itself renders for their ordinary supra cites.
+            if (!authorPrefix) {
+                var st = BCF.cite.shortTitle(data);
+                if (!st) {
+                    BCF.diag.event("skip:id-suppress", "no author or title for " + BCF.cite.itemKey(item));
+                    return BCF.cite.stripNoId(segRtf);
+                }
+                authorPrefix = isBook ? BCF.rtf.smallCaps(st) : BCF.rtf.italic(st);
+            }
             // "supra" is italicized (Bluebook); "note N" stays roman. The
             // plainish projection still reads "supra note N", so hereinafter's
             // _hasSupraNote / _rewriteSubsequent recognize it and inject the
             // short title before it when the work is ambiguous.
-            shortForm = (authorPrefix ? authorPrefix + ", " : "") +
+            shortForm = authorPrefix + ", " +
                 BCF.rtf.italic("supra") + " note " + firstNote +
                 (locator ? ", at " + BCF.rtf.escape(locator) : "");
         } else {
@@ -173,7 +196,23 @@ BCF.features.idSuppress = {
             return BCF.cite.stripNoId(segRtf);
         }
 
-        var rebuilt = BCF.cite.stripNoId(prefixRtf + shortForm);
+        // Replace only the "Id. [at <loc>]" span. Everything before it (any
+        // introductory signal the user typed) and everything after it (a
+        // user suffix, e.g. an explanatory parenthetical) is preserved.
+        var range = BCF.rtf.findPlainRange(segRtf, BCF.features.idSuppress.ID_SPAN_RE);
+        if (!range) return BCF.cite.stripNoId(segRtf);
+        // citeproc italicizes "Id." per Bluebook, so the RTF up to "Id." can end
+        // inside an open group (e.g. "{\i{}" from "{\i{}Id.}"). Slicing there
+        // leaves that group unclosed, which would italicize the whole rewritten
+        // cite. Close any groups still open at the cut so the short form we
+        // append renders roman; an introductory signal keeps its own formatting
+        // because its group opened and closed before "Id.".
+        var prefixRtf = BCF.features.idSuppress._closeOpenGroups(segRtf.slice(0, range.start));
+        var tailRtf = segRtf.slice(range.end);
+
+        var rebuilt = BCF.cite.stripNoId(
+            BCF.rtf.repairGroups(prefixRtf + shortForm + tailRtf)
+        );
         BCF.diag.event("id-suppress:rewrite", {
             type: t,
             before: plain,
@@ -200,11 +239,13 @@ BCF.features.idSuppress = {
 
     // Pin locator for the rewritten short form. Prefer the citationItem's own
     // `locator` (raw, e.g. "526-27"); fall back to scraping "Id. at <loc>" from
-    // the rendered text. Empty string when there is no pincite.
+    // the rendered text. The scrape must end on a digit so multi-pincites
+    // ("12, 15") come through whole but trailing punctuation stays out.
+    // Empty string when there is no pincite.
     _locator: function (item, plain) {
         var loc = item && item.locator != null ? String(item.locator).trim() : "";
         if (!loc) {
-            var m = /\bid\.\s+at\s+([0-9][0-9.,–-]*)/i.exec(plain);
+            var m = /\bid\.\s+at\s+(\d(?:[\d.,:–\- ]*\d)?)/i.exec(plain);
             loc = m ? m[1] : "";
         }
         return loc;

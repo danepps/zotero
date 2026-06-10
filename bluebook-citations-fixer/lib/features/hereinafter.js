@@ -104,7 +104,7 @@ BCF.features.hereinafter = {
         if (isSubsequent) {
             return BCF.features.hereinafter._rewriteSubsequent(segRtf, shortTitle, isBook);
         }
-        return BCF.features.hereinafter._rewriteFirst(segRtf, itemData, shortTitle, isBook);
+        return BCF.features.hereinafter._rewriteFirst(segRtf, itemData, shortTitle, isBook, citItem);
     },
 
     _hasSupraNote: function (rtf) {
@@ -115,7 +115,7 @@ BCF.features.hereinafter = {
         return /\bid\./i.test(BCF.rtf.plainish(rtf));
     },
 
-    _rewriteFirst: function (segRtf, itemData, shortTitle, isBook) {
+    _rewriteFirst: function (segRtf, itemData, shortTitle, isBook, citItem) {
         var plain = BCF.rtf.plainish(segRtf);
         // Idempotency: already has "[hereinafter ...<shortTitle>...]" (loose).
         // Matches both the legacy form ("[hereinafter <ShortTitle>]") and the
@@ -130,12 +130,30 @@ BCF.features.hereinafter = {
         if (/\bsupra\s+note\b/i.test(plain)) return null;
         if (BCF.features.hereinafter._hasIdCite(segRtf)) return null;
 
-        // Append inline RTF. setText wraps the whole string in {\rtf ...} if
+        // Inline RTF. setText wraps the whole string in {\rtf ...} if
         // needed; inline groups are fine.
         var authorPrefix = BCF.features.hereinafter._authorPrefix(itemData, isBook);
         var titleFrag = isBook ? BCF.rtf.smallCaps(shortTitle) : BCF.rtf.italic(shortTitle);
         var inside = (authorPrefix ? authorPrefix + ", " : "") + titleFrag;
-        return segRtf + " [hereinafter " + inside + "]";
+        var bracket = " [hereinafter " + inside + "]";
+
+        // Rule 4.2(b) places the bracket after the citation proper (the date
+        // parenthetical) but BEFORE any explanatory parenthetical. The only
+        // explanatory text we can identify reliably is the cite's own suffix —
+        // if it's rendered at the tail of the segment, insert the bracket in
+        // front of it. Otherwise append at the end (the historical behavior).
+        var suffixPlain = citItem && citItem.suffix
+            ? BCF.rtf.plainish(String(citItem.suffix)).trim() : "";
+        if (suffixPlain) {
+            var suffixRe = new RegExp(
+                "\\s*" + BCF.cite.escapeRegex(suffixPlain) + "\\s*$"
+            );
+            var off = BCF.rtf.findPlainOffset(segRtf, suffixRe);
+            if (off >= 0) {
+                return segRtf.slice(0, off) + bracket + segRtf.slice(off);
+            }
+        }
+        return segRtf + bracket;
     },
 
     // Bluebook short-form author rendering (rule 15.1, applied inside the

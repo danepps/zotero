@@ -124,12 +124,19 @@ BCF.features.bookAt = {
         // searching for the locator itself: the locator in the RTF may use a
         // different separator (en-dash as \uc0\u8211{}) than item.locator (hyphen).
         var sepNeedle = new RegExp("(?:,\\s*|\\s+)(?:" + escapedLocator + ")" + tail, "i");
-        var mSep = sepNeedle.exec(plain);
-        if (!mSep) return null;
-        var sepLength = /^(?:,\s*|\s+)/.exec(mSep[0])[0].length;
-        var rtfSepStart = BCF.rtf.findPlainOffset(segRtf, sepNeedle);
-        if (rtfSepStart < 0) return null;
-        return segRtf.slice(0, rtfSepStart) + ", at " + segRtf.slice(rtfSepStart + sepLength);
+        var range = BCF.rtf.findPlainRange(segRtf, sepNeedle);
+        if (!range) return null;
+        var sepLength = /^(?:,\s*|\s+)/.exec(range.match[0])[0].length;
+        // Map the locator's start back to an RTF offset too \u2014 the separator's
+        // plain length is not its RTF length when a group brace or control
+        // word sits inside the span, and slicing by plain length there would
+        // eat a brace and corrupt the RTF. repairGroups covers the remaining
+        // pathological case of a group cut by the splice.
+        var rtfLocStart = BCF.rtf.plainIndexToRtf(segRtf, range.match.index + sepLength);
+        if (rtfLocStart < 0 || rtfLocStart < range.start) return null;
+        return BCF.rtf.repairGroups(
+            segRtf.slice(0, range.start) + ", at " + segRtf.slice(rtfLocStart)
+        );
     },
 
     _inferLocator: function (plain) {
