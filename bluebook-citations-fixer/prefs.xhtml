@@ -8,14 +8,17 @@
   <groupbox>
     <label><html:h2>Style gate</html:h2></label>
     <description>
-      Bluebook Citations Fixer only rewrites citations when the document's
-      active citation style matches one of the style IDs below (separate
-      several IDs with spaces or commas). Leave it set to your Bluebook styles
-      so the plugin stays dormant under every other style. Clear the box to
-      apply the rules under all styles.
+      Bluebook Citations Fixer only rewrites citations when the document uses
+      one of the checked citation styles, so it stays dormant everywhere else.
     </description>
-    <vbox>
-      <label control="bcf-style-id" value="Apply only to these style IDs:"/>
+    <checkbox id="bcf-style-all"
+              label="Apply under all citation styles"/>
+    <vbox id="bcf-style-list"
+          style="margin-left: 1.6em; margin-top: 4px; max-height: 220px; overflow-y: auto;"/>
+    <!-- Raw pref editor; hidden by prefs-pane.js when the checkbox picker
+         renders. Stays visible (and functional) if that script fails. -->
+    <vbox id="bcf-style-manual">
+      <label control="bcf-style-id" value="Apply only to these style IDs (separate with spaces or commas; clear to apply under all styles):"/>
       <html:input id="bcf-style-id" type="text" size="60"
                   preference="extensions.bluebook-citations-fixer.styleID"/>
     </vbox>

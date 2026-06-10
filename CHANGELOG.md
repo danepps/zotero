@@ -13,8 +13,13 @@ Bug-fix release from a full code review of the rewrite pipeline.
   `extensions.bluebook-citations-fixer.styleID` pref now holds a list
   (space/comma/semicolon separated) and defaults to the Epps Bluebook style
   **and its experimental variant**, so the plugin no longer sits dormant when
-  a document uses `BluebookDSEStyle-Experimental.csl`. Forked styles carry
-  their own `<id>`; add it in Settings → Style gate to cover more variants.
+  a document uses `BluebookDSEStyle-Experimental.csl`.
+- **Style-gate checkbox picker.** Settings → BB Citations Fixer now lists
+  every installed citation style with a checkbox (plus an "Apply under all
+  citation styles" switch) instead of a raw URL box. Configured-but-not-
+  installed style IDs stay visible and checked so they can't be silently
+  dropped; if the picker ever fails to render, the raw style-ID input
+  reappears as a fallback.
 - **Hereinafter bracket placement (Rule 4.2(b)).** `[hereinafter ...]` is now
   inserted *before* the cite's explanatory-parenthetical suffix instead of
   after it.

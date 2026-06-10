@@ -1612,6 +1612,17 @@ const NOID = String.fromCharCode(0x200B);
             BCF.patch._prepareCitationTexts(s);
             assert.strictEqual(s.citationsByIndex[1].text, GATED);
         });
+
+        // (f) "(none)" sentinel (written by the settings pane when "limit to
+        // selected styles" is on with nothing checked): gate active, matches
+        // no real style ID — dormant everywhere, NOT gate-off.
+        withPrefs({ [PREF]: "(none)" }, () => {
+            assert(!BCF.patch._styleAllowed({ data: { style: { styleID: STYLE } } }));
+            assert(!BCF.patch._styleAllowed({ data: { style: { styleID: EXPERIMENTAL } } }));
+            const s = journalSession(STYLE);
+            BCF.patch._prepareCitationTexts(s);
+            assert.strictEqual(s.citationsByIndex[1].text, RAW);
+        });
     }
 
     console.log("bluebook-citations-fixer node tests passed");

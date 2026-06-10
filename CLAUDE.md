@@ -28,7 +28,7 @@ At the repo root, `update-*.json` files are the Zotero auto-update manifests, se
 
 ## Build / release
 
-Each plugin is a zip of its root files (`manifest.json`, `chrome.manifest`, `bootstrap.js`, and — for `bluebook-citations-fixer` — `prefs.js`, `prefs.xhtml`, `locale/`, and the `lib/` tree) with a `.xpi` extension. Plugins with a `build.sh` use it:
+Each plugin is a zip of its root files (`manifest.json`, `chrome.manifest`, `bootstrap.js`, and — for `bluebook-citations-fixer` — `prefs.js`, `prefs.xhtml`, `prefs-pane.js`, `locale/`, and the `lib/` tree) with a `.xpi` extension. Plugins with a `build.sh` use it:
 
 ```
 ./bluebook-citations-fixer/build.sh <version>
@@ -63,7 +63,9 @@ While `_updateDocument` is fanning the (already-rewritten) cluster texts out to 
 
 ### Style gate
 
-Both hook paths consult `BCF.patch._styleAllowed(session)` before running the feature chain (`patch.run` for `setText`, `_prepareCitationTexts` for the prewrite pass). It compares the document's active style — read from `session.data.style.styleID`, falling back to `session.styleID` / `session.style.styleID` — against the `extensions.bluebook-citations-fixer.styleID` pref. The pref holds a **list** of style IDs separated by whitespace, commas, or semicolons (style IDs are URLs, so those separators can't appear inside an ID); it **defaults to the Epps Bluebook style and its experimental variant** (`https://danepps.github.io/bluebook/BluebookDSEStyle.csl` + `…/BluebookDSEStyle-Experimental.csl`), so out of the box the plugin stays dormant under every other style. Matching against each listed ID is **exact** — a forked/renamed style gets its own `<id>` and must be added to the pref, or the plugin silently sits out (this bit once: hereinafters "broke" because the document used the experimental style while the gate only listed the main one). Two escape hatches keep it from going silently dark: an **empty pref disables the gate** (rewrite under all styles — the old behavior), and an **unreadable styleID fails open** (allow + log `style: unknown styleID`). Mismatches log `skip: style mismatch`. The pref is surfaced in the Settings pane (`prefs.xhtml`). The Node harness leaves `Zotero.Prefs` unstubbed, so `_configuredStyleIDs()` throws → caught → returns `[]` → gate disabled, preserving historical test behavior.
+Both hook paths consult `BCF.patch._styleAllowed(session)` before running the feature chain (`patch.run` for `setText`, `_prepareCitationTexts` for the prewrite pass). It compares the document's active style — read from `session.data.style.styleID`, falling back to `session.styleID` / `session.style.styleID` — against the `extensions.bluebook-citations-fixer.styleID` pref. The pref holds a **list** of style IDs separated by whitespace, commas, or semicolons (style IDs are URLs, so those separators can't appear inside an ID); it **defaults to the Epps Bluebook style and its experimental variant** (`https://danepps.github.io/bluebook/BluebookDSEStyle.csl` + `…/BluebookDSEStyle-Experimental.csl`), so out of the box the plugin stays dormant under every other style. Matching against each listed ID is **exact** — a forked/renamed style gets its own `<id>` and must be added to the pref, or the plugin silently sits out (this bit once: hereinafters "broke" because the document used the experimental style while the gate only listed the main one). Two escape hatches keep it from going silently dark: an **empty pref disables the gate** (rewrite under all styles — the old behavior), and an **unreadable styleID fails open** (allow + log `style: unknown styleID`). Mismatches log `skip: style mismatch`. The Node harness leaves `Zotero.Prefs` unstubbed, so `_configuredStyleIDs()` throws → caught → returns `[]` → gate disabled, preserving historical test behavior.
+
+The Settings pane surfaces the gate as a **checkbox picker**: `prefs-pane.js` (registered via `PreferencePanes.register({ scripts: [...] })`, paths relative to the plugin root like `src`) lists every installed CSL style from `Zotero.Styles.getAll()` plus any configured-but-not-installed IDs, and an "Apply under all citation styles" master checkbox. It's a progressive enhancement over a raw pref `<input>` row in `prefs.xhtml`: the script hides that row only after it builds the picker, so a script failure leaves the manual editor working. The picker writes the pref encoding above, with one addition: when "limit to selected styles" is on but nothing is checked it writes the sentinel **`(none)`** — which matches no real style ID (IDs are URLs), so the plugin goes dormant everywhere rather than silently flipping to gate-off. Only the pane knows the sentinel; `_styleAllowed` just sees an ID that never matches.
 
 Key facts that anchor the design:
 
@@ -83,6 +85,7 @@ bluebook-citations-fixer/
 ├── build.sh
 ├── prefs.js                      # default diag + style-gate + hereinafter prefs
 ├── prefs.xhtml                   # Settings pane (style gate + hereinafter options)
+├── prefs-pane.js                 # Settings pane script: style-gate checkbox picker
 ├── locale/en-US/bluebook-citations-fixer.ftl
 ├── tests/run-node-tests.js       # pure helper tests for ambiguity + rewrites
 └── lib/
