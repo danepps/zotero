@@ -15,6 +15,8 @@ Update CLAUDE.md in the same change as the code whenever any of the following sh
 
 Do not let it drift. Stale guidance is worse than no guidance.
 
+**READMEs:** when a plugin changes, update only that plugin's own README (e.g. `bluebook-citations-fixer/README.md` — its install link, feature list, "Latest Released Version", and release history). Do **not** touch the repo-root `README.md` for plugin-level changes; it's a stable index page and only changes when a plugin is added/removed or the install flow itself changes.
+
 `AGENTS.md` at the repo root is the Codex-facing sister file and mirrors the architecture sections below. When you change anything in "Repository layout", "Build / release", or "bluebook-citations-fixer architecture" here, apply the same edit to `AGENTS.md` in the same commit. The two files exist for different agents but describe one codebase; they must agree.
 
 ## Repository layout

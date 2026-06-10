@@ -13,7 +13,7 @@ that are awkward or impossible to express cleanly in CSL alone.
 
 ## Install
 
-Download [Bluebook_Citations_Fixer_v1.1.0.1.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.1.0.1/Bluebook_Citations_Fixer_v1.1.0.1.xpi)
+Download [Bluebook_Citations_Fixer_v1.2.0.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2/Bluebook_Citations_Fixer_v1.2.0.xpi)
 and install it via **Zotero → Tools → Plugins → gear menu → Install Plugin From File**.
 
 > 💡 Pairs with [Bluebook Signals](../bluebook-signals/README.md) —
@@ -21,17 +21,20 @@ and install it via **Zotero → Tools → Plugins → gear menu → Install Plug
 
 > ## 🚨 Requires the Epps Bluebook CSL style
 >
-> Out of the box this plugin **only runs when your document uses Dan Epps's
-> Bluebook style** — under any other citation style it stays completely
-> dormant and changes nothing. You must install and select that style for the
-> fixer to do anything.
+> This plugin runs when your document uses **Dan Epps's Bluebook style** (or
+> its experimental variant) — under other citation styles it stays dormant by
+> default and changes nothing. You must install and select one of those styles
+> for the fixer to do anything.
 >
 > - **Get the style:** [BluebookDSEStyle.csl](https://danepps.github.io/bluebook/BluebookDSEStyle.csl)
 > - **More info:** [danepps.github.io/bluebook](https://danepps.github.io/bluebook/)
+> - If the style isn't installed yet, the plugin's Settings pane offers a
+>   one-click **Install style** button.
 >
-> (Advanced: the style requirement is a configurable "style gate" — see
-> [Current Features](#current-features). You can clear it in Settings to apply
-> the rules under any style, but the default expects the Epps Bluebook style.)
+> (The Epps styles are always active — no setup needed. To run the fixer under
+> *additional* styles, check them in **Settings → BB Citations Fixer → Style
+> gate**, where the traditional Bluebook Law Review style is offered
+> first-class, or check "Apply under all citation styles".)
 
 > ## 🔄 Run a full refresh to apply the rules
 >
@@ -54,7 +57,9 @@ and install it via **Zotero → Tools → Plugins → gear menu → Install Plug
 ## Current Features
 
 - Hereinafter support for ambiguous same-author works
-  - First full cite gets `[hereinafter Author, <short title>]`
+  - First full cite gets `[hereinafter Author, <short title>]` — placed before
+    any explanatory-parenthetical suffix you've added to the cite, per Rule
+    4.2(b)
   - Subsequent `supra note` cites get the short title inserted before
     `supra note`
   - Only fires when the work actually has a subsequent cite — no
@@ -82,17 +87,23 @@ and install it via **Zotero → Tools → Plugins → gear menu → Install Plug
   wrongly renders the cite as `Id.` When flagged, the plugin rewrites that
   `Id.` into the correct Bluebook short form: `Author, supra note N` for
   secondary sources (italic *supra*; the hereinafter rule adds the short
-  title when the author is ambiguous), or `Short, Vol Reporter at Pincite`
-  for cases. The flag is invisible and persists across refreshes. First-cite
-  long forms, statutes, and cases missing the reporter/volume are detected
-  and left untouched.
-- **Style gate.** By default the plugin only rewrites citations when the open
-  document uses Dan Epps's Bluebook CSL style — under every other style it
-  stays completely dormant, so it never touches a document formatted in some
-  other style. Configurable in Settings: clear the style-ID box to apply the
-  rules under all styles (the old behavior), or point it at a different style's
-  ID. If the active style can't be read for any reason, it fails open so the
-  plugin never silently stops working.
+  title when the author is ambiguous; authorless works are cited by title),
+  or `Short, Vol Reporter at Pincite` for cases. Only the `Id. [at pincite]`
+  span is replaced — signals you typed before it and suffixes after it (e.g.
+  an explanatory parenthetical) are preserved, and multi-pincites like
+  `Id. at 12, 15` come through whole. The flag is invisible and persists
+  across refreshes. First-cite long forms, statutes, cases missing the
+  reporter/volume, and documents without footnote numbering are detected and
+  left untouched.
+- **Style gate.** The plugin always runs under the Epps Bluebook style and its
+  experimental variant — that's hard-wired, so it can never accidentally go
+  dormant under your own styles. Under every other style it stays inactive
+  unless you opt in: **Settings → BB Citations Fixer → Style gate** lists your
+  installed citation styles as checkboxes (with the traditional Bluebook Law
+  Review style pinned at the top) and offers an "Apply under all citation
+  styles" switch. Styles missing from the current machine get a one-click
+  **Install style** button. If the active style can't be read for any reason,
+  the gate fails open so the plugin never silently stops working.
 
 ## Companion plugin
 
@@ -108,13 +119,32 @@ only — Word and LibreOffice work; Google Docs is not yet supported.
 
 ## Latest Released Version
 
-- `1.1.0.1`
-- Git tag: `bluebook-citations-fixer-v1.1.0.1`
-- GitHub release asset: [Bluebook_Citations_Fixer_v1.1.0.1.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.1.0.1/Bluebook_Citations_Fixer_v1.1.0.1.xpi)
+- `1.2.0`
+- Git tag: `bluebook-citations-fixer-v1.2`
+- GitHub release asset: [Bluebook_Citations_Fixer_v1.2.0.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2/Bluebook_Citations_Fixer_v1.2.0.xpi)
 
 ## Release History
 
 See [`../CHANGELOG.md`](../CHANGELOG.md) for the full history. Recent releases:
+
+### v1.2.0
+
+- **Epps Bluebook styles hard-wired into the style gate** — the fixer always
+  runs under the main and experimental Epps styles, with no configuration to
+  drift out of sync.
+- **Style-gate checkbox picker** in Settings: an "Apply under all citation
+  styles" switch, a pinned option for the traditional Bluebook Law Review
+  style, a checkbox per installed style, and one-click **Install style**
+  buttons when the Epps styles aren't installed on this machine.
+- **"Break id." improvements:** keeps your suffixes and multi-pincites,
+  supports authorless sources (title-based supra form), and never emits
+  `supra note 0`.
+- **Hereinafter placement:** the `[hereinafter ...]` bracket lands before an
+  explanatory-parenthetical suffix, per Rule 4.2(b).
+- **Robustness & speed:** RTF splices can no longer produce unbalanced output
+  that Word rejects; Google Docs (HTML) sessions are passed through untouched
+  by both hook paths; refreshes on large documents skip a redundant
+  per-field round trip.
 
 ### v1.1.0.1
 
