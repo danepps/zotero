@@ -2,22 +2,34 @@
      Zotero.PreferencePanes.register (src is relative to the plugin root).
      Elements with a `preference` attribute are auto-bound by Zotero to the
      named pref (read on open, written on change). Plain English labels are
-     used intentionally (see lib/ui.js) to avoid FTL registration. -->
-<vbox xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+     used intentionally (see lib/dialog.js) to avoid FTL registration. -->
+<vbox id="bcf-prefpane"
+      xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
       xmlns:html="http://www.w3.org/1999/xhtml">
   <groupbox>
     <label><html:h2>Style gate</html:h2></label>
     <description>
-      Bluebook Citations Fixer only rewrites citations when the document's
-      active citation style matches the style ID below. Leave it set to your
-      Bluebook style so the plugin stays dormant under every other style. Clear
-      the box to apply the rules under all styles.
+      Bluebook Citations Fixer always runs under the Epps Bluebook styles.
+      Check additional citation styles it should also apply to, or apply it
+      under every style.
     </description>
-    <vbox>
-      <label control="bcf-style-id" value="Apply only to this style ID:"/>
+    <checkbox id="bcf-style-all"
+              label="Apply under all citation styles"/>
+    <vbox id="bcf-style-list"
+          style="margin-left: 1.6em; margin-top: 4px; max-height: 220px; overflow-y: auto; padding: 2px 4px 2px 6px;"/>
+    <!-- Raw pref editor; hidden by prefs-pane.js when the checkbox picker
+         renders. Stays visible (and functional) if that script fails. -->
+    <vbox id="bcf-style-manual">
+      <label control="bcf-style-id" value="Also apply under these style IDs (separate with spaces or commas):"/>
       <html:input id="bcf-style-id" type="text" size="60"
                   preference="extensions.bluebook-citations-fixer.styleID"/>
     </vbox>
+    <hbox align="center">
+      <label value="Get the Epps Bluebook styles:"/>
+      <label class="text-link" is="text-link"
+             href="https://danepps.github.io/bluebook/"
+             value="danepps.github.io/bluebook"/>
+    </hbox>
   </groupbox>
   <groupbox>
     <label><html:h2>Hereinafter (Bluebook Rule 4.2(b))</html:h2></label>

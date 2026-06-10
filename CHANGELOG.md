@@ -5,6 +5,61 @@ prefix in each section header identifies which plugin shipped.
 
 ## bluebook-citations-fixer
 
+### v1.2.0 — 2026-06-10
+
+Bug-fix release from a full code review of the rewrite pipeline.
+
+- **Epps Bluebook styles are hard-wired into the style gate.** The fixer now
+  always runs under the Epps Bluebook style **and its experimental variant** —
+  no configuration involved, so the plugin can never sit dormant under either
+  (which is exactly what happened when the old single-ID pref only listed the
+  main style).
+- **Style-gate checkbox picker.** Settings → BB Citations Fixer now shows an
+  "Apply under all citation styles" switch and a checkbox per citation style
+  instead of a raw URL box. The Epps styles appear as always-on rows, the
+  traditional **Bluebook Law Review** style is pinned as a first-class option,
+  and every other installed style is listed below. The `styleID` pref now
+  holds only the *extra* styles (space/comma/semicolon separated; the new
+  `allStyles` bool pref replaces "empty pref = all styles"). Configured-but-
+  not-installed IDs stay visible so they can't be silently dropped; if the
+  picker ever fails to render, the raw style-ID input reappears as a
+  fallback. On a machine missing the Epps styles (or Bluebook Law Review),
+  those rows are marked "(not installed)" with a one-click **Install style**
+  button, and the pane links to danepps.github.io/bluebook for manual
+  installs — a missing style is otherwise harmless (the plugin just stays
+  dormant until it's installed and selected).
+- **Hereinafter bracket placement (Rule 4.2(b)).** `[hereinafter ...]` is now
+  inserted *before* the cite's explanatory-parenthetical suffix instead of
+  after it.
+- **Faster refreshes on large documents.** While the prewrite pass has
+  already rewritten every cluster for an update, the per-field `setText` hook
+  short-circuits instead of re-running the chain (which cost a `getCode()`
+  round trip to the word processor per field).
+- **"Break id." keeps your suffix.** The id-suppress rewrite now replaces only
+  the `Id. [at <pincite>]` span. A user-typed suffix on the flagged cite —
+  e.g. an explanatory parenthetical `(discussing X)` — survives the rewrite
+  instead of being silently dropped, and multi-pincites (`Id. at 12, 15`)
+  come through whole.
+- **"Break id." works for authorless sources.** Student notes and other
+  unsigned pieces are now tracked in the first-note map and rewritten in the
+  title-based form the Bluebook style itself uses for their supra cites:
+  `<i>Short Title</i>, supra note N, at <loc>`.
+- **Never `supra note 0`.** If note numbering is unavailable, the `Id.` is
+  left in place (with the sentinel stripped) rather than pointing at a
+  nonexistent note.
+- **Output-format gate on the prewrite pass.** The `Session._updateDocument`
+  prewrite pass now skips non-RTF sessions (Google Docs HTML, plain text),
+  matching the `setText` hook — previously it could inject RTF fragments into
+  HTML output.
+- **RTF splice safety.** New `BCF.rtf.findPlainRange` / `plainIndexToRtf` /
+  `repairGroups` helpers ensure rewrites that cut through formatting groups
+  (e.g. a style that italicizes the comma before a pincite) can never emit
+  unbalanced RTF that Word/LibreOffice would reject.
+- **Lifecycle hygiene.** Delayed citations rebuild the per-run eligibility
+  cache; the prewrite pass can no longer break document updates if it throws;
+  diagnostic field wrappers are removed on shutdown; and a stale `setText`
+  patch left by a failed unload is recovered instead of adopted.
+
 ### v1.1.0.1 — 2026-06-08
 
 - **Style gate.** The fixer now reads the document's active CSL style (from the

@@ -11,6 +11,7 @@ zip -r "$OUT" \
     chrome.manifest \
     prefs.js \
     prefs.xhtml \
+    prefs-pane.js \
     bootstrap.js \
     locale \
     lib \

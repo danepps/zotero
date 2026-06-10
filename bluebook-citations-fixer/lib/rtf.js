@@ -73,12 +73,10 @@ BCF.rtf.plainish = function (s) {
     return s;
 };
 
-// Find the RTF-offset index that corresponds to the first match of `needleRe`
-// in the plainish projection.  Returns the RTF offset, or -1.
-// Walks the RTF once, tracking plainish-offset alongside, so we can insert
-// at the right spot without mangling control words.
-BCF.rtf.findPlainOffset = function (rtf, needleRe) {
-    // Build a parallel array of [plainChar, rtfIndex] for each visible char.
+// Walk the RTF once and build a parallel array of [plainChar, rtfIndex] for
+// each visible character, plus the plainish projection itself. Shared by the
+// offset/range helpers below so they all agree on the projection.
+BCF.rtf._plainMap = function (rtf) {
     var map = [];
     var plain = "";
     var i = 0;
@@ -122,11 +120,68 @@ BCF.rtf.findPlainOffset = function (rtf, needleRe) {
         plain += ch;
         i += 1;
     }
+    return { map: map, plain: plain };
+};
 
-    var m = needleRe.exec(plain);
+// Find the RTF-offset index that corresponds to the first match of `needleRe`
+// in the plainish projection.  Returns the RTF offset, or -1.
+BCF.rtf.findPlainOffset = function (rtf, needleRe) {
+    var pm = BCF.rtf._plainMap(rtf);
+    var m = needleRe.exec(pm.plain);
     if (!m) return -1;
-    if (m.index >= map.length) return rtf.length;
-    return map[m.index][1];
+    if (m.index >= pm.map.length) return rtf.length;
+    return pm.map[m.index][1];
+};
+
+// Like findPlainOffset, but returns the full RTF span of the first match:
+// { start, end, match }. `end` is the RTF offset of the first visible char
+// AFTER the match (or rtf.length), so invisible content (closing braces,
+// control words) sitting between the match and the next visible char is
+// included in the span — which keeps groups opened inside the span from
+// leaking a stray closer into the tail. Returns null when there is no match.
+BCF.rtf.findPlainRange = function (rtf, needleRe) {
+    var pm = BCF.rtf._plainMap(rtf);
+    var m = needleRe.exec(pm.plain);
+    if (!m) return null;
+    var start = m.index >= pm.map.length ? rtf.length : pm.map[m.index][1];
+    var endIdx = m.index + m[0].length;
+    var end = endIdx >= pm.map.length ? rtf.length : pm.map[endIdx][1];
+    return { start: start, end: end, match: m };
+};
+
+// RTF offset of the visible character at `plainIdx` in the plainish
+// projection (rtf.length when plainIdx is past the end).
+BCF.rtf.plainIndexToRtf = function (rtf, plainIdx) {
+    var pm = BCF.rtf._plainMap(rtf);
+    if (plainIdx < 0) return -1;
+    if (plainIdx >= pm.map.length) return rtf.length;
+    return pm.map[plainIdx][1];
+};
+
+// Repair group balance after a splice: drop closing braces that would take
+// the depth negative and append closers for any groups left open. Escaped
+// \{ \} don't count. Splices that cut through a group can otherwise leave
+// RTF that Word/LibreOffice reject outright; this trades that for (at worst)
+// a slightly larger formatting span.
+BCF.rtf.repairGroups = function (s) {
+    var out = "";
+    var depth = 0;
+    for (var i = 0; i < s.length; i++) {
+        var ch = s.charAt(i);
+        if (ch === "\\") {
+            out += ch;
+            if (i + 1 < s.length) { out += s.charAt(i + 1); i++; }
+            continue;
+        }
+        if (ch === "{") { depth++; out += ch; continue; }
+        if (ch === "}") {
+            if (depth > 0) { depth--; out += ch; }
+            continue;
+        }
+        out += ch;
+    }
+    while (depth-- > 0) out += "}";
+    return out;
 };
 
 // Split a multi-item RTF citation cluster on the citeproc cite-group delimiter
