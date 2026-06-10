@@ -23,7 +23,11 @@ Bug-fix release from a full code review of the rewrite pipeline.
   `allStyles` bool pref replaces "empty pref = all styles"). Configured-but-
   not-installed IDs stay visible so they can't be silently dropped; if the
   picker ever fails to render, the raw style-ID input reappears as a
-  fallback.
+  fallback. On a machine missing the Epps styles (or Bluebook Law Review),
+  those rows are marked "(not installed)" with a one-click **Install style**
+  button, and the pane links to danepps.github.io/bluebook for manual
+  installs — a missing style is otherwise harmless (the plugin just stays
+  dormant until it's installed and selected).
 - **Hereinafter bracket placement (Rule 4.2(b)).** `[hereinafter ...]` is now
   inserted *before* the cite's explanatory-parenthetical suffix instead of
   after it.

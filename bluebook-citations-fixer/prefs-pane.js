@@ -90,14 +90,26 @@
 
         // Row order: built-ins (always on), pinned styles, other installed
         // styles (by title), then any configured-but-unknown extras so a
-        // sync/profile mismatch can't silently drop them.
+        // sync/profile mismatch can't silently drop them. Built-in and pinned
+        // styles may not be installed on this machine (fresh profile, second
+        // computer): their IDs are also their download URLs, so those rows
+        // get an "Install style" button instead of silently looking odd.
         var pinnedIDs = PINNED.map(function (p) { return p.id; });
         var rows = [];
         BUILTINS.forEach(function (b) {
-            rows.push({ id: b.id, title: titleByID[b.id] || b.title, builtin: true });
+            rows.push({
+                id: b.id,
+                title: titleByID[b.id] || b.title,
+                builtin: true,
+                installable: !(b.id in titleByID)
+            });
         });
         PINNED.forEach(function (p) {
-            rows.push({ id: p.id, title: titleByID[p.id] || p.title });
+            rows.push({
+                id: p.id,
+                title: titleByID[p.id] || p.title,
+                installable: !(p.id in titleByID)
+            });
         });
         installed
             .filter(function (id) {
@@ -127,16 +139,53 @@
             });
         }
 
+        function rowLabel(row, installed_) {
+            return row.title +
+                (row.builtin ? " — always on" : "") +
+                (installed_ ? "" : " (not installed)");
+        }
+
         rows.forEach(function (row) {
             var cb = document.createXULElement("checkbox");
-            cb.setAttribute("label", row.title + (row.builtin ? " — always on" : ""));
+            cb.setAttribute("label", rowLabel(row, !row.installable));
             cb.setAttribute("tooltiptext", row.id);
             cb.setAttribute("data-bcf-style-id", row.id);
             if (row.builtin) cb.setAttribute("data-bcf-builtin", "1");
             cb.checked = !!row.builtin || extras.indexOf(row.id) !== -1;
             if (!row.builtin) cb.addEventListener("command", commit);
-            listBox.appendChild(cb);
             boxes.push(cb);
+
+            if (!row.installable) {
+                listBox.appendChild(cb);
+                return;
+            }
+            // Not installed but fetchable: offer one-click install. The
+            // checkbox still works either way — the gate compares ID strings,
+            // so checking a not-yet-installed style is harmless and the
+            // intent survives until the style arrives.
+            var hbox = document.createXULElement("hbox");
+            hbox.setAttribute("align", "center");
+            var btn = document.createXULElement("button");
+            btn.setAttribute("label", "Install style");
+            btn.addEventListener("command", function () {
+                btn.disabled = true;
+                Promise.resolve()
+                    .then(function () {
+                        return Zotero.Styles.install({ url: row.id }, row.id, true);
+                    })
+                    .then(function () {
+                        btn.hidden = true;
+                        cb.setAttribute("label", rowLabel(row, true));
+                    })
+                    .catch(function (e) {
+                        report(e);
+                        btn.disabled = false;
+                        btn.setAttribute("label", "Install failed — retry");
+                    });
+            });
+            hbox.appendChild(cb);
+            hbox.appendChild(btn);
+            listBox.appendChild(hbox);
         });
         listBox.setAttribute("data-bcf-built", "1");
 
