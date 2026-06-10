@@ -1353,11 +1353,14 @@ const NOID = String.fromCharCode(0x200B);
 }
 
 {
-    // Rule 4.2(b) placement: the [hereinafter ...] bracket lands before the
-    // cite's explanatory-parenthetical suffix, not after it.
+    // The [hereinafter ...] bracket always lands at the END of the segment,
+    // after any suffix. A suffix can hold the date/edition parenthetical just
+    // as easily as an explanatory one, and Rule 4.2(b) puts the bracket after
+    // the former — placing it before every suffix misplaced brackets in real
+    // documents (v1.2.0 regression).
     const a = cit("SfxA", "Epps", "Checks", "Checks and Balances");
     const b = cit("SfxB", "Epps", "Asymmetry", "Adversarial Asymmetry");
-    a.suffix = "(discussing X)";
+    a.suffix = "(2011)";
     const run = eligibleRun({
         1: citation(1, [a]),
         2: citation(1, [b])
@@ -1365,12 +1368,12 @@ const NOID = String.fromCharCode(0x200B);
     const out = BCF.features.hereinafter.rewrite({
         codeJson: { citationItems: [a] },
         run,
-        text: "Dan Epps, Checks and Balances (discussing X)",
+        text: "Dan Epps, Checks and Balances (2011)",
         rtf: BCF.rtf
     });
     assert.strictEqual(
         out,
-        "Dan Epps, Checks and Balances [hereinafter Epps, {\\i{}Checks}] (discussing X)"
+        "Dan Epps, Checks and Balances (2011) [hereinafter Epps, {\\i{}Checks}]"
     );
 }
 

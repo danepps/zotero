@@ -21,9 +21,6 @@ Bug-fix release from a full code review of the rewrite pipeline.
 - **Never `supra note 0`.** If note numbering is unavailable, the `Id.` is
   left in place (with the sentinel stripped) rather than pointing at a
   nonexistent note.
-- **Hereinafter bracket placement (Rule 4.2(b)).** `[hereinafter ...]` is now
-  inserted *before* the cite's explanatory-parenthetical suffix instead of
-  after it.
 - **Output-format gate on the prewrite pass.** The `Session._updateDocument`
   prewrite pass now skips non-RTF sessions (Google Docs HTML, plain text),
   matching the `setText` hook — previously it could inject RTF fragments into
