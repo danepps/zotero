@@ -3,7 +3,8 @@
      Elements with a `preference` attribute are auto-bound by Zotero to the
      named pref (read on open, written on change). Plain English labels are
      used intentionally (see lib/dialog.js) to avoid FTL registration. -->
-<vbox xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+<vbox id="bcf-prefpane"
+      xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
       xmlns:html="http://www.w3.org/1999/xhtml">
   <groupbox>
     <label><html:h2>Style gate</html:h2></label>
@@ -15,7 +16,7 @@
     <checkbox id="bcf-style-all"
               label="Apply under all citation styles"/>
     <vbox id="bcf-style-list"
-          style="margin-left: 1.6em; margin-top: 4px; max-height: 220px; overflow-y: auto;"/>
+          style="margin-left: 1.6em; margin-top: 4px; max-height: 220px; overflow-y: auto; padding: 2px 4px 2px 6px;"/>
     <!-- Raw pref editor; hidden by prefs-pane.js when the checkbox picker
          renders. Stays visible (and functional) if that script fails. -->
     <vbox id="bcf-style-manual">

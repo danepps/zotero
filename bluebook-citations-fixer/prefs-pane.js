@@ -67,11 +67,30 @@
         try { return !!Zotero.Prefs.get(PREF_ALL, true); } catch (_) { return false; }
     }
 
+    // Wire http(s) links to open in the default browser. The toolkit
+    // label[is=text-link] widget isn't upgraded in plugin pane fragments, so
+    // those labels render but clicking them does nothing (mailto: links work
+    // only because the OS protocol handler intercepts them — leave those be).
+    function wireLinks() {
+        var root = document.getElementById("bcf-prefpane");
+        if (!root) return;
+        root.querySelectorAll('label.text-link[href^="http"]').forEach(function (lnk) {
+            if (lnk.getAttribute("data-bcf-linked") === "1") return;
+            lnk.setAttribute("data-bcf-linked", "1");
+            lnk.style.cursor = "pointer";
+            lnk.addEventListener("click", function (ev) {
+                ev.preventDefault();
+                try { Zotero.launchURL(lnk.getAttribute("href")); } catch (e) { report(e); }
+            });
+        });
+    }
+
     async function init() {
         var allBox = document.getElementById("bcf-style-all");
         var listBox = document.getElementById("bcf-style-list");
         var manual = document.getElementById("bcf-style-manual");
         if (!allBox || !listBox || !manual) return false;
+        wireLinks();
         if (listBox.getAttribute("data-bcf-built") === "1") return true;
 
         await Zotero.Styles.init();
