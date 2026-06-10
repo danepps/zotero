@@ -9,17 +9,21 @@ prefix in each section header identifies which plugin shipped.
 
 Bug-fix release from a full code review of the rewrite pipeline.
 
-- **Style gate accepts multiple style IDs.** The
-  `extensions.bluebook-citations-fixer.styleID` pref now holds a list
-  (space/comma/semicolon separated) and defaults to the Epps Bluebook style
-  **and its experimental variant**, so the plugin no longer sits dormant when
-  a document uses `BluebookDSEStyle-Experimental.csl`.
-- **Style-gate checkbox picker.** Settings → BB Citations Fixer now lists
-  every installed citation style with a checkbox (plus an "Apply under all
-  citation styles" switch) instead of a raw URL box. Configured-but-not-
-  installed style IDs stay visible and checked so they can't be silently
-  dropped; if the picker ever fails to render, the raw style-ID input
-  reappears as a fallback.
+- **Epps Bluebook styles are hard-wired into the style gate.** The fixer now
+  always runs under the Epps Bluebook style **and its experimental variant** —
+  no configuration involved, so the plugin can never sit dormant under either
+  (which is exactly what happened when the old single-ID pref only listed the
+  main style).
+- **Style-gate checkbox picker.** Settings → BB Citations Fixer now shows an
+  "Apply under all citation styles" switch and a checkbox per citation style
+  instead of a raw URL box. The Epps styles appear as always-on rows, the
+  traditional **Bluebook Law Review** style is pinned as a first-class option,
+  and every other installed style is listed below. The `styleID` pref now
+  holds only the *extra* styles (space/comma/semicolon separated; the new
+  `allStyles` bool pref replaces "empty pref = all styles"). Configured-but-
+  not-installed IDs stay visible so they can't be silently dropped; if the
+  picker ever fails to render, the raw style-ID input reappears as a
+  fallback.
 - **Hereinafter bracket placement (Rule 4.2(b)).** `[hereinafter ...]` is now
   inserted *before* the cite's explanatory-parenthetical suffix instead of
   after it.

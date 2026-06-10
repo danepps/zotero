@@ -10,6 +10,7 @@
 
 BCF.patch = {};
 BCF.patch.PREF_STYLE_ID = "extensions.bluebook-citations-fixer.styleID";
+BCF.patch.PREF_ALL_STYLES = "extensions.bluebook-citations-fixer.allStyles";
 BCF.patch._orig = null;
 BCF.patch._retryTimer = null;
 BCF.patch._origExecCommand = null;
@@ -268,25 +269,39 @@ BCF.patch._uninstrumentFields = function () {
     BCF.patch._wrappedFieldProtos = [];
 };
 
-// The CSL style ID(s) this gate is allowed to rewrite under, read from the
-// styleID pref. The pref may hold several IDs separated by whitespace, commas,
-// or semicolons (style IDs are URLs, so none of those appear inside an ID).
-// An empty/whitespace pref turns the gate off (rewrite under every style).
+// Hard-wired style IDs: the Epps Bluebook style and its experimental variant.
+// These are the styles the rules are written against, so the gate ALWAYS
+// allows them — no configuration involved, nothing to drift out of sync when
+// a document switches between the two.
+BCF.patch.BUILTIN_STYLE_IDS = [
+    "https://danepps.github.io/bluebook/BluebookDSEStyle.csl",
+    "https://danepps.github.io/bluebook/BluebookDSEStyle-Experimental.csl"
+];
+
+// Extra CSL style IDs the fixer should ALSO run under (beyond the built-ins),
+// read from the styleID pref. The pref may hold several IDs separated by
+// whitespace, commas, or semicolons (style IDs are URLs, so none of those
+// appear inside an ID). "(none)" is a legacy sentinel from an older Settings
+// pane; filter it so it can't show up as a junk entry.
 BCF.patch._configuredStyleIDs = function () {
     try {
         var v = Zotero.Prefs.get(BCF.patch.PREF_STYLE_ID, true);
         if (v == null) return [];
-        return String(v).split(/[\s,;]+/).filter(function (s) { return !!s; });
+        return String(v).split(/[\s,;]+/).filter(function (s) {
+            return !!s && s !== "(none)";
+        });
     } catch (_) {
         return [];
     }
 };
 
-// Back-compat shim: a single configured ID (first of the list), used nowhere
-// internally anymore but kept so external callers/tests don't break.
-BCF.patch._configuredStyleID = function () {
-    var ids = BCF.patch._configuredStyleIDs();
-    return ids.length ? ids[0] : "";
+// "Apply under all citation styles": disables the gate entirely.
+BCF.patch._allStylesEnabled = function () {
+    try {
+        return !!Zotero.Prefs.get(BCF.patch.PREF_ALL_STYLES, true);
+    } catch (_) {
+        return false;
+    }
 };
 
 // The styleID of the document's active citation style. Zotero hangs the active
@@ -308,14 +323,13 @@ BCF.patch._sessionStyleID = function (session) {
     return "";
 };
 
-// Gate: when style IDs are configured (default = the Epps Bluebook style plus
-// its experimental variant), only rewrite when the document's active style
-// matches one of them exactly. An empty pref disables the gate. If the active
-// style can't be read at all, fail open and log — the plugin should never go
-// silently dark if Zotero moves the styleID.
+// Gate: rewrite under the hard-wired Epps Bluebook styles, plus any extra
+// style IDs from the pref (exact match), plus everything when "apply under
+// all styles" is on. If the active style can't be read at all, fail open and
+// log — the plugin should never go silently dark if Zotero moves the styleID.
 BCF.patch._styleAllowed = function (session) {
-    var want = BCF.patch._configuredStyleIDs();
-    if (!want.length) return true; // gate disabled
+    if (BCF.patch._allStylesEnabled()) return true;
+    var want = BCF.patch.BUILTIN_STYLE_IDS.concat(BCF.patch._configuredStyleIDs());
     var have = BCF.patch._sessionStyleID(session);
     if (!have) {
         BCF.diag.event("style", "unknown styleID; allowing (configured=" + want.join(" ") + ")");

@@ -8,8 +8,9 @@
   <groupbox>
     <label><html:h2>Style gate</html:h2></label>
     <description>
-      Bluebook Citations Fixer only rewrites citations when the document uses
-      one of the checked citation styles, so it stays dormant everywhere else.
+      Bluebook Citations Fixer always runs under the Epps Bluebook styles.
+      Check additional citation styles it should also apply to, or apply it
+      under every style.
     </description>
     <checkbox id="bcf-style-all"
               label="Apply under all citation styles"/>
@@ -18,7 +19,7 @@
     <!-- Raw pref editor; hidden by prefs-pane.js when the checkbox picker
          renders. Stays visible (and functional) if that script fails. -->
     <vbox id="bcf-style-manual">
-      <label control="bcf-style-id" value="Apply only to these style IDs (separate with spaces or commas; clear to apply under all styles):"/>
+      <label control="bcf-style-id" value="Also apply under these style IDs (separate with spaces or commas):"/>
       <html:input id="bcf-style-id" type="text" size="60"
                   preference="extensions.bluebook-citations-fixer.styleID"/>
     </vbox>

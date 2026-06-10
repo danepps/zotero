@@ -1533,11 +1533,16 @@ const NOID = String.fromCharCode(0x200B);
     }
 
     {
-        // Style gate: the fixer only rewrites under the configured style ID.
-        // Reuse journal-volume-year (strips a trailing "(YYYY)" when the volume
-        // is itself that year) as an observable rewrite to gate on.
-        const STYLE = "https://danepps.github.io/bluebook/BluebookDSEStyle.csl";
-        const PREF = "extensions.bluebook-citations-fixer.styleID";
+        // Style gate: the Epps Bluebook styles are HARD-WIRED (always allowed);
+        // the styleID pref lists extra styles; the allStyles pref disables the
+        // gate. Reuse journal-volume-year (strips a trailing "(YYYY)" when the
+        // volume is itself that year) as an observable rewrite to gate on.
+        const MAIN = "https://danepps.github.io/bluebook/BluebookDSEStyle.csl";
+        const EXPERIMENTAL = "https://danepps.github.io/bluebook/BluebookDSEStyle-Experimental.csl";
+        const TRADITIONAL = "http://www.zotero.org/styles/bluebook-law-review";
+        const APA = "http://www.zotero.org/styles/apa";
+        const PREF_EXTRAS = "extensions.bluebook-citations-fixer.styleID";
+        const PREF_ALL = "extensions.bluebook-citations-fixer.allStyles";
 
         function journalSession(styleID) {
             const journal = cit(
@@ -1556,72 +1561,60 @@ const NOID = String.fromCharCode(0x200B);
         const GATED = "Maria Lopez, Gate Piece, 2024 Yale L.J. 5";       // (2024) stripped
         const RAW = "Maria Lopez, Gate Piece, 2024 Yale L.J. 5 (2024)";  // untouched
 
-        // (a) Matching style -> rewrite applies.
-        withPrefs({ [PREF]: STYLE }, () => {
-            const s = journalSession(STYLE);
-            BCF.patch._prepareCitationTexts(s);
-            assert.strictEqual(s.citationsByIndex[1].text, GATED);
+        // (a) Built-in styles always pass, with NO pref configuration at all.
+        withPrefs({}, () => {
+            for (const id of [MAIN, EXPERIMENTAL]) {
+                const s = journalSession(id);
+                BCF.patch._prepareCitationTexts(s);
+                assert.strictEqual(s.citationsByIndex[1].text, GATED);
+            }
         });
 
-        // (b) Different style -> cluster left untouched.
-        withPrefs({ [PREF]: STYLE }, () => {
-            const s = journalSession("http://www.zotero.org/styles/apa");
+        // (b) Any other style is blocked by default...
+        withPrefs({}, () => {
+            const s = journalSession(APA);
             BCF.patch._prepareCitationTexts(s);
             assert.strictEqual(s.citationsByIndex[1].text, RAW);
         });
 
-        // (c) Empty pref disables the gate -> rewrite under any style.
-        withPrefs({ [PREF]: "" }, () => {
-            const s = journalSession("http://www.zotero.org/styles/apa");
+        // (c) ...unless listed in the extras pref (e.g. the traditional
+        // Bluebook Law Review checkbox) — any separator works...
+        for (const extras of [TRADITIONAL, TRADITIONAL + ", " + APA, APA + ";" + TRADITIONAL]) {
+            withPrefs({ [PREF_EXTRAS]: extras }, () => {
+                const s = journalSession(TRADITIONAL);
+                BCF.patch._prepareCitationTexts(s);
+                assert.strictEqual(s.citationsByIndex[1].text, GATED);
+            });
+        }
+
+        // (d) ...or allStyles is on (gate disabled).
+        withPrefs({ [PREF_ALL]: true }, () => {
+            const s = journalSession(APA);
             BCF.patch._prepareCitationTexts(s);
             assert.strictEqual(s.citationsByIndex[1].text, GATED);
         });
 
-        // (d) Style unreadable -> fail open (rewrite), never silently dark.
-        withPrefs({ [PREF]: STYLE }, () => {
+        // (e) Style unreadable -> fail open (rewrite), never silently dark.
+        withPrefs({}, () => {
             const s = journalSession(undefined); // no session.data.style
             BCF.patch._prepareCitationTexts(s);
             assert.strictEqual(s.citationsByIndex[1].text, GATED);
         });
 
-        // Direct predicate checks, including the fallback styleID locations.
-        withPrefs({ [PREF]: STYLE }, () => {
-            assert(BCF.patch._styleAllowed({ data: { style: { styleID: STYLE } } }));
-            assert(!BCF.patch._styleAllowed({ data: { style: { styleID: "x" } } }));
-            assert(BCF.patch._styleAllowed({}));                  // unknown -> fail open
-            assert(BCF.patch._styleAllowed({ styleID: STYLE }));  // session.styleID fallback
+        // Direct predicate checks, including the fallback styleID locations
+        // and the legacy "(none)" sentinel (filtered out of extras; built-ins
+        // unaffected).
+        withPrefs({ [PREF_EXTRAS]: TRADITIONAL }, () => {
+            assert(BCF.patch._styleAllowed({ data: { style: { styleID: MAIN } } }));
+            assert(BCF.patch._styleAllowed({ data: { style: { styleID: TRADITIONAL } } }));
+            assert(!BCF.patch._styleAllowed({ data: { style: { styleID: APA } } }));
+            assert(BCF.patch._styleAllowed({}));                 // unknown -> fail open
+            assert(BCF.patch._styleAllowed({ styleID: MAIN }));  // session.styleID fallback
         });
-        withPrefs({ [PREF]: "" }, () => {
-            assert(BCF.patch._styleAllowed({ data: { style: { styleID: "anything" } } }));
-        });
-
-        // (e) Multiple style IDs in the pref (space/comma/semicolon separated):
-        // each listed style passes the gate, anything else is blocked. This is
-        // how the default covers both the main Epps style and its experimental
-        // variant.
-        const EXPERIMENTAL = "https://danepps.github.io/bluebook/BluebookDSEStyle-Experimental.csl";
-        for (const sep of [" ", ", ", ";", "\n"]) {
-            withPrefs({ [PREF]: STYLE + sep + EXPERIMENTAL }, () => {
-                assert(BCF.patch._styleAllowed({ data: { style: { styleID: STYLE } } }));
-                assert(BCF.patch._styleAllowed({ data: { style: { styleID: EXPERIMENTAL } } }));
-                assert(!BCF.patch._styleAllowed({ data: { style: { styleID: "http://www.zotero.org/styles/apa" } } }));
-            });
-        }
-        withPrefs({ [PREF]: STYLE + " " + EXPERIMENTAL }, () => {
-            const s = journalSession(EXPERIMENTAL);
-            BCF.patch._prepareCitationTexts(s);
-            assert.strictEqual(s.citationsByIndex[1].text, GATED);
-        });
-
-        // (f) "(none)" sentinel (written by the settings pane when "limit to
-        // selected styles" is on with nothing checked): gate active, matches
-        // no real style ID — dormant everywhere, NOT gate-off.
-        withPrefs({ [PREF]: "(none)" }, () => {
-            assert(!BCF.patch._styleAllowed({ data: { style: { styleID: STYLE } } }));
-            assert(!BCF.patch._styleAllowed({ data: { style: { styleID: EXPERIMENTAL } } }));
-            const s = journalSession(STYLE);
-            BCF.patch._prepareCitationTexts(s);
-            assert.strictEqual(s.citationsByIndex[1].text, RAW);
+        withPrefs({ [PREF_EXTRAS]: "(none)" }, () => {
+            assert(BCF.patch._styleAllowed({ data: { style: { styleID: MAIN } } }));
+            assert(!BCF.patch._styleAllowed({ data: { style: { styleID: "(none)" } } }));
+            assert(!BCF.patch._styleAllowed({ data: { style: { styleID: APA } } }));
         });
     }
 

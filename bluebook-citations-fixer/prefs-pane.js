@@ -5,39 +5,51 @@
 // Progressive enhancement over the raw style-ID input (#bcf-style-manual):
 // when this script runs successfully it hides the manual row and renders
 //   [ ] Apply under all citation styles
-//   [x] Bluebook Style — Epps Version
-//   [x] Bluebook Style — Epps Version (Experimental)
-//   [ ] ...one checkbox per installed CSL style...
-// keeping the `styleID` pref in sync. If anything here throws, the manual
-// row stays visible and fully functional — the pref is always the source
-// of truth and this UI is just a nicer way to edit it.
+//   [x] Bluebook Style — Epps Version            (always on, disabled)
+//   [x] Bluebook Style — Epps Version (Experimental)  (always on, disabled)
+//   [ ] Bluebook Law Review                      (pinned, even if not installed)
+//   [ ] ...one checkbox per other installed CSL style...
+// If anything here throws, the manual row stays visible and fully
+// functional — the prefs are the source of truth and this UI is just a
+// nicer way to edit them.
 //
-// Pref encoding (see lib/patch.js):
-//   ""            -> gate disabled, rewrite under every style
-//   "id1 id2 ..." -> rewrite only under those exact style IDs
-//   "(none)"      -> sentinel written when "limit to selected styles" is on
-//                    but nothing is checked; matches no real style ID (IDs
-//                    are URLs), so the plugin stays dormant everywhere
-//                    instead of silently flipping to "all styles".
+// Pref model (see lib/patch.js):
+//   allStyles (bool)  -> gate off, rewrite under every style
+//   styleID (string)  -> EXTRA style IDs beyond the hard-wired built-ins,
+//                        separated by whitespace/commas/semicolons
 (function () {
-    var PREF = "extensions.bluebook-citations-fixer.styleID";
+    var PREF_EXTRAS = "extensions.bluebook-citations-fixer.styleID";
+    var PREF_ALL = "extensions.bluebook-citations-fixer.allStyles";
+    // Legacy sentinel from an older pane; never write it, always drop it.
     var SENTINEL = "(none)";
-    var DEFAULT_IDS = [
-        "https://danepps.github.io/bluebook/BluebookDSEStyle.csl",
-        "https://danepps.github.io/bluebook/BluebookDSEStyle-Experimental.csl"
+    // Hard-wired in BCF.patch.BUILTIN_STYLE_IDS; shown here as always-on rows.
+    var BUILTINS = [
+        { id: "https://danepps.github.io/bluebook/BluebookDSEStyle.csl",
+          title: "Bluebook Style — Epps Version" },
+        { id: "https://danepps.github.io/bluebook/BluebookDSEStyle-Experimental.csl",
+          title: "Bluebook Style — Epps Version (Experimental)" }
+    ];
+    // First-class optional styles, listed even when not installed.
+    var PINNED = [
+        { id: "http://www.zotero.org/styles/bluebook-law-review",
+          title: "Bluebook Law Review" }
     ];
 
-    function parsePref() {
+    function builtinIDs() {
+        return BUILTINS.map(function (b) { return b.id; });
+    }
+
+    function parseExtras() {
         var v = "";
-        try { v = Zotero.Prefs.get(PREF, true) || ""; } catch (_) {}
+        try { v = Zotero.Prefs.get(PREF_EXTRAS, true) || ""; } catch (_) {}
+        var builtin = builtinIDs();
         return String(v).split(/[\s,;]+/).filter(function (s) {
-            return !!s && s !== SENTINEL;
+            return !!s && s !== SENTINEL && builtin.indexOf(s) === -1;
         });
     }
 
-    function writePref(ids, limit) {
-        var v = !limit ? "" : (ids.length ? ids.join(" ") : SENTINEL);
-        try { Zotero.Prefs.set(PREF, v, true); } catch (_) {}
+    function readAll() {
+        try { return !!Zotero.Prefs.get(PREF_ALL, true); } catch (_) { return false; }
     }
 
     async function init() {
@@ -48,63 +60,73 @@
         if (listBox.getAttribute("data-bcf-built") === "1") return true;
 
         await Zotero.Styles.init();
-        var styles = Zotero.Styles.getAll().map(function (s) {
-            return { id: s.styleID || s.url || "", title: s.title || "" };
-        }).filter(function (s) { return s.id; });
-        styles.sort(function (a, b) { return a.title.localeCompare(b.title); });
+        var titleByID = {};
+        var installed = [];
+        Zotero.Styles.getAll().forEach(function (s) {
+            var id = s.styleID || s.url || "";
+            if (!id) return;
+            titleByID[id] = s.title || id;
+            installed.push(id);
+        });
 
-        var selected = parsePref();
-        var limit = selected.length > 0; // empty pref = gate off = all styles
+        var extras = parseExtras();
 
-        // IDs configured but not installed locally must stay visible (and
-        // checked) so a sync/profile mismatch can't silently drop them.
-        var installed = {};
-        styles.forEach(function (s) { installed[s.id] = true; });
-        selected.forEach(function (id) {
-            if (!installed[id]) styles.push({ id: id, title: id + " — not installed" });
+        // Row order: built-ins (always on), pinned styles, other installed
+        // styles (by title), then any configured-but-unknown extras so a
+        // sync/profile mismatch can't silently drop them.
+        var pinnedIDs = PINNED.map(function (p) { return p.id; });
+        var rows = [];
+        BUILTINS.forEach(function (b) {
+            rows.push({ id: b.id, title: titleByID[b.id] || b.title, builtin: true });
+        });
+        PINNED.forEach(function (p) {
+            rows.push({ id: p.id, title: titleByID[p.id] || p.title });
+        });
+        installed
+            .filter(function (id) {
+                return builtinIDs().indexOf(id) === -1 && pinnedIDs.indexOf(id) === -1;
+            })
+            .sort(function (a, b) { return titleByID[a].localeCompare(titleByID[b]); })
+            .forEach(function (id) { rows.push({ id: id, title: titleByID[id] }); });
+        extras.forEach(function (id) {
+            if (installed.indexOf(id) === -1 && pinnedIDs.indexOf(id) === -1) {
+                rows.push({ id: id, title: id + " — not installed" });
+            }
         });
 
         var boxes = [];
         function commit() {
             var ids = [];
             boxes.forEach(function (b) {
-                if (b.checked) ids.push(b.getAttribute("data-bcf-style-id"));
+                if (!b.__bcfBuiltin && b.checked) {
+                    ids.push(b.getAttribute("data-bcf-style-id"));
+                }
             });
-            writePref(ids, !allBox.checked);
+            try { Zotero.Prefs.set(PREF_EXTRAS, ids.join(" "), true); } catch (_) {}
         }
         function syncDisabled() {
-            boxes.forEach(function (b) { b.disabled = allBox.checked; });
+            boxes.forEach(function (b) {
+                b.disabled = b.__bcfBuiltin || allBox.checked;
+            });
         }
 
-        styles.forEach(function (s) {
+        rows.forEach(function (row) {
             var cb = document.createXULElement("checkbox");
-            cb.setAttribute("label", s.title);
-            cb.setAttribute("tooltiptext", s.id);
-            cb.setAttribute("data-bcf-style-id", s.id);
-            cb.checked = selected.indexOf(s.id) !== -1;
-            cb.addEventListener("command", commit);
+            cb.setAttribute("label", row.title + (row.builtin ? " — always on" : ""));
+            cb.setAttribute("tooltiptext", row.id);
+            cb.setAttribute("data-bcf-style-id", row.id);
+            cb.__bcfBuiltin = !!row.builtin;
+            cb.checked = row.builtin || extras.indexOf(row.id) !== -1;
+            if (!row.builtin) cb.addEventListener("command", commit);
             listBox.appendChild(cb);
             boxes.push(cb);
         });
         listBox.setAttribute("data-bcf-built", "1");
 
-        allBox.checked = !limit;
+        allBox.checked = readAll();
         allBox.addEventListener("command", function () {
-            if (!allBox.checked) {
-                // Flipping from "all styles" back to "selected styles" with an
-                // empty selection would leave the plugin dormant everywhere;
-                // preselect the plugin's default styles when present.
-                var any = boxes.some(function (b) { return b.checked; });
-                if (!any) {
-                    boxes.forEach(function (b) {
-                        if (DEFAULT_IDS.indexOf(b.getAttribute("data-bcf-style-id")) !== -1) {
-                            b.checked = true;
-                        }
-                    });
-                }
-            }
+            try { Zotero.Prefs.set(PREF_ALL, !!allBox.checked, true); } catch (_) {}
             syncDisabled();
-            commit();
         });
         syncDisabled();
 
