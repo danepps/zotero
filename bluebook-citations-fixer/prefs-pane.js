@@ -9,9 +9,19 @@
 //   [x] Bluebook Style — Epps Version (Experimental)  (always on, disabled)
 //   [ ] Bluebook Law Review                      (pinned, even if not installed)
 //   [ ] ...one checkbox per other installed CSL style...
-// If anything here throws, the manual row stays visible and fully
+// If anything here fails, the manual row stays visible and fully
 // functional — the prefs are the source of truth and this UI is just a
 // nicer way to edit them.
+//
+// Pane-script environment notes (Zotero 7 preferences.js):
+//   * Scripts are loaded into a Cu.Sandbox with sandboxPrototype = the prefs
+//     window, BEFORE the pane's XHTML fragment is inserted into the DOM. So
+//     never touch elements at top level — wait for the `load` event Zotero
+//     fires on the pane content after insertion (capture listener on the
+//     document catches it; it doesn't bubble).
+//   * Never call bare `setTimeout(...)`: it resolves to window.setTimeout but
+//     gets the sandbox as `this` and throws. Use `window.setTimeout(...)`.
+//   * Report failures via Zotero.logError so they reach the Error Console.
 //
 // Pref model (see lib/patch.js):
 //   allStyles (bool)  -> gate off, rewrite under every style
@@ -34,6 +44,11 @@
         { id: "http://www.zotero.org/styles/bluebook-law-review",
           title: "Bluebook Law Review" }
     ];
+
+    function report(e) {
+        try { Zotero.logError(e); } catch (_) {}
+        try { Zotero.debug("bluebook-citations-fixer prefs pane: " + e); } catch (_) {}
+    }
 
     function builtinIDs() {
         return BUILTINS.map(function (b) { return b.id; });
@@ -60,9 +75,11 @@
         if (listBox.getAttribute("data-bcf-built") === "1") return true;
 
         await Zotero.Styles.init();
+        var all = Zotero.Styles.getAll();
+        if (!Array.isArray(all)) all = Object.values(all || {});
         var titleByID = {};
         var installed = [];
-        Zotero.Styles.getAll().forEach(function (s) {
+        all.forEach(function (s) {
             var id = s.styleID || s.url || "";
             if (!id) return;
             titleByID[id] = s.title || id;
@@ -98,15 +115,15 @@
         function commit() {
             var ids = [];
             boxes.forEach(function (b) {
-                if (!b.__bcfBuiltin && b.checked) {
+                if (b.getAttribute("data-bcf-builtin") !== "1" && b.checked) {
                     ids.push(b.getAttribute("data-bcf-style-id"));
                 }
             });
-            try { Zotero.Prefs.set(PREF_EXTRAS, ids.join(" "), true); } catch (_) {}
+            try { Zotero.Prefs.set(PREF_EXTRAS, ids.join(" "), true); } catch (e) { report(e); }
         }
         function syncDisabled() {
             boxes.forEach(function (b) {
-                b.disabled = b.__bcfBuiltin || allBox.checked;
+                b.disabled = b.getAttribute("data-bcf-builtin") === "1" || allBox.checked;
             });
         }
 
@@ -115,8 +132,8 @@
             cb.setAttribute("label", row.title + (row.builtin ? " — always on" : ""));
             cb.setAttribute("tooltiptext", row.id);
             cb.setAttribute("data-bcf-style-id", row.id);
-            cb.__bcfBuiltin = !!row.builtin;
-            cb.checked = row.builtin || extras.indexOf(row.id) !== -1;
+            if (row.builtin) cb.setAttribute("data-bcf-builtin", "1");
+            cb.checked = !!row.builtin || extras.indexOf(row.id) !== -1;
             if (!row.builtin) cb.addEventListener("command", commit);
             listBox.appendChild(cb);
             boxes.push(cb);
@@ -125,7 +142,7 @@
 
         allBox.checked = readAll();
         allBox.addEventListener("command", function () {
-            try { Zotero.Prefs.set(PREF_ALL, !!allBox.checked, true); } catch (_) {}
+            try { Zotero.Prefs.set(PREF_ALL, !!allBox.checked, true); } catch (e) { report(e); }
             syncDisabled();
         });
         syncDisabled();
@@ -134,18 +151,28 @@
         return true;
     }
 
-    function start(attempt) {
+    var attempts = 0;
+    function tryInit() {
         Promise.resolve()
             .then(init)
             .then(function (ok) {
-                // The pane fragment may not be in the document yet when the
-                // script runs; retry briefly, then give up and leave the
-                // manual input visible.
-                if (!ok && attempt < 20) setTimeout(function () { start(attempt + 1); }, 100);
+                // Backup path only: the elements normally appear with the
+                // `load` event below. window.setTimeout, NOT bare setTimeout —
+                // see the environment notes up top.
+                if (!ok && ++attempts < 20) window.setTimeout(tryInit, 100);
             })
-            .catch(function (e) {
-                try { Zotero.debug("bluebook-citations-fixer prefs pane: " + e); } catch (_) {}
-            });
+            .catch(report);
     }
-    start(0);
+
+    // Zotero dispatches `load` on the pane's content after inserting it; it
+    // doesn't bubble, so listen in the capture phase.
+    document.addEventListener("load", function onPaneLoad(event) {
+        var t = event.target;
+        if (!t || !t.querySelector || !t.querySelector("#bcf-style-list")) return;
+        document.removeEventListener("load", onPaneLoad, true);
+        tryInit();
+    }, true);
+    // Also try right away in case the fragment is already in the document
+    // (e.g. the script is re-run after the pane was built once).
+    tryInit();
 })();
