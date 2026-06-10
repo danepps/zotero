@@ -28,10 +28,6 @@ Bug-fix release from a full code review of the rewrite pipeline.
   prewrite pass now skips non-RTF sessions (Google Docs HTML, plain text),
   matching the `setText` hook — previously it could inject RTF fragments into
   HTML output.
-- **Faster refreshes on large documents.** While the prewrite pass has
-  already rewritten every cluster for an update, the per-field `setText` hook
-  short-circuits instead of re-running the chain (which cost a `getCode()`
-  round trip to the word processor per field).
 - **RTF splice safety.** New `BCF.rtf.findPlainRange` / `plainIndexToRtf` /
   `repairGroups` helpers ensure rewrites that cut through formatting groups
   (e.g. a style that italicizes the comma before a pincite) can never emit

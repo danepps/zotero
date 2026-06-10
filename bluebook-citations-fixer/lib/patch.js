@@ -167,16 +167,7 @@ BCF.patch._installSessionPatches = function () {
             } catch (e) {
                 BCF.diag.err("prepareCitationTexts", e);
             }
-            // While the original _updateDocument fans the (already rewritten)
-            // cluster texts out to field writes, the setText hook would re-run
-            // the whole chain — including a getCode() round trip to the word
-            // processor per field. Flag the session so patch.run can skip.
-            try { this.__bcfPrewriteActive = true; } catch (_) {}
-            try {
-                return await BCF.patch._origSessionInternalUpdateDocument.apply(this, arguments);
-            } finally {
-                try { this.__bcfPrewriteActive = false; } catch (_) {}
-            }
+            return await BCF.patch._origSessionInternalUpdateDocument.apply(this, arguments);
         };
         BCF.diag.event("patch", "installed on Session._updateDocument");
     }
@@ -316,16 +307,13 @@ BCF.patch._styleAllowed = function (session) {
     return ok;
 };
 
-// The session's output format ("rtf", "html", "text"), best-effort.
+// The session's output format ("rtf" or "html"; Zotero sets it from
+// app.outputFormat with an "rtf" default). Read ONLY session.outputFormat —
+// the exact field the setText gate has always used — and fail open when it's
+// unreadable, so a Zotero layout change can't silently turn the plugin off.
 BCF.patch._sessionOutputFormat = function (session) {
     if (!session) return "";
-    if (session.outputFormat) return String(session.outputFormat);
-    try {
-        if (session.data && session.data.prefs && session.data.prefs.outputFormat) {
-            return String(session.data.prefs.outputFormat);
-        }
-    } catch (_) {}
-    return "";
+    return session.outputFormat ? String(session.outputFormat) : "";
 };
 
 BCF.patch._prepareCitationTexts = function (session) {
@@ -408,15 +396,6 @@ BCF.patch.run = async function (field, text) {
     var session = Zotero.Integration.currentSession;
     if (!session) {
         BCF.diag.event("skip", "no currentSession");
-        return text;
-    }
-
-    // The _updateDocument prewrite pass already ran the chain on every
-    // cluster this update will write; re-running it here would only burn a
-    // getCode() round trip per field. Delayed citations and any other write
-    // outside _updateDocument still take the full path below.
-    if (session.__bcfPrewriteActive) {
-        BCF.diag.event("skip", "prewrite pass handled this update");
         return text;
     }
 

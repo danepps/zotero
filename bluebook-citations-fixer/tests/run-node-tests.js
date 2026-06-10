@@ -1510,20 +1510,24 @@ const NOID = String.fromCharCode(0x200B);
     }
 
     {
-        // While _updateDocument's prewrite pass is active, the setText hook
-        // short-circuits (the cluster text was already rewritten upstream).
+        // The setText hook runs the chain even when the prewrite pass already
+        // did — features are idempotent, and the redundancy is load-bearing:
+        // it covers any write whose text didn't come from citation.text.
         const journal = cit(
             "PA1", "Smith", "Active Piece", "Active Piece",
             undefined, undefined, { type: "article-journal", volume: "2024" }
         );
-        const RAW = "John Smith, Active Piece, 2024 Yale L.J. 55 (2024)";
         const session = {
             outputFormat: "rtf",
-            __bcfPrewriteActive: true,
             citationsByIndex: { 1: citation(1, [journal]) }
         };
-        const out = await runPatch(session, session.citationsByIndex[1], RAW);
-        assert.strictEqual(out, RAW);
+        BCF.patch._prepareCitationTexts(session);
+        const out = await runPatch(
+            session,
+            session.citationsByIndex[1],
+            "John Smith, Active Piece, 2024 Yale L.J. 55 (2024)"
+        );
+        assert.strictEqual(out, "John Smith, Active Piece, 2024 Yale L.J. 55");
     }
 
     {
