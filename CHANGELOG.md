@@ -9,6 +9,19 @@ prefix in each section header identifies which plugin shipped.
 
 Bug-fix release from a full code review of the rewrite pipeline.
 
+- **Style gate accepts multiple style IDs.** The
+  `extensions.bluebook-citations-fixer.styleID` pref now holds a list
+  (space/comma/semicolon separated) and defaults to the Epps Bluebook style
+  **and its experimental variant**, so the plugin no longer sits dormant when
+  a document uses `BluebookDSEStyle-Experimental.csl`. Forked styles carry
+  their own `<id>`; add it in Settings → Style gate to cover more variants.
+- **Hereinafter bracket placement (Rule 4.2(b)).** `[hereinafter ...]` is now
+  inserted *before* the cite's explanatory-parenthetical suffix instead of
+  after it.
+- **Faster refreshes on large documents.** While the prewrite pass has
+  already rewritten every cluster for an update, the per-field `setText` hook
+  short-circuits instead of re-running the chain (which cost a `getCode()`
+  round trip to the word processor per field).
 - **"Break id." keeps your suffix.** The id-suppress rewrite now replaces only
   the `Id. [at <pincite>]` span. A user-typed suffix on the flagged cite —
   e.g. an explanatory parenthetical `(discussing X)` — survives the rewrite

@@ -167,7 +167,16 @@ BCF.patch._installSessionPatches = function () {
             } catch (e) {
                 BCF.diag.err("prepareCitationTexts", e);
             }
-            return await BCF.patch._origSessionInternalUpdateDocument.apply(this, arguments);
+            // While the original _updateDocument fans the (already rewritten)
+            // cluster texts out to field writes, the setText hook would re-run
+            // the whole chain — including a getCode() round trip to the word
+            // processor per field. Flag the session so patch.run can skip.
+            try { this.__bcfPrewriteActive = true; } catch (_) {}
+            try {
+                return await BCF.patch._origSessionInternalUpdateDocument.apply(this, arguments);
+            } finally {
+                try { this.__bcfPrewriteActive = false; } catch (_) {}
+            }
         };
         BCF.diag.event("patch", "installed on Session._updateDocument");
     }
@@ -259,16 +268,25 @@ BCF.patch._uninstrumentFields = function () {
     BCF.patch._wrappedFieldProtos = [];
 };
 
-// The exact CSL style ID this gate is allowed to rewrite under, read from the
-// styleID pref. Empty/whitespace turns the gate off (rewrite under every style).
-BCF.patch._configuredStyleID = function () {
+// The CSL style ID(s) this gate is allowed to rewrite under, read from the
+// styleID pref. The pref may hold several IDs separated by whitespace, commas,
+// or semicolons (style IDs are URLs, so none of those appear inside an ID).
+// An empty/whitespace pref turns the gate off (rewrite under every style).
+BCF.patch._configuredStyleIDs = function () {
     try {
         var v = Zotero.Prefs.get(BCF.patch.PREF_STYLE_ID, true);
-        if (v == null) return "";
-        return String(v).trim();
+        if (v == null) return [];
+        return String(v).split(/[\s,;]+/).filter(function (s) { return !!s; });
     } catch (_) {
-        return "";
+        return [];
     }
+};
+
+// Back-compat shim: a single configured ID (first of the list), used nowhere
+// internally anymore but kept so external callers/tests don't break.
+BCF.patch._configuredStyleID = function () {
+    var ids = BCF.patch._configuredStyleIDs();
+    return ids.length ? ids[0] : "";
 };
 
 // The styleID of the document's active citation style. Zotero hangs the active
@@ -290,20 +308,21 @@ BCF.patch._sessionStyleID = function (session) {
     return "";
 };
 
-// Gate: when a style ID is configured (default = the Epps Bluebook style), only
-// rewrite when the document's active style matches it exactly. An empty pref
-// disables the gate. If the active style can't be read at all, fail open and
-// log — the plugin should never go silently dark if Zotero moves the styleID.
+// Gate: when style IDs are configured (default = the Epps Bluebook style plus
+// its experimental variant), only rewrite when the document's active style
+// matches one of them exactly. An empty pref disables the gate. If the active
+// style can't be read at all, fail open and log — the plugin should never go
+// silently dark if Zotero moves the styleID.
 BCF.patch._styleAllowed = function (session) {
-    var want = BCF.patch._configuredStyleID();
-    if (!want) return true; // gate disabled
+    var want = BCF.patch._configuredStyleIDs();
+    if (!want.length) return true; // gate disabled
     var have = BCF.patch._sessionStyleID(session);
     if (!have) {
-        BCF.diag.event("style", "unknown styleID; allowing (configured=" + want + ")");
+        BCF.diag.event("style", "unknown styleID; allowing (configured=" + want.join(" ") + ")");
         return true;
     }
-    var ok = (have === want);
-    if (!ok) BCF.diag.event("skip", "style mismatch: have=" + have + " want=" + want);
+    var ok = want.indexOf(have) !== -1;
+    if (!ok) BCF.diag.event("skip", "style mismatch: have=" + have + " want=" + want.join(" "));
     return ok;
 };
 
@@ -396,6 +415,15 @@ BCF.patch.run = async function (field, text) {
     var session = Zotero.Integration.currentSession;
     if (!session) {
         BCF.diag.event("skip", "no currentSession");
+        return text;
+    }
+
+    // The _updateDocument prewrite pass already ran the chain on every
+    // cluster this update will write; re-running it here would only burn a
+    // getCode() round trip per field. Delayed citations and any other write
+    // outside _updateDocument still take the full path below.
+    if (session.__bcfPrewriteActive) {
+        BCF.diag.event("skip", "prewrite pass handled this update");
         return text;
     }
 

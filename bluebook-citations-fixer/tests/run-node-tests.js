@@ -1353,14 +1353,11 @@ const NOID = String.fromCharCode(0x200B);
 }
 
 {
-    // The [hereinafter ...] bracket always lands at the END of the segment,
-    // after any suffix. A suffix can hold the date/edition parenthetical just
-    // as easily as an explanatory one, and Rule 4.2(b) puts the bracket after
-    // the former — placing it before every suffix misplaced brackets in real
-    // documents (v1.2.0 regression).
+    // Rule 4.2(b) placement: the [hereinafter ...] bracket lands before the
+    // cite's explanatory-parenthetical suffix, not after it.
     const a = cit("SfxA", "Epps", "Checks", "Checks and Balances");
     const b = cit("SfxB", "Epps", "Asymmetry", "Adversarial Asymmetry");
-    a.suffix = "(2011)";
+    a.suffix = "(discussing X)";
     const run = eligibleRun({
         1: citation(1, [a]),
         2: citation(1, [b])
@@ -1368,12 +1365,12 @@ const NOID = String.fromCharCode(0x200B);
     const out = BCF.features.hereinafter.rewrite({
         codeJson: { citationItems: [a] },
         run,
-        text: "Dan Epps, Checks and Balances (2011)",
+        text: "Dan Epps, Checks and Balances (discussing X)",
         rtf: BCF.rtf
     });
     assert.strictEqual(
         out,
-        "Dan Epps, Checks and Balances (2011) [hereinafter Epps, {\\i{}Checks}]"
+        "Dan Epps, Checks and Balances [hereinafter Epps, {\\i{}Checks}] (discussing X)"
     );
 }
 
@@ -1513,24 +1510,26 @@ const NOID = String.fromCharCode(0x200B);
     }
 
     {
-        // The setText hook runs the chain even when the prewrite pass already
-        // did — features are idempotent, and the redundancy is load-bearing:
-        // it covers any write whose text didn't come from citation.text.
+        // While _updateDocument's prewrite pass is active, the setText hook
+        // short-circuits (the cluster text was already rewritten upstream).
+        // Delayed citations and other writes outside _updateDocument (no flag)
+        // still get the full chain.
         const journal = cit(
             "PA1", "Smith", "Active Piece", "Active Piece",
             undefined, undefined, { type: "article-journal", volume: "2024" }
         );
+        const RAW = "John Smith, Active Piece, 2024 Yale L.J. 55 (2024)";
         const session = {
             outputFormat: "rtf",
             citationsByIndex: { 1: citation(1, [journal]) }
         };
-        BCF.patch._prepareCitationTexts(session);
-        const out = await runPatch(
-            session,
-            session.citationsByIndex[1],
-            "John Smith, Active Piece, 2024 Yale L.J. 55 (2024)"
-        );
-        assert.strictEqual(out, "John Smith, Active Piece, 2024 Yale L.J. 55");
+        session.__bcfPrewriteActive = true;
+        assert.strictEqual(
+            await runPatch(session, session.citationsByIndex[1], RAW), RAW);
+        session.__bcfPrewriteActive = false;
+        assert.strictEqual(
+            await runPatch(session, session.citationsByIndex[1], RAW),
+            "John Smith, Active Piece, 2024 Yale L.J. 55");
     }
 
     {
@@ -1594,6 +1593,24 @@ const NOID = String.fromCharCode(0x200B);
         });
         withPrefs({ [PREF]: "" }, () => {
             assert(BCF.patch._styleAllowed({ data: { style: { styleID: "anything" } } }));
+        });
+
+        // (e) Multiple style IDs in the pref (space/comma/semicolon separated):
+        // each listed style passes the gate, anything else is blocked. This is
+        // how the default covers both the main Epps style and its experimental
+        // variant.
+        const EXPERIMENTAL = "https://danepps.github.io/bluebook/BluebookDSEStyle-Experimental.csl";
+        for (const sep of [" ", ", ", ";", "\n"]) {
+            withPrefs({ [PREF]: STYLE + sep + EXPERIMENTAL }, () => {
+                assert(BCF.patch._styleAllowed({ data: { style: { styleID: STYLE } } }));
+                assert(BCF.patch._styleAllowed({ data: { style: { styleID: EXPERIMENTAL } } }));
+                assert(!BCF.patch._styleAllowed({ data: { style: { styleID: "http://www.zotero.org/styles/apa" } } }));
+            });
+        }
+        withPrefs({ [PREF]: STYLE + " " + EXPERIMENTAL }, () => {
+            const s = journalSession(EXPERIMENTAL);
+            BCF.patch._prepareCitationTexts(s);
+            assert.strictEqual(s.citationsByIndex[1].text, GATED);
         });
     }
 

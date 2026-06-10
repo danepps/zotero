@@ -9,12 +9,13 @@
     <label><html:h2>Style gate</html:h2></label>
     <description>
       Bluebook Citations Fixer only rewrites citations when the document's
-      active citation style matches the style ID below. Leave it set to your
-      Bluebook style so the plugin stays dormant under every other style. Clear
-      the box to apply the rules under all styles.
+      active citation style matches one of the style IDs below (separate
+      several IDs with spaces or commas). Leave it set to your Bluebook styles
+      so the plugin stays dormant under every other style. Clear the box to
+      apply the rules under all styles.
     </description>
     <vbox>
-      <label control="bcf-style-id" value="Apply only to this style ID:"/>
+      <label control="bcf-style-id" value="Apply only to these style IDs:"/>
       <html:input id="bcf-style-id" type="text" size="60"
                   preference="extensions.bluebook-citations-fixer.styleID"/>
     </vbox>
