@@ -1384,6 +1384,48 @@ const NOID = String.fromCharCode(0x200B);
     assert.strictEqual(run.itemCounts.get(BCF.cite.itemKey(noAuth)), 1);
 }
 
+{
+    // parseFieldCode is string-aware: a brace inside a citation prefix/suffix
+    // (JSON does NOT escape literal braces) must not fool the boundary scanner.
+    // Unmatched closer in a suffix: a naive depth counter stops early and
+    // JSON.parse fails; the string-aware scanner skips it.
+    const withCloser = 'ADDIN ZOTERO_ITEM CSL_CITATION ' +
+        JSON.stringify({ citationItems: [{ id: 1, suffix: "see } foo" }] }) +
+        ' RAW';
+    const parsedCloser = BCF.cite.parseFieldCode(withCloser);
+    assert(parsedCloser && parsedCloser.citationItems.length === 1);
+    assert.strictEqual(parsedCloser.citationItems[0].suffix, "see } foo");
+
+    // Unmatched opener in a prefix: a naive counter never returns to depth 0
+    // inside the object and runs past the real close brace.
+    const withOpener = 'ADDIN ZOTERO_ITEM CSL_CITATION ' +
+        JSON.stringify({ citationItems: [{ id: 2, prefix: "see { foo" }] });
+    const parsedOpener = BCF.cite.parseFieldCode(withOpener);
+    assert(parsedOpener && parsedOpener.citationItems.length === 1);
+    assert.strictEqual(parsedOpener.citationItems[0].prefix, "see { foo");
+
+    // An escaped quote inside a string must not be mistaken for the string's
+    // closing quote.
+    const withQuote = 'ADDIN ZOTERO_ITEM CSL_CITATION ' +
+        JSON.stringify({ citationItems: [{ id: 3, prefix: 'a "}" b' }] });
+    const parsedQuote = BCF.cite.parseFieldCode(withQuote);
+    assert.strictEqual(parsedQuote.citationItems[0].prefix, 'a "}" b');
+}
+
+{
+    // itemKey handles the array uris (preferred), the array uri fallback, and
+    // a singular string uri — the last of which a naive [0] index would
+    // collapse to its first character.
+    assert.strictEqual(
+        BCF.cite.itemKey({ uris: ["http://z/items/A"] }), "http://z/items/A");
+    assert.strictEqual(
+        BCF.cite.itemKey({ uri: ["http://z/items/B"] }), "http://z/items/B");
+    assert.strictEqual(
+        BCF.cite.itemKey({ uri: "http://z/items/C" }), "http://z/items/C");
+    assert.strictEqual(BCF.cite.itemKey({ id: 7 }), "id:7");
+    assert.strictEqual(BCF.cite.itemKey(null), "");
+}
+
 (async function () {
     {
         const journal = cit(

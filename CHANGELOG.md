@@ -5,6 +5,26 @@ prefix in each section header identifies which plugin shipped.
 
 ## bluebook-citations-fixer
 
+### v1.2.1 — 2026-06-11
+
+Robustness fixes from a code review of the rewrite pipeline. No changes to the
+citation rules themselves.
+
+- **String-aware field-code parsing.** The `CSL_CITATION` JSON boundary scanner
+  now tracks string/escape state, so an unmatched brace typed into a citation
+  prefix or suffix (which JSON does not escape) can no longer truncate or
+  overrun the parsed object and silently disable rewriting for that cite on the
+  `setText` path.
+- **Item-key URI handling.** A singular string `uri` is no longer indexed down
+  to its first character, which would have collapsed unrelated sources onto one
+  run-level key (corrupting citation counts, first-note lookup, ambiguity, and
+  hereinafter eligibility).
+- **Complete shutdown cleanup.** Uninstall no longer skips restoring the
+  `execCommand`/session diagnostic patches when shutdown happens during the
+  `Field.setText` patch-retry window.
+- **`build.sh`** derives its default version from `manifest.json` instead of a
+  hardcoded stale value.
+
 ### v1.2.0 — 2026-06-10
 
 Bug-fix release from a full code review of the rewrite pipeline.

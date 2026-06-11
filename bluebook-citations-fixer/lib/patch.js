@@ -76,14 +76,19 @@ BCF.patch.uninstall = function () {
         }
     } catch (_) {}
     BCF.patch._uninstrumentFields();
-    if (!BCF.patch._orig) return;
-    try {
-        var Field = Zotero.Integration.Field;
-        Field.prototype.setText = BCF.patch._orig;
-        delete Field.prototype.__lcfPatched;
-        delete Field.prototype.__bcfOrigSetText;
-    } catch (_) {}
-    BCF.patch._orig = null;
+    // Restore the setText patch only if it was installed (install() sets _orig
+    // last, after the exec/session patches), but DON'T gate the exec/session
+    // restores below on _orig: a shutdown during the Field-retry window leaves
+    // those installed while _orig is still null.
+    if (BCF.patch._orig) {
+        try {
+            var Field = Zotero.Integration.Field;
+            Field.prototype.setText = BCF.patch._orig;
+            delete Field.prototype.__lcfPatched;
+            delete Field.prototype.__bcfOrigSetText;
+        } catch (_) {}
+        BCF.patch._orig = null;
+    }
     if (BCF.patch._origExecCommand) {
         try { Zotero.Integration.execCommand = BCF.patch._origExecCommand; } catch (_) {}
         BCF.patch._origExecCommand = null;

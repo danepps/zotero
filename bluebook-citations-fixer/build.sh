@@ -1,8 +1,11 @@
 #!/bin/bash
 # Usage: ./build.sh 0.1.14
 set -e
-VERSION=${1:-0.1.18}
 cd "$(dirname "$0")"
+# Default to the version in manifest.json so an argument-less build never
+# produces a stale, misleadingly-named artifact.
+MANIFEST_VERSION=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' manifest.json | head -n1)
+VERSION=${1:-${MANIFEST_VERSION:?could not read version from manifest.json}}
 mkdir -p releases
 OUT="releases/Bluebook_Citations_Fixer_v${VERSION}.xpi"
 rm -f "$OUT"
