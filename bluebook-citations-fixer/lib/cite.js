@@ -13,10 +13,20 @@ BCF.cite.parseFieldCode = function (code) {
     if (idx === -1) return null;
     var jsonStart = code.indexOf("{", idx);
     if (jsonStart === -1) return null;
-    var depth = 0, end = -1;
+    // Track string state so braces inside a citation prefix/suffix (which JSON
+    // does NOT escape, e.g. a user typing "see {foo}" or an unmatched "see }")
+    // can't fool the brace counter into stopping early or running past the end.
+    var depth = 0, end = -1, inStr = false, esc = false;
     for (var i = jsonStart; i < code.length; i++) {
         var ch = code.charAt(i);
-        if (ch === "{") depth++;
+        if (inStr) {
+            if (esc) { esc = false; }
+            else if (ch === "\\") { esc = true; }
+            else if (ch === "\"") { inStr = false; }
+            continue;
+        }
+        if (ch === "\"") inStr = true;
+        else if (ch === "{") depth++;
         else if (ch === "}") {
             depth--;
             if (depth === 0) { end = i; break; }
@@ -33,8 +43,12 @@ BCF.cite.parseFieldCode = function (code) {
 // Stable per-item key. Prefers the first Zotero URI, then the id.
 BCF.cite.itemKey = function (citItem) {
     if (!citItem) return "";
-    if (citItem.uris && citItem.uris.length) return citItem.uris[0];
-    if (citItem.uri && citItem.uri.length) return citItem.uri[0];
+    if (Array.isArray(citItem.uris) && citItem.uris.length) return citItem.uris[0];
+    // `uri` is normally an array, but guard the string form too: indexing a
+    // string would return its first character ("h" from an http URL) and
+    // collapse unrelated items onto the same key.
+    if (Array.isArray(citItem.uri) && citItem.uri.length) return citItem.uri[0];
+    if (typeof citItem.uri === "string" && citItem.uri) return citItem.uri;
     if (citItem.id != null) return "id:" + citItem.id;
     return "";
 };
