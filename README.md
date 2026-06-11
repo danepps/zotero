@@ -18,8 +18,6 @@ etc.).
 
 🌐 [Project page & install →](https://danepps.github.io/zotero/bluebook-signals/)
 
-📖 **[Documentation](bluebook-signals/README.md)**
-
 ### Bluebook Citations Fixer
 
 
@@ -30,8 +28,6 @@ plugin dormant under any style but your own). The document-aware rules
 (hereinafter and "Break id.") apply on a full Zotero refresh.
 
 🌐 [Project page & install →](https://danepps.github.io/zotero/bluebook-citations-fixer/)
-
-📖 **[Documentation](bluebook-citations-fixer/README.md)**
 
 ## Installing a plugin
 
