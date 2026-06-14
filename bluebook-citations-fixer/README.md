@@ -13,7 +13,7 @@ that are awkward or impossible to express cleanly in CSL alone.
 
 ## Install
 
-Download [Bluebook_Citations_Fixer_v1.2.0.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2/Bluebook_Citations_Fixer_v1.2.0.xpi)
+Download [Bluebook_Citations_Fixer_v1.2.1.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2.1/Bluebook_Citations_Fixer_v1.2.1.xpi)
 and install it via **Zotero → Tools → Plugins → gear menu → Install Plugin From File**.
 
 > 💡 Pairs with [Bluebook Signals](../bluebook-signals/README.md) —
@@ -119,13 +119,22 @@ only — Word and LibreOffice work; Google Docs is not yet supported.
 
 ## Latest Released Version
 
-- `1.2.0`
-- Git tag: `bluebook-citations-fixer-v1.2`
-- GitHub release asset: [Bluebook_Citations_Fixer_v1.2.0.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2/Bluebook_Citations_Fixer_v1.2.0.xpi)
+- `1.2.1`
+- Git tag: `bluebook-citations-fixer-v1.2.1`
+- GitHub release asset: [Bluebook_Citations_Fixer_v1.2.1.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2.1/Bluebook_Citations_Fixer_v1.2.1.xpi)
 
 ## Release History
 
 See [`../CHANGELOG.md`](../CHANGELOG.md) for the full history. Recent releases:
+
+### v1.2.1
+
+- **Robustness fixes from a code review.** The `CSL_CITATION` field-code parser
+  is now string-aware, so a brace typed into a citation prefix or suffix can no
+  longer disable rewriting for that cite. Item-key resolution handles a
+  singular-string URI without collapsing unrelated sources together. Plugin
+  shutdown fully removes its diagnostic patches even after a partial startup.
+  No behavioral changes to the citation rules themselves.
 
 ### v1.2.0
 
