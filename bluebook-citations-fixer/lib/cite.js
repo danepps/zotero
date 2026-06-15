@@ -84,6 +84,10 @@ BCF.cite.normalizeTitleMarkup = function (s) {
     s = s.replace(/&quot;/gi, "\"");
     s = s.replace(/&#39;/gi, "'");
     s = s.replace(/&nbsp;/gi, " ");
+    // Convert apostrophes between word characters to the typographic right
+    // single quotation mark (U+2019), matching citeproc's smart-quotes pass
+    // so injected short titles agree with the rendered first cite.
+    s = s.replace(/(\w)'(\w)/g, "$1’$2");
     return s;
 };
 

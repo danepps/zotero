@@ -662,6 +662,45 @@ function eligibleRun(initialCitationsByIndex, items) {
 }
 
 {
+    // Straight apostrophes (U+0027) in short titles must be converted to the
+    // typographic right single quotation mark (U+2019) to match citeproc’s
+    // smart-quotes pass when rendering the first cite.
+    const STRAIGHT = String.fromCharCode(0x0027); // straight apostrophe as it arrives from CSL JSON
+    const CURLY    = String.fromCharCode(0x2019); // right single quotation mark as citeproc emits
+    assert.strictEqual(
+        BCF.cite.shortTitle({ "title-short": "Children" + STRAIGHT + "s Rights" }),
+        "Children" + CURLY + "s Rights"
+    );
+    assert.strictEqual(
+        BCF.cite.shortTitle({ "title-short": "Don" + STRAIGHT + "t Know" }),
+        "Don" + CURLY + "t Know"
+    );
+    // Verify hereinafter injects the curly form encoded as \uc0舗{} in RTF.
+    // (U+2019 decimal = 8217; citeproc-js RTF encoding: \uc0\uNNNN{})
+    const item = cit("Apos", "Doe",
+        "Children" + STRAIGHT + "s Rights",
+        "Children" + STRAIGHT + "s Rights",
+        undefined, undefined, { type: "article-journal" });
+    const item2 = cit("Apos2", "Doe", "Other Work", "Other Work",
+        undefined, undefined, { type: "article-journal" });
+    const run = eligibleRun({
+        1: citation(1, [item]),
+        2: citation(1, [item2])
+    }, [item, item2]);
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [item] },
+        run,
+        text: "Jane Doe, Children\\uc0\\u8217{}s Rights (2020)",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Jane Doe, Children\\uc0\\u8217{}s Rights (2020) " +
+        "[hereinafter Doe, {\\i{}Children\\uc0\\u8217{}s Rights}]"
+    );
+}
+
+{
     const journal = cit(
         "J1",
         "Epps",

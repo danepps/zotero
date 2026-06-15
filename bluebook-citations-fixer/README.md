@@ -13,7 +13,7 @@ that are awkward or impossible to express cleanly in CSL alone.
 
 ## Install
 
-Download [Bluebook_Citations_Fixer_v1.2.1.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2.1/Bluebook_Citations_Fixer_v1.2.1.xpi)
+Download [Bluebook_Citations_Fixer_v1.2.2.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2.2/Bluebook_Citations_Fixer_v1.2.2.xpi)
 and install it via **Zotero → Tools → Plugins → gear menu → Install Plugin From File**.
 
 > 💡 Pairs with [Bluebook Signals](../bluebook-signals/README.md) —
@@ -119,13 +119,21 @@ only — Word and LibreOffice work; Google Docs is not yet supported.
 
 ## Latest Released Version
 
-- `1.2.1`
-- Git tag: `bluebook-citations-fixer-v1.2.1`
-- GitHub release asset: [Bluebook_Citations_Fixer_v1.2.1.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2.1/Bluebook_Citations_Fixer_v1.2.1.xpi)
+- `1.2.2`
+- Git tag: `bluebook-citations-fixer-v1.2.2`
+- GitHub release asset: [Bluebook_Citations_Fixer_v1.2.2.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2.2/Bluebook_Citations_Fixer_v1.2.2.xpi)
 
 ## Release History
 
 See [`../CHANGELOG.md`](../CHANGELOG.md) for the full history. Recent releases:
+
+### v1.2.2
+
+- **Curly apostrophes in hereinafter short titles.** Short titles containing
+  apostrophes (e.g. *Children's Rights*) now use the typographic right single
+  quotation mark (U+2019) in the injected `[hereinafter ...]` bracket and supra
+  cites, matching what Zotero's citeproc typography pass emits for the first
+  cite.
 
 ### v1.2.1
 
