@@ -1414,6 +1414,46 @@ const NOID = String.fromCharCode(0x200B);
 }
 
 {
+    // Rule 4.2(b) placement: when the rendered citation ends with a URL,
+    // the bracket goes before the URL (not after), even if the cite also has a
+    // suffix that appears between the date parenthetical and the URL.
+    const a = cit("UrlA", "Bellia", "Erie", "Erie and the Constitution");
+    const b = cit("UrlB", "Bellia", "Asymmetry", "Adversarial Asymmetry");
+    a.suffix = "(manuscript at 71)";
+    const run = eligibleRun({
+        1: citation(1, [a]),
+        2: citation(1, [b])
+    }, [a, b]);
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: "Bellia, Erie (forthcoming 2026) (manuscript at 71), https://example.com/paper",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Bellia, Erie (forthcoming 2026) (manuscript at 71) [hereinafter Bellia, {\\i{}Erie}], https://example.com/paper"
+    );
+    // Also works with no suffix — just a URL at the tail.
+    const c = cit("UrlC", "Clark", "Erie", "Erie and the Constitution");
+    const d = cit("UrlD", "Clark", "Other", "Other Work");
+    const run2 = eligibleRun({
+        1: citation(1, [c]),
+        2: citation(1, [d])
+    }, [c, d]);
+    const out2 = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [c] },
+        run: run2,
+        text: "Clark, Erie (2024), https://example.com/paper",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out2,
+        "Clark, Erie (2024) [hereinafter Clark, {\\i{}Erie}], https://example.com/paper"
+    );
+}
+
+{
     // Authorless works still land in the first-note map (id-suppress needs a
     // supra target even though they can't join the author-ambiguity buckets).
     const noAuth = cit("NAmap", null, "Promise", "Originalism's Promise",

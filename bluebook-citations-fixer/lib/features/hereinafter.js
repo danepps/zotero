@@ -138,10 +138,14 @@ BCF.features.hereinafter = {
         var bracket = " [hereinafter " + inside + "]";
 
         // Rule 4.2(b) places the bracket after the citation proper (the date
-        // parenthetical) but BEFORE any explanatory parenthetical. The only
-        // explanatory text we can identify reliably is the cite's own suffix —
-        // if it's rendered at the tail of the segment, insert the bracket in
-        // front of it. Otherwise append at the end (the historical behavior).
+        // parenthetical) but BEFORE any explanatory parenthetical. Insertion
+        // priority (first match wins):
+        //   1. Before the cite's own suffix, if found at the segment tail.
+        //   2. Before a trailing URL (citeproc appends the item URL after the
+        //      date parenthetical; the bracket belongs before it per practice).
+        //   3. Appended at segment end (historical fallback).
+        // Note: the suffix check uses $, so it fails when a URL follows the
+        // suffix in the rendered text — the URL check then compensates.
         var suffixPlain = citItem && citItem.suffix
             ? BCF.rtf.plainish(String(citItem.suffix)).trim() : "";
         if (suffixPlain) {
@@ -152,6 +156,10 @@ BCF.features.hereinafter = {
             if (off >= 0) {
                 return segRtf.slice(0, off) + bracket + segRtf.slice(off);
             }
+        }
+        var urlOff = BCF.rtf.findPlainOffset(segRtf, /[,\s]+https?:\/\/\S+\s*$/i);
+        if (urlOff >= 0) {
+            return segRtf.slice(0, urlOff) + bracket + segRtf.slice(urlOff);
         }
         return segRtf + bracket;
     },

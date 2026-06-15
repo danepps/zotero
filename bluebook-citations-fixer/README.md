@@ -13,7 +13,7 @@ that are awkward or impossible to express cleanly in CSL alone.
 
 ## Install
 
-Download [Bluebook_Citations_Fixer_v1.2.2.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2.2/Bluebook_Citations_Fixer_v1.2.2.xpi)
+Download [Bluebook_Citations_Fixer_v1.2.3.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2.3/Bluebook_Citations_Fixer_v1.2.3.xpi)
 and install it via **Zotero → Tools → Plugins → gear menu → Install Plugin From File**.
 
 > 💡 Pairs with [Bluebook Signals](../bluebook-signals/README.md) —
@@ -119,13 +119,19 @@ only — Word and LibreOffice work; Google Docs is not yet supported.
 
 ## Latest Released Version
 
-- `1.2.2`
-- Git tag: `bluebook-citations-fixer-v1.2.2`
-- GitHub release asset: [Bluebook_Citations_Fixer_v1.2.2.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2.2/Bluebook_Citations_Fixer_v1.2.2.xpi)
+- `1.2.3`
+- Git tag: `bluebook-citations-fixer-v1.2.3`
+- GitHub release asset: [Bluebook_Citations_Fixer_v1.2.3.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2.3/Bluebook_Citations_Fixer_v1.2.3.xpi)
 
 ## Release History
 
 See [`../CHANGELOG.md`](../CHANGELOG.md) for the full history. Recent releases:
+
+### v1.2.3
+
+- **`[hereinafter ...]` placement before URLs.** When citeproc appends the
+  item's URL to the citation (e.g. an SSRN link after the date parenthetical),
+  the bracket now lands before the URL rather than after it.
 
 ### v1.2.2
 
