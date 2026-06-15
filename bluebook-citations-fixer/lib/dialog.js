@@ -20,19 +20,19 @@
 
 BCF.dialog = {};
 
-BCF.dialog.XHTML_NS = “http://www.w3.org/1999/xhtml”;
-BCF.dialog.CHECKBOX_ID = “bluebook-citations-fixer-break-id”;
-BCF.dialog.ROW_ID = “bluebook-citations-fixer-break-id-row”;
-BCF.dialog.LABEL = “Break id.”;
-BCF.dialog.TITLE = “Render this cite as a short form, not “Id.” “ +
-    “(the previous citation is hand-typed and invisible to Zotero).”;
+BCF.dialog.XHTML_NS = "http://www.w3.org/1999/xhtml";
+BCF.dialog.CHECKBOX_ID = "bluebook-citations-fixer-break-id";
+BCF.dialog.ROW_ID = "bluebook-citations-fixer-break-id-row";
+BCF.dialog.LABEL = "Break id.";
+BCF.dialog.TITLE = "Render this cite as a short form, not "Id." " +
+    "(the previous citation is hand-typed and invisible to Zotero).";
 
-BCF.dialog.HEREINAFTER_CHECKBOX_ID = “bluebook-citations-fixer-hereinafter”;
-BCF.dialog.HEREINAFTER_ROW_ID = “bluebook-citations-fixer-hereinafter-row”;
-BCF.dialog.HEREINAFTER_LABEL = “Use hereinafter”;
-BCF.dialog.HEREINAFTER_TITLE = “Force hereinafter treatment for this source across the “ +
-    “whole document, even if the automatic eligibility rules are not met. “ +
-    “Requires at least two cites to the source.”;
+BCF.dialog.HEREINAFTER_CHECKBOX_ID = "bluebook-citations-fixer-hereinafter";
+BCF.dialog.HEREINAFTER_ROW_ID = "bluebook-citations-fixer-hereinafter-row";
+BCF.dialog.HEREINAFTER_LABEL = "Use hereinafter";
+BCF.dialog.HEREINAFTER_TITLE = "Force hereinafter treatment for this source across the " +
+    "whole document, even if the automatic eligibility rules are not met. " +
+    "Requires at least two cites to the source.";
 
 BCF.dialog._watcher = null;
 BCF.dialog._observers = [];
