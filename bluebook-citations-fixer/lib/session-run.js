@@ -239,6 +239,28 @@ BCF.run._build = function (session) {
         });
     }
 
+    // Forced hereinafter: any cite whose prefix carries BCF.HEREINAFTER_SENTINEL
+    // triggers hereinafter treatment for that source across the whole document,
+    // bypassing the automatic eligibility rules. Still requires count >= 2 so
+    // [hereinafter Short] is never injected on a source that has no subsequent cite.
+    var forcedHereinafterKeys = new Set();
+    for (var fci = 0; fci < citations.length; fci++) {
+        var fcit = citations[fci];
+        if (!fcit) continue;
+        var fitems = BCF.cite.itemsOf(fcit);
+        for (var fcii = 0; fcii < fitems.length; fcii++) {
+            var fci_ = fitems[fcii];
+            if (BCF.cite.hasHereinafter(fci_.prefix || "")) {
+                var fkey = BCF.cite.itemKey(fci_);
+                if (fkey && (itemCounts.get(fkey) || 0) >= 2) {
+                    forcedHereinafterKeys.add(fkey);
+                } else if (fkey) {
+                    BCF.diag.event("skip:hereinafter-forced", "only one cite: " + fkey);
+                }
+            }
+        }
+    }
+
     var ctx = {
         session: session,
         items: items,
@@ -250,6 +272,7 @@ BCF.run._build = function (session) {
         sameFootnoteKeys: sameFootnoteKeys,
         thresholdKeys: thresholdKeys,
         eligibleKeys: eligibleKeys,
+        forcedHereinafterKeys: forcedHereinafterKeys,
         log: []
     };
     BCF.diag.event("session", {
@@ -262,6 +285,7 @@ BCF.run._build = function (session) {
         sameFootnote: sameFootnoteKeys.size,
         threshold: thresholdKeys.size,
         eligible: eligibleKeys.size,
+        forced: forcedHereinafterKeys.size,
         crossFootnote: opts.crossFootnote,
         thresholdN: opts.threshold
     });
@@ -293,8 +317,10 @@ BCF.run.isAmbiguous = function (ctx, citItem) {
 };
 
 BCF.run.shouldUseHereinafter = function (ctx, citItem) {
-    if (!ctx || !ctx.eligibleKeys) return false;
-    return ctx.eligibleKeys.has(BCF.cite.itemKey(citItem));
+    if (!ctx) return false;
+    var key = BCF.cite.itemKey(citItem);
+    return (ctx.eligibleKeys && ctx.eligibleKeys.has(key)) ||
+        (ctx.forcedHereinafterKeys && ctx.forcedHereinafterKeys.has(key));
 };
 
 // Author+title signature for an itemData. Lets two cites of the same source

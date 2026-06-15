@@ -35,6 +35,11 @@ BCF.features.hereinafter = {
     },
 
     rewriteText: function (text, codeJson, run) {
+        // Strip the forced-hereinafter sentinel unconditionally so it never
+        // reaches the document, even when the source has only one cite and the
+        // forced path was skipped by the count guard in session-run.
+        text = BCF.cite.stripHereinafter(text);
+
         var items = BCF.cite.itemsOf(codeJson);
         if (!items.length) return text;
 

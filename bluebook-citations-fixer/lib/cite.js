@@ -212,3 +212,29 @@ BCF.cite.stripNoId = function (rtf) {
     s = s.replace(new RegExp("\\\\u" + cp + "\\b\\s?(?:\\{\\})?", "g"), "");
     return s;
 };
+
+// "Use hereinafter" sentinel. The citation-dialog checkbox stores this character
+// at the head of a cite's `prefix` to force hereinafter treatment for that source
+// across the whole document, bypassing the automatic eligibility rules. U+200C
+// (ZERO WIDTH NON-JOINER) — same rationale as NOID_SENTINEL but a distinct
+// character so the two flags don't interfere. The hereinafter feature detects it
+// via session-run's `forcedHereinafterKeys` set and strips it from the rendered
+// RTF so it never reaches the document.
+BCF.HEREINAFTER_SENTINEL_CP = 0x200C;
+BCF.HEREINAFTER_SENTINEL = String.fromCharCode(BCF.HEREINAFTER_SENTINEL_CP);
+
+BCF.cite.hasHereinafter = function (prefix) {
+    return typeof prefix === "string" && prefix.indexOf(BCF.HEREINAFTER_SENTINEL) !== -1;
+};
+
+BCF.cite.stripHereinafter = function (rtf) {
+    if (rtf == null) return rtf;
+    var s = String(rtf);
+    if (s.indexOf(BCF.HEREINAFTER_SENTINEL) !== -1) {
+        s = s.split(BCF.HEREINAFTER_SENTINEL).join("");
+    }
+    var cp = BCF.HEREINAFTER_SENTINEL_CP;
+    s = s.replace(new RegExp("\\\\uc0\\\\u" + cp + "\\{\\}", "g"), "");
+    s = s.replace(new RegExp("\\\\u" + cp + "\\b\\s?(?:\\{\\})?", "g"), "");
+    return s;
+};

@@ -20,12 +20,20 @@
 
 BCF.dialog = {};
 
-BCF.dialog.XHTML_NS = "http://www.w3.org/1999/xhtml";
-BCF.dialog.CHECKBOX_ID = "bluebook-citations-fixer-break-id";
-BCF.dialog.ROW_ID = "bluebook-citations-fixer-break-id-row";
-BCF.dialog.LABEL = "Break id.";
-BCF.dialog.TITLE = "Render this cite as a short form, not “Id.” " +
-    "(the previous citation is hand-typed and invisible to Zotero).";
+BCF.dialog.XHTML_NS = “http://www.w3.org/1999/xhtml”;
+BCF.dialog.CHECKBOX_ID = “bluebook-citations-fixer-break-id”;
+BCF.dialog.ROW_ID = “bluebook-citations-fixer-break-id-row”;
+BCF.dialog.LABEL = “Break id.”;
+BCF.dialog.TITLE = “Render this cite as a short form, not “Id.” “ +
+    “(the previous citation is hand-typed and invisible to Zotero).”;
+
+BCF.dialog.HEREINAFTER_CHECKBOX_ID = “bluebook-citations-fixer-hereinafter”;
+BCF.dialog.HEREINAFTER_ROW_ID = “bluebook-citations-fixer-hereinafter-row”;
+BCF.dialog.HEREINAFTER_LABEL = “Use hereinafter”;
+BCF.dialog.HEREINAFTER_TITLE = “Force hereinafter treatment for this source across the “ +
+    “whole document, even if the automatic eligibility rules are not met. “ +
+    “Requires at least two cites to the source.”;
+
 BCF.dialog._watcher = null;
 BCF.dialog._observers = [];
 
@@ -82,25 +90,39 @@ BCF.dialog._wire = function (doc) {
     }
 };
 
-// Idempotently ensure our row sits after the Omit Author row, styled to match,
-// and reflect the active cite's flag state.
+// Idempotently ensure both rows sit after the Omit Author row and reflect the
+// active cite's flag state. Order: Omit Author → Use hereinafter → Break id.
 BCF.dialog._tryInject = function (doc) {
     try {
         var omitBox = BCF.dialog._findOmitAuthor(doc);
         if (!omitBox) return;
+
+        // "Break id." row (inserts after omitRow).
         var box = doc.getElementById(BCF.dialog.CHECKBOX_ID);
         if (!box) {
             box = BCF.dialog._inject(doc, omitBox);
             if (!box) return;
         }
-        // Don't fight the user: while our checkbox is focused (just clicked),
-        // leave its state alone — otherwise an observer pass triggered by the
-        // click's own DOM mutation would revert the check before it shows.
         var row = doc.getElementById(BCF.dialog.ROW_ID);
         if (row) BCF.dialog._align(row, box, omitBox);
-        if (box === doc.activeElement) return;
+
+        // "Use hereinafter" row (inserts before "Break id." row so it appears
+        // between Omit Author and Break id.).
+        var hBox = doc.getElementById(BCF.dialog.HEREINAFTER_CHECKBOX_ID);
+        if (!hBox) {
+            hBox = BCF.dialog._injectHereinafter(doc, omitBox);
+        }
+        var hRow = doc.getElementById(BCF.dialog.HEREINAFTER_ROW_ID);
+        if (hRow) BCF.dialog._align(hRow, hBox, omitBox);
+
+        // Sync both, but skip whichever is currently focused (just clicked).
         var prefix = doc.getElementById("prefix");
-        if (prefix) BCF.dialog._sync(box, prefix);
+        if (prefix) {
+            // Don't fight the user: while a checkbox is the activeElement, the
+            // click's own DOM mutation must not revert the check before it shows.
+            if (box && box !== doc.activeElement) BCF.dialog._sync(box, prefix);
+            if (hBox && hBox !== doc.activeElement) BCF.dialog._syncHereinafter(hBox, prefix);
+        }
     } catch (e) {
         BCF.diag.err("dialog.tryInject", e);
     }
@@ -172,16 +194,92 @@ BCF.dialog._findOmitAuthor = function (doc) {
         doc.getElementById("suppress-author") ||
         doc.getElementById("suppressAuthor");
     if (byId) return byId;
+    var ourIds = [BCF.dialog.CHECKBOX_ID, BCF.dialog.HEREINAFTER_CHECKBOX_ID];
     var nodes = doc.querySelectorAll("input[type='checkbox'], checkbox");
     for (var i = 0; i < nodes.length; i++) {
         var el = nodes[i];
-        if (el.id === BCF.dialog.CHECKBOX_ID) continue;
+        if (ourIds.indexOf(el.id) !== -1) continue;
         var lbl = (el.getAttribute && el.getAttribute("label")) || el.label || el.textContent || "";
         if (/(omit|suppress)\s+author/i.test(lbl)) return el;
         var p = el.parentNode;
         if (p && /(omit|suppress)\s+author/i.test(p.textContent || "")) return el;
     }
     return null;
+};
+
+// Inject the "Use hereinafter" row, positioned before the "Break id." row so
+// the visual order is: Omit Author → Use hereinafter → Break id.
+BCF.dialog._injectHereinafter = function (doc, omitBox) {
+    var XHTML = BCF.dialog.XHTML_NS;
+    var omitRow = (omitBox.closest && (omitBox.closest("div") || omitBox.closest("tr"))) ||
+        omitBox.parentNode;
+
+    var row = doc.createElementNS(XHTML, "div");
+    row.id = BCF.dialog.HEREINAFTER_ROW_ID;
+    row.style.display = "flex";
+    row.style.alignItems = "center";
+    row.style.gap = "6px";
+    row.style.marginTop = "6px";
+    row.title = BCF.dialog.HEREINAFTER_TITLE;
+
+    var box = doc.createElementNS(XHTML, "input");
+    box.setAttribute("type", "checkbox");
+    box.id = BCF.dialog.HEREINAFTER_CHECKBOX_ID;
+
+    var label = doc.createElementNS(XHTML, "label");
+    label.setAttribute("for", BCF.dialog.HEREINAFTER_CHECKBOX_ID);
+    label.style.cursor = "pointer";
+    label.textContent = BCF.dialog.HEREINAFTER_LABEL;
+
+    box.addEventListener("click", function () { BCF.dialog._toggleHereinafter(doc, box); });
+    label.addEventListener("click", function (e) {
+        e.preventDefault();
+        BCF.dialog._toggleHereinafter(doc, box);
+    });
+
+    row.appendChild(box);
+    row.appendChild(label);
+
+    // Insert after omitRow but before the "Break id." row (if present).
+    var breakRow = doc.getElementById(BCF.dialog.ROW_ID);
+    var parent = omitRow && omitRow.parentNode;
+    if (parent) {
+        if (breakRow && breakRow.parentNode === parent) {
+            parent.insertBefore(row, breakRow);
+        } else {
+            parent.insertBefore(row, omitRow.nextSibling);
+        }
+    } else if (omitRow) {
+        omitRow.appendChild(row);
+    } else {
+        return null;
+    }
+
+    BCF.dialog._align(row, box, omitBox);
+    BCF.diag.event("dialog", "use-hereinafter row injected");
+    return box;
+};
+
+BCF.dialog._toggleHereinafter = function (doc, box) {
+    try {
+        var p = doc.getElementById("prefix");
+        if (!p) { BCF.diag.event("dialog:toggle-hi", "no #prefix"); return; }
+        var val = p.value || "";
+        var want = !BCF.cite.hasHereinafter(val);
+        var newVal = want
+            ? (BCF.HEREINAFTER_SENTINEL + BCF.cite.stripHereinafter(val))
+            : BCF.cite.stripHereinafter(val);
+        BCF.dialog._setReactValue(p, newVal);
+        if (box) box.checked = want;
+        BCF.diag.event("dialog:toggle-hi",
+            "want=" + want + " nowHasHereinafter=" + BCF.cite.hasHereinafter(p.value || ""));
+    } catch (e) {
+        BCF.diag.err("dialog.toggleHereinafter", e);
+    }
+};
+
+BCF.dialog._syncHereinafter = function (box, prefixField) {
+    try { box.checked = BCF.cite.hasHereinafter(prefixField.value || ""); } catch (_) {}
 };
 
 // Toggle the flag on the active cite's prefix. The new state is derived from
