@@ -91,7 +91,7 @@ BCF.dialog._wire = function (doc) {
 };
 
 // Idempotently ensure both rows sit after the Omit Author row and reflect the
-// active cite's flag state. Order: Omit Author → Use hereinafter → Break id.
+// active cite's flag state. Order: Omit Author -> Use hereinafter -> Break id.
 BCF.dialog._tryInject = function (doc) {
     try {
         var omitBox = BCF.dialog._findOmitAuthor(doc);
@@ -208,7 +208,7 @@ BCF.dialog._findOmitAuthor = function (doc) {
 };
 
 // Inject the "Use hereinafter" row, positioned before the "Break id." row so
-// the visual order is: Omit Author → Use hereinafter → Break id.
+// the visual order is: Omit Author -> Use hereinafter -> Break id.
 BCF.dialog._injectHereinafter = function (doc, omitBox) {
     var XHTML = BCF.dialog.XHTML_NS;
     var omitRow = (omitBox.closest && (omitBox.closest("div") || omitBox.closest("tr"))) ||
