@@ -24,7 +24,7 @@ BCF.dialog.XHTML_NS = "http://www.w3.org/1999/xhtml";
 BCF.dialog.CHECKBOX_ID = "bluebook-citations-fixer-break-id";
 BCF.dialog.ROW_ID = "bluebook-citations-fixer-break-id-row";
 BCF.dialog.LABEL = "Break id.";
-BCF.dialog.TITLE = "Render this cite as a short form, not “Id.” " +
+BCF.dialog.TITLE = "Render this cite as a short form, not \"Id.\" " +
     "(the previous citation is hand-typed and invisible to Zotero).";
 BCF.dialog._watcher = null;
 BCF.dialog._observers = [];

@@ -13,7 +13,7 @@ that are awkward or impossible to express cleanly in CSL alone.
 
 ## Install
 
-Download [Bluebook_Citations_Fixer_v1.2.3.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2.3/Bluebook_Citations_Fixer_v1.2.3.xpi)
+Download [Bluebook_Citations_Fixer_v1.2.4.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2.4/Bluebook_Citations_Fixer_v1.2.4.xpi)
 and install it via **Zotero → Tools → Plugins → gear menu → Install Plugin From File**.
 
 > 💡 Pairs with [Bluebook Signals](../bluebook-signals/README.md) —
@@ -119,13 +119,20 @@ only — Word and LibreOffice work; Google Docs is not yet supported.
 
 ## Latest Released Version
 
-- `1.2.3`
-- Git tag: `bluebook-citations-fixer-v1.2.3`
-- GitHub release asset: [Bluebook_Citations_Fixer_v1.2.3.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2.3/Bluebook_Citations_Fixer_v1.2.3.xpi)
+- `1.2.4`
+- Git tag: `bluebook-citations-fixer-v1.2.4`
+- GitHub release asset: [Bluebook_Citations_Fixer_v1.2.4.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2.4/Bluebook_Citations_Fixer_v1.2.4.xpi)
 
 ## Release History
 
 See [`../CHANGELOG.md`](../CHANGELOG.md) for the full history. Recent releases:
+
+### v1.2.4
+
+- **Startup crash fix.** The `dialog.js` `TITLE` string used straight double
+  quotes around `"Id."` without escaping them, which closed the string early
+  and left `Id.` as a bare identifier — Zotero failed to load the plugin with
+  `SyntaxError: unexpected token: identifier`. The quotes are now escaped.
 
 ### v1.2.3
 

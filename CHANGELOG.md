@@ -5,6 +5,13 @@ prefix in each section header identifies which plugin shipped.
 
 ## bluebook-citations-fixer
 
+### v1.2.4 — 2026-06-18
+
+- **Startup crash fix.** `lib/dialog.js`'s `TITLE` constant wrapped `"Id."` in
+  unescaped straight double quotes, closing the string early and leaving `Id.`
+  as a bare identifier. Zotero failed to load the plugin at startup with
+  `SyntaxError: unexpected token: identifier`. The inner quotes are now escaped.
+
 ### v1.2.1 — 2026-06-11
 
 Robustness fixes from a code review of the rewrite pipeline. No changes to the
