@@ -93,6 +93,7 @@ bluebook-citations-fixer/
         ├── id-suppress.js        # manual "Break id." -> correct short form (supra / reporter)
         ├── hereinafter.js        # Rule 4.2(b): [hereinafter Short] + supra-cite rewrite
         ├── journal-volume-year.js# suppress redundant trailing year when volume is year-like
+        ├── statute-year.js       # suppress redundant trailing year when a statute's name ends in that same year (Rule 12.3.2)
         └── book-at.js            # insert ", at" when numeral-ending titles make locators ambiguous
 ```
 
@@ -113,7 +114,7 @@ ctx = {
 }
 ```
 
-Returning a string replaces `ctx.text`; returning undefined is a pass-through. Features run in `registry.list` order, each seeing the previous feature's output. The current order is `id-suppress` -> `journal-volume-year` -> `book-at` -> `hereinafter`. **`id-suppress` runs first on purpose:** it corrects a wrongly-rendered `Id.` into the proper short form so every later feature sees the corrected text (and `hereinafter` can then inject a short title before its `supra note`). **Hereinafter runs last on purpose:** it appends `[hereinafter ...]` to the end of a segment, and both `journal-volume-year` (strips trailing `(YYYY)`) and `book-at` (rewrites trailing `<numeral> <locator>`) anchor on `$` — they must see the un-bracketed tail first. **To add a new Bluebook rule: create `lib/features/<id>.js`, load it in `bootstrap.js`, and append it to `registry.list`.**
+Returning a string replaces `ctx.text`; returning undefined is a pass-through. Features run in `registry.list` order, each seeing the previous feature's output. The current order is `id-suppress` -> `journal-volume-year` -> `statute-year` -> `book-at` -> `hereinafter`. **`id-suppress` runs first on purpose:** it corrects a wrongly-rendered `Id.` into the proper short form so every later feature sees the corrected text (and `hereinafter` can then inject a short title before its `supra note`). **Hereinafter runs last on purpose:** it appends `[hereinafter ...]` to the end of a segment, and `journal-volume-year` / `statute-year` (both strip a trailing `(YYYY)`) and `book-at` (rewrites trailing `<numeral> <locator>`) anchor on `$` — they must see the un-bracketed tail first. `statute-year` strips the trailing `(YYYY)` only when it equals the four-digit year the statute's name ends in (Rule 12.3.2), so a codified statute's code-edition year is preserved. **To add a new Bluebook rule: create `lib/features/<id>.js`, load it in `bootstrap.js`, and append it to `registry.list`.**
 
 #### Dialog UI surface
 

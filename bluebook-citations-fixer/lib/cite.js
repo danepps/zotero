@@ -141,6 +141,21 @@ BCF.cite.hasFourDigitVolume = function (itemData) {
     return /^\d{4}$/.test(String(itemData.volume).trim());
 };
 
+BCF.cite.isStatute = function (itemData) {
+    return BCF.cite.itemType(itemData) === "legislation";
+};
+
+// If the (long-form) title ends in a four-digit year-like numeral (e.g.
+// "...Act of 2010"), return that year as a string; otherwise null. Operates on
+// the long-form title because that's what CSL renders into the cluster text the
+// statute-year feature then rewrites. Returning the captured year (not a bool)
+// lets the feature suppress the trailing "(YYYY)" only when it matches.
+BCF.cite.titleTrailingYear = function (itemData) {
+    var title = BCF.cite.fullTitle(itemData);
+    var m = /(?:^|\D)(\d{4})\s*$/.exec(title);
+    return m ? m[1] : null;
+};
+
 // citeproc position: 0=first, 1=subsequent, 2=ibid, 3=ibid-with-locator.
 // Undefined falls back to 0.
 BCF.cite.POSITION_FIRST = 0;

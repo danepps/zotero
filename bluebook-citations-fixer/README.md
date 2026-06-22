@@ -47,9 +47,9 @@ and install it via **Zotero → Tools → Plugins → gear menu → Install Plug
 > - **Need a refresh:** the *hereinafter* rule and the *"Break id."* short-form
 >   fix — both depend on the whole document (who shares an author, how often a
 >   work is cited, which footnote a source first appears in).
-> - **Apply on insert too:** the *journal volume/year* and *book ", at"* fixes
->   are local to a single cite, so they take effect immediately — but a refresh
->   never hurts.
+> - **Apply on insert too:** the *journal volume/year*, *statute name/year*, and
+>   *book ", at"* fixes are local to a single cite, so they take effect
+>   immediately — but a refresh never hurts.
 >
 > When in doubt, **refresh** — it's the only way to guarantee every rule is
 > applied consistently across the document.
@@ -75,6 +75,11 @@ and install it via **Zotero → Tools → Plugins → gear menu → Install Plug
     document refresh without needing to re-insert the citation
 - Suppress the trailing year parenthetical for journal articles when the
   volume itself is a four-digit year-like number
+- Suppress the trailing year parenthetical for statutes when the statute's
+  name already ends in that same four-digit year (e.g. "...Act of 2010, Pub.
+  L. No. 111-203 (2010)" → drop the "(2010)"), per Bluebook 12.3.2. Only fires
+  when the parenthetical year matches the year in the name, so a codified
+  statute's code-edition year (e.g. "15 U.S.C. § 7201 (2018)") is preserved
 - Insert `, at` for qualifying citations when a title ends in a numeral and
   the rendered cite would otherwise look like `... 1868 45 (2006)`. Works
   regardless of what follows the pincite — `(YYYY)`, `(rev. ed. 2005)`,

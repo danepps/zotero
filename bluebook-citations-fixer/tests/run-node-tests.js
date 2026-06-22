@@ -35,6 +35,7 @@ context.BCF.diag = { event() {}, log() {}, err() {} };
 load("lib/session-run.js");
 load("lib/features/hereinafter.js");
 load("lib/features/journal-volume-year.js");
+load("lib/features/statute-year.js");
 load("lib/features/book-at.js");
 load("lib/features/id-suppress.js");
 load("lib/features/registry.js");
@@ -738,6 +739,80 @@ function eligibleRun(initialCitationsByIndex, items) {
         text,
         rtf: BCF.rtf
     }), text);
+}
+
+// statute-year: title ends in the same year as the trailing parenthetical ->
+// strip the redundant "(YYYY)" (Bluebook 12.3.2).
+{
+    const statute = cit(
+        "S1", null, null, "Dodd-Frank Wall Street Reform and Consumer Protection Act of 2010",
+        undefined, [], { type: "legislation" }
+    );
+    const run = buildRun({ 1: citation(1, [statute]) });
+    const out = BCF.features.statuteYear.rewrite({
+        codeJson: { citationItems: [statute] },
+        run,
+        text: "Dodd-Frank Wall Street Reform and Consumer Protection Act of 2010, Pub. L. No. 111-203 (2010)",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "Dodd-Frank Wall Street Reform and Consumer Protection Act of 2010, Pub. L. No. 111-203");
+}
+
+// statute-year: parenthetical year differs from the title year (a codified
+// statute's code-edition year) -> leave it alone.
+{
+    const statute = cit(
+        "S2", null, null, "Sarbanes-Oxley Act of 2002",
+        undefined, [], { type: "legislation" }
+    );
+    const run = buildRun({ 1: citation(1, [statute]) });
+    const text = "Sarbanes-Oxley Act of 2002, 15 U.S.C. § 7201 (2018)";
+    assert.strictEqual(BCF.features.statuteYear.rewrite({
+        codeJson: { citationItems: [statute] },
+        run,
+        text,
+        rtf: BCF.rtf
+    }), text);
+}
+
+// statute-year: non-statute item type with a year-ending title is untouched
+// (journal-volume-year owns the journal case; this feature must not double-handle).
+{
+    const journal = cit(
+        "S3", "Epps", null, "Some Reform Act of 2010",
+        undefined, undefined, { type: "article-journal", volume: "123", "container-title": "Yale Law Journal" }
+    );
+    const run = buildRun({ 1: citation(1, [journal]) });
+    const text = "Dan Epps, Some Reform Act of 2010, 123 Yale L.J. 15 (2010)";
+    assert.strictEqual(BCF.features.statuteYear.rewrite({
+        codeJson: { citationItems: [journal] },
+        run,
+        text,
+        rtf: BCF.rtf
+    }), text);
+}
+
+// statute-year: idempotent -> running on already-stripped text is a no-op.
+{
+    const statute = cit(
+        "S4", null, null, "Tax Reform Act of 1986",
+        undefined, [], { type: "legislation" }
+    );
+    const run = buildRun({ 1: citation(1, [statute]) });
+    const once = BCF.features.statuteYear.rewrite({
+        codeJson: { citationItems: [statute] },
+        run,
+        text: "Tax Reform Act of 1986, Pub. L. No. 99-514 (1986)",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(once, "Tax Reform Act of 1986, Pub. L. No. 99-514");
+    const twice = BCF.features.statuteYear.rewrite({
+        codeJson: { citationItems: [statute] },
+        run,
+        text: once,
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(twice, once);
 }
 
 {

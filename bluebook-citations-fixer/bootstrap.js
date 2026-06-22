@@ -119,6 +119,7 @@ async function startup(data) {
         load("lib/session-run.js");
         load("lib/features/hereinafter.js");
         load("lib/features/journal-volume-year.js");
+        load("lib/features/statute-year.js");
         load("lib/features/book-at.js");
         load("lib/features/id-suppress.js");
         load("lib/features/registry.js");
