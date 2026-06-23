@@ -5,6 +5,19 @@ prefix in each section header identifies which plugin shipped.
 
 ## bluebook-citations-fixer
 
+### v1.3 — 2026-06-23
+
+- **New rule: suppress the redundant statute year (Bluebook 12.3.2).** When a
+  statute's name already ends in its year (e.g. "...Act of 2010, Pub. L. No.
+  111-203 (2010)"), the trailing "(2010)" date parenthetical is now stripped.
+  The strip fires only when the parenthetical year equals the four-digit year
+  the name ends in, so a codified statute's code-edition year (e.g. "15 U.S.C.
+  § 7201 (2018)") is left intact. Scope is the CSL `legislation` type (Zotero
+  "Statute"). Implemented as a new `lib/features/statute-year.js` feature in the
+  rewrite chain, running between `journal-volume-year` and `book-at`; like the
+  journal volume/year rule it is local to a single cite and takes effect on
+  insert.
+
 ### v1.2.4 — 2026-06-18
 
 - **Startup crash fix.** `lib/dialog.js`'s `TITLE` constant wrapped `"Id."` in

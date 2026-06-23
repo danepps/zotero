@@ -13,7 +13,7 @@ that are awkward or impossible to express cleanly in CSL alone.
 
 ## Install
 
-Download [Bluebook_Citations_Fixer_v1.2.4.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2.4/Bluebook_Citations_Fixer_v1.2.4.xpi)
+Download [Bluebook_Citations_Fixer_v1.3.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.3/Bluebook_Citations_Fixer_v1.3.xpi)
 and install it via **Zotero → Tools → Plugins → gear menu → Install Plugin From File**.
 
 > 💡 Pairs with [Bluebook Signals](../bluebook-signals/README.md) —
@@ -124,13 +124,23 @@ only — Word and LibreOffice work; Google Docs is not yet supported.
 
 ## Latest Released Version
 
-- `1.2.4`
-- Git tag: `bluebook-citations-fixer-v1.2.4`
-- GitHub release asset: [Bluebook_Citations_Fixer_v1.2.4.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.2.4/Bluebook_Citations_Fixer_v1.2.4.xpi)
+- `1.3`
+- Git tag: `bluebook-citations-fixer-v1.3`
+- GitHub release asset: [Bluebook_Citations_Fixer_v1.3.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.3/Bluebook_Citations_Fixer_v1.3.xpi)
 
 ## Release History
 
 See [`../CHANGELOG.md`](../CHANGELOG.md) for the full history. Recent releases:
+
+### v1.3
+
+- **New rule: suppress the redundant statute year.** When a statute's name
+  already ends in its year (e.g. "...Act of 2010, Pub. L. No. 111-203 (2010)"),
+  the trailing "(2010)" date parenthetical is now dropped, per Bluebook 12.3.2.
+  The fix fires only when the parenthetical year matches the year in the name,
+  so a codified statute's code-edition year (e.g. "15 U.S.C. § 7201 (2018)") is
+  preserved. Applies to Zotero "Statute" items and, like the journal
+  volume/year rule, takes effect on insert.
 
 ### v1.2.4
 
