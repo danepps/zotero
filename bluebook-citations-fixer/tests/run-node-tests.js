@@ -945,6 +945,37 @@ function eligibleRun(initialCitationsByIndex, items) {
 }
 
 {
+    // Regression: a page-plus-note pincite ("94 n.30", Rule 3.2(b)) must still
+    // get ", at" — the locator isn't a bare page/range, so book-at must accept
+    // it once it merely opens on a digit rather than requiring the whole
+    // string to be numeric.
+    const book = cit(
+        "B1h",
+        "Currie",
+        "Currie",
+        "The Constitution in the Supreme Court: The First Hundred Years, 1789–1888",
+        undefined,
+        undefined,
+        { type: "book" }
+    );
+    book.locator = "94 n.30";
+    book.label = "page";
+    const run = buildRun({ 1: citation(1, [book]) });
+    const out = BCF.features.bookAt.rewrite({
+        codeJson: { citationItems: [book] },
+        run,
+        text: "David P. Currie, The Constitution in the Supreme Court: The First Hundred " +
+            "Years, 1789–1888 94 n.30 (1992)",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "David P. Currie, The Constitution in the Supreme Court: The First Hundred " +
+            "Years, 1789–1888, at 94 n.30 (1992)"
+    );
+}
+
+{
     const book = cit(
         "B2",
         "Epps",
