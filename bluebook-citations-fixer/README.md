@@ -141,6 +141,10 @@ See [`../CHANGELOG.md`](../CHANGELOG.md) for the full history. Recent releases:
   so a codified statute's code-edition year (e.g. "15 U.S.C. § 7201 (2018)") is
   preserved. Applies to Zotero "Statute" items and, like the journal
   volume/year rule, takes effect on insert.
+- **Book-at fix for page-plus-note pincites.** The ", at" insertion for
+  numeral-ending book titles skipped citations whose pincite included a
+  footnote reference (e.g. `94 n.30`, Bluebook 3.2(b)) — the locator check
+  only accepted a bare page or page range. Such locators are now handled.
 
 ### v1.2.4
 

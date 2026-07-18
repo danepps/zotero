@@ -5,7 +5,7 @@ prefix in each section header identifies which plugin shipped.
 
 ## bluebook-citations-fixer
 
-### v1.3 — 2026-06-23
+### v1.3 — 2026-07-18
 
 - **New rule: suppress the redundant statute year (Bluebook 12.3.2).** When a
   statute's name already ends in its year (e.g. "...Act of 2010, Pub. L. No.
@@ -17,6 +17,13 @@ prefix in each section header identifies which plugin shipped.
   rewrite chain, running between `journal-volume-year` and `book-at`; like the
   journal volume/year rule it is local to a single cite and takes effect on
   insert.
+- **Book-at fix: page-plus-note pincites.** `book-at`'s locator-acceptance
+  check required a bare page or range (`94`, `94-96`), so a footnote pincite
+  like `94 n.30` (Bluebook 3.2(b)) fell through to text-inference — which also
+  couldn't reconstruct it — and the feature silently skipped the citation
+  instead of inserting ", at". The check now requires only that the locator
+  open on a digit; the downstream rewrite anchors solely on what follows the
+  locator, so this is sufficient.
 
 ### v1.2.4 — 2026-06-18
 
