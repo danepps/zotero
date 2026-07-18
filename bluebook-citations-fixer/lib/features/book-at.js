@@ -55,7 +55,11 @@ BCF.features.bookAt = {
 
             var seg = segments[i];
             var inferredLocator = BCF.features.bookAt._inferLocator(BCF.rtf.plainish(seg.text));
-            if (!locator || !/^\d+(?:[-\u2013]\d+)?$/.test(locator)) {
+            // Accept the locator as-is once it opens on a digit \u2014 covers not just a
+            // bare page/range but a page-plus-note pincite like "94 n.30" (Rule
+            // 3.2(b)) or "94, 96". Anything else (missing, or non-numeric like a
+            // hand-typed "supra") falls back to inferring from the rendered text.
+            if (!locator || !/^\d/.test(locator)) {
                 locator = inferredLocator;
             }
             if (label &&
