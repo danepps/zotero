@@ -17,13 +17,15 @@
 //     is ambiguous, hereinafter then injects the short title before "supra
 //     note", and the two features compose.)
 //   * `hereinafter` runs LAST: it appends "[hereinafter ...]" to the end of a
-//     segment; both `journal-volume-year` (strips trailing "(YYYY)") and
-//     `book-at` (rewrites the trailing "<numeral> <locator>") anchor their
-//     regexes at the end of the segment, so they must run *before* hereinafter
-//     or they'll see the bracketed tag at the tail and silently no-op.
+//     segment; `journal-volume-year` and `statute-year` (both strip a trailing
+//     "(YYYY)") and `book-at` (rewrites the trailing "<numeral> <locator>")
+//     anchor their regexes at the end of the segment, so they must run *before*
+//     hereinafter or they'll see the bracketed tag at the tail and silently
+//     no-op.
 BCF.features.list = [
     BCF.features.idSuppress,
     BCF.features.journalVolumeYear,
+    BCF.features.statuteYear,
     BCF.features.bookAt,
     BCF.features.hereinafter
 ];
