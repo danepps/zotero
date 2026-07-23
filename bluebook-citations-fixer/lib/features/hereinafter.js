@@ -102,9 +102,18 @@ BCF.features.hereinafter = {
             BCF.features.hereinafter._hasSupraNote(segRtf);
 
         if (isSubsequent) {
-            return BCF.features.hereinafter._rewriteSubsequent(segRtf, shortTitle, isBook);
+            return BCF.features.hereinafter._rewriteSubsequent(segRtf, itemData, shortTitle, isBook);
         }
         return BCF.features.hereinafter._rewriteFirst(segRtf, itemData, shortTitle, isBook, citItem);
+    },
+
+    // RTF fragment for the short title: small caps for books, italics
+    // otherwise. Embedded <i>/<em> markup in the title field is rendered
+    // with citeproc-style flip-flop (roman inside italics, italic inside
+    // small caps) rather than flattened into the surrounding style.
+    _titleFrag: function (itemData, isBook) {
+        var segs = BCF.cite.titleSegments(BCF.cite.shortTitleRaw(itemData));
+        return isBook ? BCF.rtf.smallCapsTitle(segs) : BCF.rtf.italicTitle(segs);
     },
 
     _hasSupraNote: function (rtf) {
@@ -133,7 +142,7 @@ BCF.features.hereinafter = {
         // Inline RTF. setText wraps the whole string in {\rtf ...} if
         // needed; inline groups are fine.
         var authorPrefix = BCF.features.hereinafter._authorPrefix(itemData, isBook);
-        var titleFrag = isBook ? BCF.rtf.smallCaps(shortTitle) : BCF.rtf.italic(shortTitle);
+        var titleFrag = BCF.features.hereinafter._titleFrag(itemData, isBook);
         var inside = (authorPrefix ? authorPrefix + ", " : "") + titleFrag;
         var bracket = " [hereinafter " + inside + "]";
 
@@ -181,7 +190,7 @@ BCF.features.hereinafter = {
         return name(surnames[0]) + " " + BCF.rtf.italic("et al.");
     },
 
-    _rewriteSubsequent: function (segRtf, shortTitle, isBook) {
+    _rewriteSubsequent: function (segRtf, itemData, shortTitle, isBook) {
         var plain = BCF.rtf.plainish(segRtf);
         // Idempotency: short title already appears before "supra note".
         var beforeSupra = new RegExp(
@@ -196,7 +205,7 @@ BCF.features.hereinafter = {
         var rtfOffset = BCF.rtf.findPlainOffset(segRtf, needle);
         if (rtfOffset < 0) return null;
 
-        var titleFrag = isBook ? BCF.rtf.smallCaps(shortTitle) : BCF.rtf.italic(shortTitle);
+        var titleFrag = BCF.features.hereinafter._titleFrag(itemData, isBook);
         var injection = ", " + titleFrag;
         return segRtf.slice(0, rtfOffset) + injection + segRtf.slice(rtfOffset);
     }

@@ -163,6 +163,8 @@ Zotero hands RTF to the integration bridge using citeproc-js's RTF output format
 
 Hereinafter uses small caps for book-like items (`BCF.cite.isBookLike` → `book`, `entry-encyclopedia`, `entry-dictionary`, etc.) and italics for everything else, per Bluebook rules 15.1, 16, and B14. Chapters are the exception: although `isBookLike` includes them, the chapter title is italic and the chapter author is roman in long form (Rule 15.5/B14), so a hereinafter naming the chapter renders like an article. "Et al." stays italic in both cases.
 
+Titles carrying embedded `<i>`/`<em>` markup (e.g. a case name inside an article title) are rendered with citeproc-style flip-flop, not flattened: `BCF.cite.titleSegments(raw)` parses the raw title (`BCF.cite.shortTitleRaw`) into `{ text, italic }` segments, and `BCF.rtf.italicTitle(segs)` / `BCF.rtf.smallCapsTitle(segs)` emit the marked spans as roman (`{\i0{}...}`) inside an italic title and as italic inside a small-caps title. `hereinafter._titleFrag(itemData, isBook)` bundles the two steps and is shared by `id-suppress`'s title injections. `BCF.cite.shortTitle` remains the plain projection (markup stripped) used for idempotency checks and diagnostics — concatenating the segments' text reproduces it exactly.
+
 ### Idempotency
 
 Every feature must be idempotent — both the `_updateDocument` prewrite pass and `setText` can see already-rewritten text on later refreshes. `hereinafter` checks for `[hereinafter <shortTitle>]` (first cite) and `shortTitle ... supra note` (subsequent cite) in the plainish projection before inserting. `journal-volume-year` checks for the trailing `(YYYY)` before stripping. `book-at` checks for `, at <locator>` before rewriting.

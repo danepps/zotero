@@ -47,6 +47,33 @@ BCF.rtf.smallCaps = function (s) {
     return "{\\scaps " + BCF.rtf.escape(s) + "}";
 };
 
+// Render a title parsed by BCF.cite.titleSegments inside an italic wrapper
+// with citeproc-style flip-flop: spans the source marked <i>/<em> come out
+// roman ({\i0{}...} — citeproc's @font-style/normal RTF form). With no
+// marked spans the output is identical to italic().
+BCF.rtf.italicTitle = function (segments) {
+    var inner = "";
+    for (var i = 0; i < segments.length; i++) {
+        inner += segments[i].italic
+            ? "{\\i0{}" + BCF.rtf.escape(segments[i].text) + "}"
+            : BCF.rtf.escape(segments[i].text);
+    }
+    return "{\\i{}" + inner + "}";
+};
+
+// Small-caps counterpart: inside a small-caps title an <i>/<em> span stays
+// italic (no flip — small caps isn't italics). With no marked spans the
+// output is identical to smallCaps().
+BCF.rtf.smallCapsTitle = function (segments) {
+    var inner = "";
+    for (var i = 0; i < segments.length; i++) {
+        inner += segments[i].italic
+            ? "{\\i{}" + BCF.rtf.escape(segments[i].text) + "}"
+            : BCF.rtf.escape(segments[i].text);
+    }
+    return "{\\scaps " + inner + "}";
+};
+
 // Is the given string *likely* already RTF-wrapped?  Detects the outer
 // {\rtf ...} envelope that Zotero wraps around rich cluster text.
 BCF.rtf.isWrapped = function (s) {

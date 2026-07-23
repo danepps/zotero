@@ -701,6 +701,141 @@ function eligibleRun(initialCitationsByIndex, items) {
 }
 
 {
+    // titleSegments preserves <i>/<em> spans (case names inside titles) and
+    // otherwise normalizes like normalizeTitleMarkup: other tags stripped,
+    // entities decoded. Concatenating the texts equals shortTitle's output.
+    // (JSON comparison: the segment objects are built in the vm context, so
+    // deepStrictEqual would reject them for having a foreign prototype.)
+    assert.strictEqual(
+        JSON.stringify(BCF.cite.titleSegments("<i>Katz</i> as Originalism")),
+        JSON.stringify([
+            { text: "Katz", italic: true },
+            { text: " as Originalism", italic: false }
+        ])
+    );
+    assert.strictEqual(
+        JSON.stringify(BCF.cite.titleSegments("The <em>Erie</em> Doctrine &amp; Beyond")),
+        JSON.stringify([
+            { text: "The ", italic: false },
+            { text: "Erie", italic: true },
+            { text: " Doctrine & Beyond", italic: false }
+        ])
+    );
+    // Unbalanced closer never goes negative; non-italic tags strip in place.
+    assert.strictEqual(
+        JSON.stringify(BCF.cite.titleSegments("</i>Plain <b>Bold</b> Text")),
+        JSON.stringify([{ text: "Plain Bold Text", italic: false }])
+    );
+    // RTF renderers: flip-flop inside italics, plain italics inside scaps.
+    const segs = BCF.cite.titleSegments("<i>Katz</i> as Originalism");
+    assert.strictEqual(
+        BCF.rtf.italicTitle(segs),
+        "{\\i{}{\\i0{}Katz} as Originalism}"
+    );
+    assert.strictEqual(
+        BCF.rtf.smallCapsTitle(segs),
+        "{\\scaps {\\i{}Katz} as Originalism}"
+    );
+    // No markup: output identical to the plain italic()/smallCaps() forms.
+    assert.strictEqual(
+        BCF.rtf.italicTitle(BCF.cite.titleSegments("Checks")),
+        BCF.rtf.italic("Checks")
+    );
+    assert.strictEqual(
+        BCF.rtf.smallCapsTitle(BCF.cite.titleSegments("Checks")),
+        BCF.rtf.smallCaps("Checks")
+    );
+}
+
+{
+    // First cite, article whose short title carries an italicized case name:
+    // the hereinafter renders it with citeproc-style flip-flop (roman inside
+    // the italic title), not flattened into uniform italics.
+    const a = cit("Ital1", "Doe", "<i>Katz</i> as Originalism",
+        "<i>Katz</i> as Originalism: A Study",
+        undefined, undefined, { type: "article-journal" });
+    const b = cit("Ital2", "Doe", "Other Work", "Other Work",
+        undefined, undefined, { type: "article-journal" });
+    const run = eligibleRun({
+        1: citation(1, [a]),
+        2: citation(1, [b])
+    }, [a, b]);
+    const first = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: "Jane Doe, {\\i0{}Katz} as Originalism: A Study (2020)",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        first,
+        "Jane Doe, {\\i0{}Katz} as Originalism: A Study (2020) " +
+        "[hereinafter Doe, {\\i{}{\\i0{}Katz} as Originalism}]"
+    );
+    // Idempotent on reprocess.
+    assert.strictEqual(BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: first,
+        rtf: BCF.rtf
+    }), first);
+}
+
+{
+    // Subsequent cite: the short title injected before "supra note" keeps
+    // the flip-flopped case name too.
+    const a = cit("Ital3", "Doe", "<i>Katz</i> as Originalism",
+        "<i>Katz</i> as Originalism: A Study",
+        1, undefined, { type: "article-journal" });
+    const b = cit("Ital4", "Doe", "Other Work", "Other Work",
+        undefined, undefined, { type: "article-journal" });
+    const run = eligibleRun({
+        1: citation(1, [a]),
+        2: citation(1, [b])
+    }, [a, b]);
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: "Doe, supra note 4",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Doe, {\\i{}{\\i0{}Katz} as Originalism}, supra note 4"
+    );
+    assert.strictEqual(BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: out,
+        rtf: BCF.rtf
+    }), out);
+}
+
+{
+    // Book-like item: small-caps title with the <i> span staying italic
+    // (no flip — small caps isn't italics).
+    const a = cit("Ital5", "Doe", "Understanding <i>Miranda</i>",
+        "Understanding <i>Miranda</i>",
+        undefined, undefined, { type: "book" });
+    const b = cit("Ital6", "Doe", "Other Book", "Other Book",
+        undefined, undefined, { type: "book" });
+    const run = eligibleRun({
+        1: citation(1, [a]),
+        2: citation(1, [b])
+    }, [a, b]);
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: "Jane Doe, Understanding Miranda (2020)",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Jane Doe, Understanding Miranda (2020) " +
+        "[hereinafter {\\scaps Doe}, {\\scaps Understanding {\\i{}Miranda}}]"
+    );
+}
+
+{
     const journal = cit(
         "J1",
         "Epps",
@@ -1086,6 +1221,34 @@ const NOID = String.fromCharCode(0x200B);
         text: out,
         rtf: BCF.rtf
     }), out);
+}
+
+{
+    // Authorless secondary source whose title carries an italicized case
+    // name: the title-based supra flips the case name to roman inside the
+    // italic title instead of flattening it.
+    const a = cit("IDital", undefined, "The <i>Erie</i> Doctrine",
+        "The <i>Erie</i> Doctrine Revisited",
+        undefined, [], { type: "article-journal" });
+    const aFlag = cit("IDital", undefined, "The <i>Erie</i> Doctrine",
+        "The <i>Erie</i> Doctrine Revisited",
+        undefined, [], { type: "article-journal" });
+    aFlag.prefix = NOID;
+    aFlag.locator = "99";
+    const run = buildRun({
+        1: citation(1, [a]),
+        2: citation(3, [aFlag])
+    });
+    const out = BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [aFlag] },
+        run,
+        text: NOID_RTF + "See id. at 99",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "See {\\i{}The {\\i0{}Erie} Doctrine}, {\\i{}supra} note 1, at 99"
+    );
 }
 
 {
