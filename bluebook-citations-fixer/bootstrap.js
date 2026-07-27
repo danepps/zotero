@@ -99,6 +99,11 @@ async function startup(data) {
             Zotero: Zot
         };
 
+        // Expose the namespace on the Zotero object so the sandboxed Settings
+        // pane script (prefs-pane.js) can reach BCF.styleSync — the pane runs
+        // in its own Cu.Sandbox and cannot see this bootstrap scope.
+        try { Zot.BluebookCitationsFixer = BCF; } catch (_) {}
+
         var loadScope = {
             Zotero: Zot,
             BCF: BCF,
@@ -124,12 +129,14 @@ async function startup(data) {
         load("lib/features/id-suppress.js");
         load("lib/features/registry.js");
         load("lib/patch.js");
+        load("lib/style-sync.js"); // after patch.js: reads BUILTIN_STYLE_IDS
 
         BCF.diag.init();
         BCF.diag.event("startup", "loaded");
         BCF.patch.install();
         BCF.dialog.install();
         _registerPrefsPane(Zot, rootURI);
+        BCF.styleSync.scheduleStartupCheck();
 
         try { Zot.debug("[bluebook-citations-fixer] startup complete"); } catch (_) {}
     } catch (e) {
@@ -164,12 +171,18 @@ async function startup(data) {
 }
 
 function shutdown() {
+    try { if (BCF && BCF.styleSync) BCF.styleSync.cancel(); } catch (_) {}
     try { if (BCF && BCF.dialog) BCF.dialog.uninstall(); } catch (_) {}
     try { if (BCF && BCF.patch) BCF.patch.uninstall(); } catch (_) {}
     try {
         if (BCF && BCF.prefsPaneID && BCF.Zotero && BCF.Zotero.PreferencePanes &&
                 typeof BCF.Zotero.PreferencePanes.unregister === "function") {
             BCF.Zotero.PreferencePanes.unregister(BCF.prefsPaneID);
+        }
+    } catch (_) {}
+    try {
+        if (BCF && BCF.Zotero && BCF.Zotero.BluebookCitationsFixer === BCF) {
+            delete BCF.Zotero.BluebookCitationsFixer;
         }
     } catch (_) {}
     BCF = null;

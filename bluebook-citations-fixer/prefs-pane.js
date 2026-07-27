@@ -85,12 +85,37 @@
         });
     }
 
+    // Manual "Check for style updates" button. The check logic lives in
+    // lib/style-sync.js, reached through Zotero.BluebookCitationsFixer (set by
+    // bootstrap.js) — this pane sandbox can't see the bootstrap BCF directly.
+    // The button bypasses the 24h throttle and works regardless of the
+    // automatic-update pref; the enable checkbox is auto-bound by Zotero via
+    // its `preference` attribute, so no wiring is needed for it here.
+    function wireStyleSync() {
+        var btn = document.getElementById("bcf-style-sync-check");
+        var status = document.getElementById("bcf-style-sync-status");
+        if (!btn || !status) return;
+        if (btn.getAttribute("data-bcf-wired") === "1") return;
+        btn.setAttribute("data-bcf-wired", "1");
+        btn.addEventListener("command", function () {
+            var api = Zotero.BluebookCitationsFixer;
+            if (!api || !api.styleSync) { status.value = "Check unavailable"; return; }
+            btn.disabled = true;
+            status.value = "Checking…";
+            api.styleSync.check()
+                .then(function (res) { status.value = api.styleSync.summaryLabel(res); })
+                .catch(function (e) { report(e); status.value = "Check failed"; })
+                .then(function () { btn.disabled = false; });
+        });
+    }
+
     async function init() {
         var allBox = document.getElementById("bcf-style-all");
         var listBox = document.getElementById("bcf-style-list");
         var manual = document.getElementById("bcf-style-manual");
         if (!allBox || !listBox || !manual) return false;
         wireLinks();
+        wireStyleSync();
         if (listBox.getAttribute("data-bcf-built") === "1") return true;
 
         await Zotero.Styles.init();

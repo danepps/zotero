@@ -60,6 +60,19 @@ While `_updateDocument` is fanning the (already-rewritten) cluster texts out to 
 
 Both hook paths consult `BCF.patch._styleAllowed(session)` before running the feature chain (`patch.run` for `setText`, `_prepareCitationTexts` for the prewrite pass). The document's active style — `session.data.style.styleID`, falling back to `session.styleID` / `session.style.styleID` — is allowed when it is (1) one of the **hard-wired** `BCF.patch.BUILTIN_STYLE_IDS` (the Epps Bluebook style + its experimental variant — always on, not configurable; a forked variant's `<id>` must be added there AND to the pane's `BUILTINS` in `prefs-pane.js`); (2) listed in the `extensions.bluebook-citations-fixer.styleID` pref (**extra** IDs, whitespace/comma/semicolon separated, exact match, default empty; the legacy `(none)` sentinel is filtered); or (3) the `extensions.bluebook-citations-fixer.allStyles` bool pref is true (gate off — this replaces the old "empty styleID pref disables the gate" rule). An **unreadable styleID fails open** so the plugin never goes silently dark. The Settings pane (`prefs-pane.js`, registered via `PreferencePanes.register({ scripts: [...] })`) renders an "Apply under all citation styles" master checkbox, the built-ins as always-on disabled rows, a pinned row for the traditional Bluebook Law Review style (`http://www.zotero.org/styles/bluebook-law-review`, shown even when not installed), every other installed style, and configured-but-not-installed extras; it's a progressive enhancement over a raw pref `<input>` row in `prefs.xhtml`, hidden only after the picker builds, so a script failure leaves the manual editor working. Built-in/pinned styles missing from this machine render with a "(not installed)" marker and an **Install style** button (`Zotero.Styles.install({ url })` — style IDs are their own download URLs), plus a static link to `https://danepps.github.io/bluebook/` for manual installs (the pane script wires `label.text-link[href^=http]` clicks to `Zotero.launchURL`; the toolkit text-link widget never upgrades inside plugin pane fragments); a missing style is otherwise harmless since the gate only compares ID strings.
 
+### Style sync
+
+`lib/style-sync.js` (`BCF.styleSync`) keeps the installed copies of the built-in Epps styles current — the gate above compares ID strings only, so a stale installed style would otherwise pass silently, and Zotero's own style auto-update covers only `zotero.org/styles` (the Epps styles on danepps.github.io never update on their own). Contract:
+
+- **Covered styles:** `BCF.patch.BUILTIN_STYLE_IDS` (read lazily — single source of truth), and only when the style is **already installed**. Never auto-installs a missing style; the pane's "Install style" button covers that.
+- **Update trigger:** the remote CSL's `<updated>` timestamp is **strictly newer** than the installed copy's (`Zotero.Styles.get(id).updated`). Equal or unreadable on either side → no install (strictly-newer prevents a reinstall loop; never install on an indeterminate comparison). Install is the same field-proven call as the pane button: `Zotero.Styles.install({ url: id }, id, true)` — 3rd arg silences the overwrite confirmation.
+- **Failures are silent:** network/404/parse/install errors go to diag + Error Console only, never a dialog, and the installed style is **never uninstalled or touched on failure** (deliberately unlike the plugin-update JSON, whose 404 deletes the plugin).
+- **Triggers:** (1) startup — `scheduleStartupCheck()` from `bootstrap.js`, throttled to once per 24h via the `styleSync.lastCheck` pref and deferred 60s behind a one-shot `nsITimer` (cancelled in `shutdown()`; the throttle is re-tested at fire time); (2) a "Check for style updates" button in the Settings pane, which bypasses **both** the throttle and the enable pref — `check()` itself consults neither, only `shouldCheck()` does.
+- **Prefs:** `extensions.bluebook-citations-fixer.styleSync` (bool, default `true`, auto-bound checkbox in `prefs.xhtml`) and `…styleSync.lastCheck` (ms-epoch **string** — Zotero prefs have no int64). `lastCheck` is written after every completed run, success or failure, so a dead network can't retry on every launch.
+- **API shape:** `check(deps?)` never rejects, shares one in-flight run between concurrent callers, and takes an injectable deps object (`now/getStyle/fetch/install`) so the Node harness tests the decision logic without `Zotero.HTTP`/`Zotero.Styles`. Pure helpers: `parseUpdated` (regex over the CSL XML — no DOM in the harness), `localUpdated`, `isRemoteNewer`, `shouldCheck`, `summaryLabel`.
+- **Pane bridge:** the sandboxed pane script reaches the lib via `Zotero.BluebookCitationsFixer` (set in `bootstrap.js` startup, deleted in `shutdown()`); the pane's `wireStyleSync()` drives the button + status label. This exposure is the plugin's only global on the Zotero object.
+- This is the plugin's **only network code**; the remote fetch uses `Zotero.HTTP.request` with a 15s timeout against the style ID (style IDs are their own download URLs).
+
 Key facts that anchor the design:
 
 - **`Zotero.Integration.currentSession`** is set on every `execCommand` and cleared in its `finally`. Full document-global knowledge (every cluster's `citationItems`, their citeproc `position`, author / short-title metadata) is available on `session.citationsByIndex` during a setText call.
@@ -76,9 +89,9 @@ bluebook-citations-fixer/
 ├── manifest.json
 ├── chrome.manifest
 ├── build.sh
-├── prefs.js                      # default diag + style-gate + hereinafter prefs
-├── prefs.xhtml                   # Settings pane (style gate + hereinafter options)
-├── prefs-pane.js                 # Settings pane script: style-gate checkbox picker
+├── prefs.js                      # default diag + style-gate + hereinafter + style-sync prefs
+├── prefs.xhtml                   # Settings pane (style gate + hereinafter + style-update options)
+├── prefs-pane.js                 # Settings pane script: style-gate checkbox picker + style-sync button
 ├── locale/en-US/bluebook-citations-fixer.ftl
 ├── tests/run-node-tests.js       # pure helper tests for ambiguity + rewrites
 └── lib/
@@ -88,6 +101,7 @@ bluebook-citations-fixer/
     ├── dialog.js                 # citation-dialog "Break id." checkbox (NOID sentinel on prefix)
     ├── session-run.js            # per-run context cached on currentSession (ambiguity map)
     ├── patch.js                  # patch Session/Field integration seams + run feature chain
+    ├── style-sync.js             # auto-update installed Epps Bluebook CSL styles (24h throttle + pane button)
     └── features/
         ├── registry.js           # ordered list of features
         ├── id-suppress.js        # manual "Break id." -> correct short form (supra / reporter)

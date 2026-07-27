@@ -109,6 +109,17 @@ and install it via **Zotero → Tools → Plugins → gear menu → Install Plug
   styles" switch. Styles missing from the current machine get a one-click
   **Install style** button. If the active style can't be read for any reason,
   the gate fails open so the plugin never silently stops working.
+- **Automatic style updates.** Keeps your installed copies of the Epps
+  Bluebook styles in sync with the versions published at
+  [danepps.github.io/bluebook](https://danepps.github.io/bluebook/): once a
+  day, shortly after Zotero starts, the plugin compares each installed style's
+  `<updated>` timestamp against the hosted copy and silently installs the
+  newer version when one is available. Only styles you already have installed
+  are updated — nothing is ever installed automatically — and a failed check
+  (offline, server trouble) changes nothing and shows no dialog. **Settings →
+  BB Citations Fixer → Style updates** has the on/off switch and a
+  **Check for style updates** button that checks immediately, whether or not
+  automatic updates are on.
 
 ## Companion plugin
 
