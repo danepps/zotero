@@ -138,8 +138,7 @@ BCF.features.idSuppress = {
             // Reporter is emitted verbatim — Zotero's Reporter field already
             // holds the abbreviation (e.g. "U.S."). Short name comes from the
             // Short Title field (title-short), else the full Case Name.
-            var shortName = BCF.cite.shortTitle(data);
-            shortForm = BCF.rtf.italic(shortName) + ", " +
+            shortForm = BCF.features.hereinafter._titleFrag(data, false) + ", " +
                 BCF.rtf.escape(vol) + " " + BCF.rtf.escape(reporter) +
                 (locator ? " at " + BCF.rtf.escape(locator) : "");
         } else if (BCF.cite.isBookLike(data) || BCF.cite.isJournalArticleLike(data)) {
@@ -182,7 +181,7 @@ BCF.features.idSuppress = {
                     BCF.diag.event("skip:id-suppress", "no author or title for " + BCF.cite.itemKey(item));
                     return BCF.cite.stripNoId(segRtf);
                 }
-                authorPrefix = isBook ? BCF.rtf.smallCaps(st) : BCF.rtf.italic(st);
+                authorPrefix = BCF.features.hereinafter._titleFrag(data, isBook);
             }
             // "supra" is italicized (Bluebook); "note N" stays roman. The
             // plainish projection still reads "supra note N", so hereinafter's

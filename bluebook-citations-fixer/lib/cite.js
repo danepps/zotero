@@ -91,10 +91,45 @@ BCF.cite.normalizeTitleMarkup = function (s) {
     return s;
 };
 
+// Like normalizeTitleMarkup, but preserves <i>/<em> boundaries: returns an
+// array of { text, italic } segments (all other markup stripped, entities
+// decoded, apostrophes smart-quoted per segment). Feed the result to
+// BCF.rtf.italicTitle / smallCapsTitle so a title containing an italicized
+// word (e.g. a case name) renders with citeproc-style flip-flop instead of
+// being flattened into one uniform style. Concatenating the segments' text
+// matches normalizeTitleMarkup's output, so plain-projection idempotency
+// checks built on shortTitle keep working.
+BCF.cite.titleSegments = function (s) {
+    if (s == null) return [];
+    var parts = String(s).split(/(<\/?(?:i|em)\b[^>]*>)/i);
+    var out = [];
+    var depth = 0;
+    for (var i = 0; i < parts.length; i++) {
+        var p = parts[i];
+        if (/^<(?:i|em)\b/i.test(p)) { depth++; continue; }
+        if (/^<\/(?:i|em)\b/i.test(p)) { if (depth > 0) depth--; continue; }
+        var text = BCF.cite.normalizeTitleMarkup(p);
+        if (!text) continue;
+        var italic = depth > 0;
+        var last = out[out.length - 1];
+        if (last && last.italic === italic) last.text += text;
+        else out.push({ text: text, italic: italic });
+    }
+    return out;
+};
+
 // Short title to inject. Prefers `title-short`; falls back to full title.
 BCF.cite.shortTitle = function (itemData) {
     if (!itemData) return "";
     return BCF.cite.normalizeTitleMarkup(itemData["title-short"] || itemData.title || "");
+};
+
+// Raw short title with markup intact (same field preference as shortTitle).
+// Use with titleSegments when rendering; shortTitle stays the plain
+// projection for matching and diagnostics.
+BCF.cite.shortTitleRaw = function (itemData) {
+    if (!itemData) return "";
+    return String(itemData["title-short"] || itemData.title || "");
 };
 
 // Full title as rendered in a first-cite. Prefers `title`; falls back to
