@@ -36,7 +36,7 @@ Each plugin is a zip of its root files (`manifest.json`, `chrome.manifest`, `boo
 
 Each writes `releases/<Name>_v<version>.xpi` inside the plugin dir. The `releases/` dirs are gitignored; built XPIs are force-added to the dev branch (`git add -f …`) so the user can side-load via the raw-branch URL for iterative testing.
 
-**Version numbering during iteration:** bump the `version` in `manifest.json` to a new `X.Y.Z` **only** when cutting a release to main. For iterative side-load builds on a dev branch, append a fourth component instead — `0.1.28.1`, `0.1.28.2`, … — so Zotero treats each test build as newer (and won't reuse a cached XPI) without burning a real version number. The base `X.Y.Z` is the version that lands on main; drop the fourth component when cutting the real release. `build.sh` takes the version string verbatim.
+**Version numbering during iteration:** bump the `version` in `manifest.json` to a new `X.Y.Z` **only** when cutting a release to main. For iterative side-load builds on a dev branch, append a fourth component to the **last released version** — released `1.3` iterating toward `1.3.1` means test builds `1.3.0.1`, `1.3.0.2`, … — so each test build sorts newer than the current release (no cached-XPI reuse) but **older than the upcoming release**, letting a machine running a test build auto-update to the real release when it ships. Do **not** build tests on the upcoming version (`1.3.1.1` > `1.3.1` would strand the tester on the test build — this happened with v1.3.1). `build.sh` takes the version string verbatim.
 
 Shipping a real release requires three things in lock-step:
 1. Create a GitHub release with the XPI attached. Tag convention:
