@@ -14,6 +14,7 @@ const context = {
     Zotero: {
         Integration: {
             currentSession: null,
+            currentDoc: false,
             Field: function () {},
             Session: function () {}
         }
@@ -76,10 +77,12 @@ async function runPatch(session, codeJson, text) {
         }
     };
     Zotero.Integration.currentSession = session;
+    Zotero.Integration.currentDoc = true;   // patch.run gates on an ACTIVE command
     try {
         return await BCF.patch.run(field, text);
     } finally {
         Zotero.Integration.currentSession = null;
+        Zotero.Integration.currentDoc = false;
     }
 }
 
@@ -2006,6 +2009,156 @@ const NOID = String.fromCharCode(0x200B);
             assert(!BCF.patch._styleAllowed({ data: { style: { styleID: "(none)" } } }));
             assert(!BCF.patch._styleAllowed({ data: { style: { styleID: APA } } }));
         });
+    }
+
+    {
+        // Output-format gate now fails CLOSED: a missing or unknown
+        // outputFormat skips the chain on both paths — injecting RTF
+        // fragments into an unidentified format would corrupt the document,
+        // which is worse than the plugin going dark.
+        const journal = cit(
+            "FC1", "Smith", "Closed Piece", "Closed Piece",
+            undefined, undefined, { type: "article-journal", volume: "2024" }
+        );
+        const RAW = "John Smith, Closed Piece, 2024 Yale L.J. 55 (2024)";
+
+        const noFmt = { citationsByIndex: { 1: citation(1, [journal]) } };
+        noFmt.citationsByIndex[1].text = RAW;
+        assert.strictEqual(BCF.patch._prepareCitationTexts(noFmt), false);
+        assert.strictEqual(noFmt.citationsByIndex[1].text, RAW);
+
+        const weird = { outputFormat: "weird", citationsByIndex: { 1: citation(1, [journal]) } };
+        weird.citationsByIndex[1].text = RAW;
+        assert.strictEqual(BCF.patch._prepareCitationTexts(weird), false);
+        assert.strictEqual(weird.citationsByIndex[1].text, RAW);
+
+        // Per-field path skips a format-less session too.
+        const s = { citationsByIndex: { 1: citation(1, [journal]) } };
+        assert.strictEqual(await runPatch(s, s.citationsByIndex[1], RAW), RAW);
+
+        // Happy path reports success — this is what arms the setText
+        // short-circuit flag in the _updateDocument wrapper.
+        const ok = { outputFormat: "rtf", citationsByIndex: { 1: citation(1, [journal]) } };
+        ok.citationsByIndex[1].text = RAW;
+        assert.strictEqual(BCF.patch._prepareCitationTexts(ok), true);
+    }
+
+    {
+        // patch.run requires an ACTIVE command. In current Zotero,
+        // execCommand's cleanup clears only currentDoc/currentWindow —
+        // currentSession persists after the command ends — so a truthy
+        // currentSession without currentDoc is stale state and must pass
+        // through untouched.
+        const journal = cit(
+            "AS1", "Smith", "Stale Piece", "Stale Piece",
+            undefined, undefined, { type: "article-journal", volume: "2024" }
+        );
+        const RAW = "John Smith, Stale Piece, 2024 Yale L.J. 55 (2024)";
+        const session = {
+            outputFormat: "rtf",
+            citationsByIndex: { 1: citation(1, [journal]) }
+        };
+        const field = {
+            async getCode() {
+                return "ADDIN ZOTERO_ITEM CSL_CITATION " +
+                    JSON.stringify(session.citationsByIndex[1]);
+            }
+        };
+        Zotero.Integration.currentSession = session;
+        Zotero.Integration.currentDoc = false;
+        try {
+            assert.strictEqual(await BCF.patch.run(field, RAW), RAW);
+        } finally {
+            Zotero.Integration.currentSession = null;
+        }
+    }
+
+    {
+        // Lifecycle: install on fully stubbed Integration seams, then verify
+        // (a) the prewrite short-circuit flag arms only when the prepare pass
+        // succeeds, and (b) uninstall restores only methods still holding OUR
+        // wrapper — an overwrapping third-party patch is left in place.
+        const Integration = Zotero.Integration;
+        const savedField = Integration.Field;
+        const savedSession = Integration.Session;
+        const savedExec = Integration.execCommand;
+
+        const origSetText = function (t) { return "orig:" + t; };
+        const origExec = async function () { return "exec"; };
+        let flagSeen = null;
+        const origUpdate = async function () { return "update"; };
+        const origDelayed = async function () { return "delayed"; };
+        const origInternal = async function () {
+            flagSeen = this.__bcfPrewriteActive;
+            return "internal";
+        };
+
+        Integration.Field = function () {};
+        Integration.Field.prototype.setText = origSetText;
+        Integration.Session = function () {};
+        Integration.Session.prototype.updateDocument = origUpdate;
+        Integration.Session.prototype.writeDelayedCitation = origDelayed;
+        Integration.Session.prototype._updateDocument = origInternal;
+        Integration.execCommand = origExec;
+
+        BCF.patch.install();
+        assert.strictEqual(BCF.patch._needsInstall(), false);
+        assert.notStrictEqual(Integration.Field.prototype.setText, origSetText);
+
+        const journal = cit(
+            "LC1", "Smith", "Life Piece", "Life Piece",
+            undefined, undefined, { type: "article-journal", volume: "2024" }
+        );
+
+        // (a) success arms the flag (and the wrapper's finally clears it)...
+        const okSession = {
+            outputFormat: "rtf",
+            citationsByIndex: { 1: citation(1, [journal]) }
+        };
+        okSession.citationsByIndex[1].text = "x";
+        assert.strictEqual(
+            await Integration.Session.prototype._updateDocument.call(okSession),
+            "internal");
+        assert.strictEqual(flagSeen, true);
+        assert.strictEqual(okSession.__bcfPrewriteActive, false);
+
+        // ...a gated skip leaves it off...
+        flagSeen = null;
+        const htmlSession = {
+            outputFormat: "html",
+            citationsByIndex: { 1: citation(1, [journal]) }
+        };
+        await Integration.Session.prototype._updateDocument.call(htmlSession);
+        assert(!flagSeen);
+
+        // ...and a prepare-pass crash leaves it off without breaking the
+        // document update.
+        flagSeen = null;
+        const savedPrepare = BCF.patch._prepareCitationTexts;
+        BCF.patch._prepareCitationTexts = function () { throw new Error("boom"); };
+        try {
+            assert.strictEqual(
+                await Integration.Session.prototype._updateDocument.call(okSession),
+                "internal");
+        } finally {
+            BCF.patch._prepareCitationTexts = savedPrepare;
+        }
+        assert(!flagSeen);
+
+        // (b) a third-party wrapper installed on top of ours survives
+        // uninstall; everything still holding our wrapper is restored.
+        const foreign = function () {};
+        Integration.Field.prototype.setText = foreign;
+        BCF.patch.uninstall();
+        assert.strictEqual(Integration.Field.prototype.setText, foreign);
+        assert.strictEqual(Integration.execCommand, origExec);
+        assert.strictEqual(Integration.Session.prototype.updateDocument, origUpdate);
+        assert.strictEqual(Integration.Session.prototype.writeDelayedCitation, origDelayed);
+        assert.strictEqual(Integration.Session.prototype._updateDocument, origInternal);
+
+        Integration.Field = savedField;
+        Integration.Session = savedSession;
+        Integration.execCommand = savedExec;
     }
 
     console.log("bluebook-citations-fixer node tests passed");

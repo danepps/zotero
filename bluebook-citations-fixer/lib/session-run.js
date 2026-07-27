@@ -120,6 +120,17 @@ BCF.run._build = function (session) {
     var liveHadData = 0;
     var noData = 0;
     var opts = BCF.run.options();
+    var fetchedByID = new Map();        // item id -> CSL data or null (misses cached too):
+                                        // a source cited N times converts once per build
+
+    var fetchOnce = function (citItem) {
+        var fid = citItem && citItem.id != null ? citItem.id : null;
+        if (fid == null) return BCF.run._fetchLibraryData(citItem);
+        if (fetchedByID.has(fid)) return fetchedByID.get(fid);
+        var fetched = BCF.run._fetchLibraryData(citItem);
+        fetchedByID.set(fid, fetched);
+        return fetched;
+    };
 
     var citations = BCF.run.citationsInOrder(session);
     for (var i = 0; i < citations.length; i++) {
@@ -136,7 +147,7 @@ BCF.run._build = function (session) {
             // without the user needing to re-insert the citation. The itemData
             // embedded in the field-code snapshot is used only as a fallback
             // when the live fetch fails (item deleted, unavailable, etc.).
-            var freshData = BCF.run._fetchLibraryData(ci_);
+            var freshData = fetchOnce(ci_);
             if (freshData) {
                 data = freshData;
                 enriched++;
