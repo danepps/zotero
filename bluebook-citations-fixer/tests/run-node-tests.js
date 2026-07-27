@@ -40,6 +40,7 @@ load("lib/features/book-at.js");
 load("lib/features/id-suppress.js");
 load("lib/features/registry.js");
 load("lib/patch.js");
+load("lib/style-sync.js");
 
 const BCF = context.BCF;
 const Zotero = context.Zotero;
@@ -2005,6 +2006,220 @@ const NOID = String.fromCharCode(0x200B);
             assert(BCF.patch._styleAllowed({ data: { style: { styleID: MAIN } } }));
             assert(!BCF.patch._styleAllowed({ data: { style: { styleID: "(none)" } } }));
             assert(!BCF.patch._styleAllowed({ data: { style: { styleID: APA } } }));
+        });
+    }
+
+    {
+        // Style sync (lib/style-sync.js): keep the installed Epps Bluebook
+        // styles current. All Zotero access is injected via a deps object, so
+        // the decision logic runs here without Zotero.HTTP/Styles.
+        const sync = BCF.styleSync;
+        const [MAIN, EXPERIMENTAL] = sync.styleIDs();
+        assert.strictEqual(MAIN, "https://danepps.github.io/bluebook/BluebookDSEStyle.csl");
+        assert.strictEqual(EXPERIMENTAL, "https://danepps.github.io/bluebook/BluebookDSEStyle-Experimental.csl");
+
+        const csl = (updated) =>
+            `<?xml version="1.0" encoding="utf-8"?><style xmlns="http://purl.org/net/xbiblio/csl">` +
+            `<info><title>T</title><updated>${updated}</updated></info></style>`;
+
+        // Stub deps recording fetch/install calls. `styles` maps id -> Style
+        // object; missing ids are "not installed".
+        function syncDeps(o) {
+            const calls = { fetch: [], install: [] };
+            const deps = {
+                now: () => (o.now !== undefined ? o.now : 1750000000000),
+                getStyle: async (id) => (o.styles && id in o.styles) ? o.styles[id] : null,
+                fetch: async (id) => {
+                    calls.fetch.push(id);
+                    if (o.fetchError) throw new Error("network down");
+                    return o.csl !== undefined ? o.csl : "";
+                },
+                install: async (id) => {
+                    calls.install.push(id);
+                    if (o.installError) throw new Error("install failed");
+                }
+            };
+            return { deps, calls };
+        }
+
+        // Async-safe pref stub with a set() recorder (withPrefs restores in a
+        // sync finally, too early for awaited bodies).
+        async function withPrefsRW(prefs, fn) {
+            const prev = Zotero.Prefs;
+            const writes = {};
+            Zotero.Prefs = {
+                get(name) {
+                    if (Object.prototype.hasOwnProperty.call(prefs, name)) return prefs[name];
+                    throw new Error("unset pref " + name);
+                },
+                set(name, value) { writes[name] = value; }
+            };
+            try { return await fn(writes); } finally { Zotero.Prefs = prev; }
+        }
+
+        // parseUpdated: RFC3339 in both offset spellings, junk, absence.
+        assert.strictEqual(sync.parseUpdated(csl("2025-06-01T00:00:00Z")),
+            Date.parse("2025-06-01T00:00:00Z"));
+        assert.strictEqual(sync.parseUpdated(csl("2025-06-01T00:00:00+00:00")),
+            Date.parse("2025-06-01T00:00:00Z"));
+        assert.strictEqual(sync.parseUpdated(csl("  2025-06-01T00:00:00Z  ")),
+            Date.parse("2025-06-01T00:00:00Z"));
+        assert.strictEqual(sync.parseUpdated("<style><info></info></style>"), null);
+        assert.strictEqual(sync.parseUpdated(csl("not a date")), null);
+        assert.strictEqual(sync.parseUpdated(null), null);
+        assert.strictEqual(sync.parseUpdated(42), null);
+
+        // localUpdated: defensive against absent/garbage `updated`.
+        assert.strictEqual(sync.localUpdated({ updated: "2024-01-01T00:00:00Z" }),
+            Date.parse("2024-01-01T00:00:00Z"));
+        assert.strictEqual(sync.localUpdated({ updated: "garbage" }), null);
+        assert.strictEqual(sync.localUpdated({}), null);
+        assert.strictEqual(sync.localUpdated(null), null);
+
+        // isRemoteNewer: strictly newer only; equality and unknowns => false.
+        assert.strictEqual(sync.isRemoteNewer(2, 1), true);
+        assert.strictEqual(sync.isRemoteNewer(1, 1), false);
+        assert.strictEqual(sync.isRemoteNewer(1, 2), false);
+        assert.strictEqual(sync.isRemoteNewer(null, 1), false);
+        assert.strictEqual(sync.isRemoteNewer(1, null), false);
+        assert.strictEqual(sync.isRemoteNewer(NaN, 1), false);
+
+        const OLD = { updated: "2024-01-01T00:00:00Z" };
+
+        // Remote newer -> install called for both styles.
+        await withPrefsRW({}, async () => {
+            const { deps, calls } = syncDeps({
+                styles: { [MAIN]: OLD, [EXPERIMENTAL]: OLD },
+                csl: csl("2025-06-01T00:00:00Z")
+            });
+            const res = await sync.check(deps);
+            assert.deepStrictEqual(calls.install, [MAIN, EXPERIMENTAL]);
+            assert.strictEqual(res.counts.updated, 2);
+            assert.strictEqual(sync.summaryLabel(res), "Updated to 2025-06-01");
+        });
+
+        // Remote equal -> no install ("up to date"); older remote likewise.
+        for (const remote of ["2024-01-01T00:00:00Z", "2020-01-01T00:00:00Z"]) {
+            await withPrefsRW({}, async () => {
+                const { deps, calls } = syncDeps({
+                    styles: { [MAIN]: OLD, [EXPERIMENTAL]: OLD },
+                    csl: csl(remote)
+                });
+                const res = await sync.check(deps);
+                assert.strictEqual(calls.install.length, 0);
+                assert.strictEqual(res.counts.upToDate, 2);
+                assert.strictEqual(sync.summaryLabel(res), "Up to date");
+            });
+        }
+
+        // Style not installed -> skipped WITHOUT a fetch, never installed.
+        await withPrefsRW({}, async () => {
+            const { deps, calls } = syncDeps({ styles: {} });
+            const res = await sync.check(deps);
+            assert.strictEqual(calls.fetch.length, 0);
+            assert.strictEqual(calls.install.length, 0);
+            assert.strictEqual(res.counts.notInstalled, 2);
+            assert.strictEqual(sync.summaryLabel(res), "Epps Bluebook styles not installed");
+        });
+
+        // Fetch failure -> resolves (never rejects), "failed", no install.
+        await withPrefsRW({}, async () => {
+            const { deps, calls } = syncDeps({
+                styles: { [MAIN]: OLD, [EXPERIMENTAL]: OLD },
+                fetchError: true
+            });
+            const res = await sync.check(deps);
+            assert.strictEqual(calls.install.length, 0);
+            assert.strictEqual(res.counts.failed, 2);
+            assert.strictEqual(sync.summaryLabel(res), "Check failed");
+        });
+
+        // Malformed remote CSL -> skipped, no install.
+        await withPrefsRW({}, async () => {
+            const { deps, calls } = syncDeps({
+                styles: { [MAIN]: OLD, [EXPERIMENTAL]: OLD },
+                csl: "<style>no updated element</style>"
+            });
+            const res = await sync.check(deps);
+            assert.strictEqual(calls.install.length, 0);
+            assert.strictEqual(res.counts.skipped, 2);
+        });
+
+        // Unreadable local `updated` -> skipped before any fetch.
+        await withPrefsRW({}, async () => {
+            const { deps, calls } = syncDeps({
+                styles: { [MAIN]: { updated: "garbage" }, [EXPERIMENTAL]: {} },
+                csl: csl("2025-06-01T00:00:00Z")
+            });
+            const res = await sync.check(deps);
+            assert.strictEqual(calls.fetch.length, 0);
+            assert.strictEqual(calls.install.length, 0);
+            assert.strictEqual(res.counts.skipped, 2);
+        });
+
+        // Install failure -> "failed", silent (check still resolves).
+        await withPrefsRW({}, async () => {
+            const { deps } = syncDeps({
+                styles: { [MAIN]: OLD, [EXPERIMENTAL]: OLD },
+                csl: csl("2025-06-01T00:00:00Z"),
+                installError: true
+            });
+            const res = await sync.check(deps);
+            assert.strictEqual(res.counts.failed, 2);
+            assert.strictEqual(sync.summaryLabel(res), "Check failed");
+        });
+
+        // lastCheck written after a run — as a string, success or failure.
+        await withPrefsRW({}, async (writes) => {
+            const { deps } = syncDeps({ styles: {}, now: 1234567890123 });
+            await sync.check(deps);
+            assert.strictEqual(writes[sync.PREF_LAST_CHECK], "1234567890123");
+        });
+        await withPrefsRW({}, async (writes) => {
+            const { deps } = syncDeps({
+                styles: { [MAIN]: OLD, [EXPERIMENTAL]: OLD },
+                fetchError: true,
+                now: 999
+            });
+            await sync.check(deps);
+            assert.strictEqual(writes[sync.PREF_LAST_CHECK], "999");
+        });
+
+        // Startup throttle (shouldCheck). Unset prefs -> defaults (enabled,
+        // never checked) -> due. Manual button never consults this.
+        const NOW = 1750000000000;
+        const H = 3600 * 1000;
+        withPrefs({}, () => assert.strictEqual(sync.shouldCheck(NOW), true));
+        withPrefs({ [sync.PREF_LAST_CHECK]: String(NOW - H) },
+            () => assert.strictEqual(sync.shouldCheck(NOW), false));
+        withPrefs({ [sync.PREF_LAST_CHECK]: String(NOW - 25 * H) },
+            () => assert.strictEqual(sync.shouldCheck(NOW), true));
+        // Clock rollback: a future lastCheck must not disable sync forever.
+        withPrefs({ [sync.PREF_LAST_CHECK]: String(NOW + H) },
+            () => assert.strictEqual(sync.shouldCheck(NOW), true));
+        withPrefs({ [sync.PREF_ENABLED]: false, [sync.PREF_LAST_CHECK]: "0" },
+            () => assert.strictEqual(sync.shouldCheck(NOW), false));
+
+        // Reentrancy: concurrent check() calls share one run; the deps of the
+        // second caller are ignored. A later call starts a fresh run.
+        await withPrefsRW({}, async () => {
+            let release;
+            const gate = new Promise((resolve) => { release = resolve; });
+            const calls = { fetch: 0 };
+            const deps = {
+                now: () => 1,
+                getStyle: async () => OLD,
+                fetch: async () => { calls.fetch++; await gate; return csl("2024-01-01T00:00:00Z"); },
+                install: async () => {}
+            };
+            const p1 = sync.check(deps);
+            const p2 = sync.check(deps);
+            assert.strictEqual(p1, p2);
+            release();
+            const res = await p1;
+            assert.strictEqual(calls.fetch, 2);      // one per style, not four
+            assert.strictEqual(res.counts.upToDate, 2);
+            assert.strictEqual(sync._inFlight, null); // cleared; next call is fresh
         });
     }
 
