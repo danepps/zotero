@@ -32,6 +32,10 @@ Feasibility anchors already in the codebase:
 - `lib/patch.js:31-38` has the one-shot `nsITimer` pattern to defer work off startup.
 - `lib/session-run.js:36-49` has the pref-read pattern (try/catch + hardcoded fallback,
   Node-harness safe).
+- **Verified against the local style repo** (`~/ClaudeCode/bluebook`): both styles carry
+  `<updated>2026-05-31T00:00:00+00:00</updated>` at line 26 — the `+hh:mm` RFC3339
+  offset form, not `Z`. `Date.parse` handles both; the parse tests below cover both
+  forms, and the `+00:00` case is the one production data actually exercises.
 
 ## 1. New file: `bluebook-citations-fixer/lib/style-sync.js`
 
@@ -342,6 +346,18 @@ out 24h) and works regardless of the enable pref.
 - **Startup cost:** two sync pref reads; network deferred 60s behind a one-shot nsITimer.
 - **Shutdown:** timer cancelled; in-flight check settles on captured locals.
 - **lastCheck written on failed runs too** — no every-launch retry on a dead network.
+- **Propagation to open documents:** an integration session keeps its citeproc engine
+  until the style ID changes or Document Preferences resets it, so an already-open Word
+  session renders with the pre-update style until the next session rebuild. Acceptable —
+  the next insert/refresh command after reopening picks up the new style; document, don't
+  engineer around it. (Same cache anatomy as the et-al override plan's propagation
+  section — if both features ship in 2.0, style install already produces fresh `Style`
+  objects with empty `_cachedEngines`, so the et-al XML rewrite re-applies naturally on
+  the rebuilt engine; no extra coordination needed.)
+- **Locally edited style copies:** the strictly-newer compare protects a hand-edited
+  local copy whose `<updated>` still equals the remote's (equal → no install). If a
+  newer remote is published, it overwrites local edits — by design; these are the
+  user's own published styles.
 
 ## 6. Docs (same commit, per CLAUDE.md rules)
 
@@ -366,15 +382,18 @@ out 24h) and works regardless of the enable pref.
 4. `prefs.xhtml` groupbox + `prefs-pane.js` `wireStyleSync()`
 5. Node tests
 6. Docs (CLAUDE.md + AGENTS.md + plugin README)
-7. Test build, commit, push to `claude/citations-epps-bbook-sync-s0bmdy`, open draft PR
+7. Test build, commit, push to the **`v2.0` branch** (the shared 2.0 feature branch —
+   features accumulate there and ship together as the 2.0 release; no per-feature PR)
 
 ## 8. Verification
 
 1. **Node tests:** `node bluebook-citations-fixer/tests/run-node-tests.js` → prints
    `bluebook-citations-fixer node tests passed`, exit 0.
 2. **Test XPI** per dev convention (last release is 1.3.1, so the 4-component version):
-   `./bluebook-citations-fixer/build.sh 1.3.1.1`; confirm `style-sync.js` is in the zip
-   (`unzip -l`); `git add -f` the XPI on the dev branch for side-loading.
+   `./bluebook-citations-fixer/build.sh 1.3.1.1` — or the next free fourth component if
+   earlier 2.0-branch features already used `1.3.1.1`, `1.3.1.2`, …; confirm
+   `style-sync.js` is in the zip (`unzip -l`); `git add -f` the XPI on the `v2.0` branch
+   for side-loading.
 3. **Manual in Zotero** (user-side; documented in the PR):
    - Install the XPI, set `extensions.bluebook-citations-fixer.diag = true`, restart →
      diag shows `startup check scheduled (+60000ms)`, then per-style
