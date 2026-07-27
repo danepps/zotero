@@ -1,5 +1,18 @@
 # Style Sync: auto-update the Epps Bluebook CSL styles
 
+> **Revised 2026-07-27** after the external review in
+> [`2.0-plan-review.md`](./2.0-plan-review.md) (findings verified against
+> `zotero/zotero@main`). Adopted deltas an implementer must apply on top of this plan:
+> single-fetch + explicit `Zotero.Styles.validate()` + `<id>` check + install via
+> `{string}` (not `{url}`); two-tier failure contract (pre-install: local style
+> untouched; install-stage: best-effort); await `Zotero.Integration.currentCommandPromise`
+> before installing; a lifecycle **generation token** so `cancel()`/shutdown prevents
+> any new install (timer cancellation alone is not enough); honest mixed-result status
+> labels (partial failure must not be masked by "Updated…"); `styleIDs()` sources only
+> `BCF.patch.BUILTIN_STYLE_IDS` (no duplicate fallback list — log + empty on absence);
+> expose a **minimal** pane bridge (check + summary functions), not the whole `BCF`
+> namespace. Corrected/superseded passages below are marked inline.
+
 ## Context
 
 The bluebook-citations-fixer style gate (`lib/patch.js:_styleAllowed`) compares style IDs
@@ -338,22 +351,28 @@ out 24h) and works regardless of the enable pref.
 
 - **Equality:** `remote === local` → no install (strictly-newer only).
 - **Timestamps:** anything unparseable on either side → skip that style; never guess.
-- **`Zotero.Styles.install({url}, url, true)`:** re-downloads the CSL itself; the tiny
-  window where the remote changes between check-fetch and install-fetch is harmless
-  (we'd install something even newer).
+- **~~`Zotero.Styles.install({url}, url, true)`~~ SUPERSEDED (2026-07-27 review):**
+  the two-fetch design is out. Fetch once, `Zotero.Styles.validate()` the text, require
+  an exact `<id>` match, then install the already-validated bytes via
+  `Zotero.Styles.install({ string: remoteText }, id, true)` — with `silent=true` the
+  installer otherwise proceeds past validation errors, and it removes the existing style
+  file before writing. See `2.0-plan-review.md` §"Style sync cannot currently guarantee
+  local-style preservation".
 - **Remote 404 / network down:** `"failed"`, logged, local style **never** touched.
 - **Missing style:** `"not-installed"`, no fetch, no install.
 - **Startup cost:** two sync pref reads; network deferred 60s behind a one-shot nsITimer.
 - **Shutdown:** timer cancelled; in-flight check settles on captured locals.
 - **lastCheck written on failed runs too** — no every-launch retry on a dead network.
-- **Propagation to open documents:** an integration session keeps its citeproc engine
-  until the style ID changes or Document Preferences resets it, so an already-open Word
-  session renders with the pre-update style until the next session rebuild. Acceptable —
-  the next insert/refresh command after reopening picks up the new style; document, don't
-  engineer around it. (Same cache anatomy as the et-al override plan's propagation
-  section — if both features ship in 2.0, style install already produces fresh `Style`
-  objects with empty `_cachedEngines`, so the et-al XML rewrite re-applies naturally on
-  the rebuilt engine; no extra coordination needed.)
+- **Propagation to open documents (CORRECTED 2026-07-27 — the original claim here was
+  wrong):** Zotero propagates automatically. `Styles.install` → `reinit` → `init` calls
+  `Zotero.Integration.resetSessionStyles()` (integration.js:225, style.js:162), which
+  rebuilds every open session's engine via `session.setData(session.data, true)`. So
+  there is **no** stale-style gap — but there **is** a race: an install can swap a
+  session's engine mid-Word-command. The installation step must therefore await
+  `Zotero.Integration.currentCommandPromise` (checking `Zotero.Integration.currentDoc`)
+  and re-verify cancellation/lifetime after the wait. Fetch/validate may run anytime;
+  only the install waits. (Et-al interaction still composes: the rebuilt engines go
+  through `getCiteProc`, so the XML override re-applies with no extra coordination.)
 - **Locally edited style copies:** the strictly-newer compare protects a hand-edited
   local copy whose `<updated>` still equals the remote's (equal → no install). If a
   newer remote is published, it overwrites local edits — by design; these are the

@@ -1,5 +1,20 @@
 # Plan: Evaluate user-configurable "et al." thresholds (overriding the installed style)
 
+> **Status note (2026-07-27):** this document is still a *feasibility-study plan* — its
+> deliverable is a research doc, not code. Before building the 2.0 feature, rewrite it
+> as an implementation plan per [`2.0-plan-review.md`](./2.0-plan-review.md)
+> §"Configurable et al." Adopted decisions that supersede passages below: **never
+> delete `Zotero.Integration.sessions` entries** — propagation is `clearEngineCache()`
+> + `await Zotero.Integration.resetSessionStyles()` (sessions never pass `cache` to
+> `getCiteProc`, so the global engine cache isn't the issue this plan assumed); the
+> global `getCiteProc` hook **fails closed** on an unreadable styleID (unlike the
+> RTF-chain gate); initial scope is the built-in Epps styles only; prefer a single
+> `et-al-min` pref (3/4/5 or "use style default") with `use-first` fixed at 1; the
+> override applies in **all output formats** (it changes citeproc input, not RTF); the
+> XML rewriter needs a dependency-injected parse/serialize seam (the node harness has
+> no `DOMParser`). The obsolete separate-branch/draft-PR step is void — work lands on
+> `v2.0`.
+
 ## Context
 
 The user wants an evaluation of a feature that would let them change the "et al." thresholds — CSL's `et-al-min` (how many authors trigger truncation) and `et-al-use-first` (how many names to keep) — from the **bluebook-citations-fixer settings pane**, overriding whatever the installed CSL style hardcodes. Today those values are baked into the Epps Bluebook style's XML; changing them means editing/forking the style. Bluebook Rule 15.1 genuinely permits either "first author et al." or listing all authors for 3+ author works, so this is a legitimate user preference, not a correctness fix.
