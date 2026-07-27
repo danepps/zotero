@@ -124,12 +124,30 @@ async function startup(data) {
         load("lib/features/id-suppress.js");
         load("lib/features/registry.js");
         load("lib/patch.js");
+        // After patch.js: style-sync reads BCF.patch.BUILTIN_STYLE_IDS as the
+        // single source of truth for which styles it may update.
+        load("lib/style-sync.js");
+
+        // Minimal bridge for the Settings pane script, which runs in its own
+        // Cu.Sandbox and cannot see this BCF. Deliberately two functions, not
+        // the namespace — the pane has no business reaching into internals.
+        try {
+            // Capture the module: the pane can call this after a teardown has
+            // already nulled BCF.
+            var sync = BCF.styleSync;
+            BCF.paneAPI = {
+                checkStyleUpdates: function () { return sync.check(); },
+                styleUpdateSummary: function (res) { return sync.summaryLabel(res); }
+            };
+            Zot.BluebookCitationsFixer = BCF.paneAPI;
+        } catch (_) {}
 
         BCF.diag.init();
         BCF.diag.event("startup", "loaded");
         BCF.patch.install();
         BCF.dialog.install();
         _registerPrefsPane(Zot, rootURI);
+        BCF.styleSync.scheduleStartupCheck();
 
         try { Zot.debug("[bluebook-citations-fixer] startup complete"); } catch (_) {}
     } catch (e) {
@@ -164,12 +182,23 @@ async function startup(data) {
 }
 
 function shutdown() {
+    // First: stop the startup timer and bump the generation token so any
+    // in-flight check can no longer begin a style installation.
+    try { if (BCF && BCF.styleSync) BCF.styleSync.cancel(); } catch (_) {}
     try { if (BCF && BCF.dialog) BCF.dialog.uninstall(); } catch (_) {}
     try { if (BCF && BCF.patch) BCF.patch.uninstall(); } catch (_) {}
     try {
         if (BCF && BCF.prefsPaneID && BCF.Zotero && BCF.Zotero.PreferencePanes &&
                 typeof BCF.Zotero.PreferencePanes.unregister === "function") {
             BCF.Zotero.PreferencePanes.unregister(BCF.prefsPaneID);
+        }
+    } catch (_) {}
+    // Remove the pane bridge only if it's still the exact object we installed:
+    // an upgrade-in-place may already have swapped in the new instance's.
+    try {
+        if (BCF && BCF.Zotero && BCF.paneAPI &&
+                BCF.Zotero.BluebookCitationsFixer === BCF.paneAPI) {
+            delete BCF.Zotero.BluebookCitationsFixer;
         }
     } catch (_) {}
     BCF = null;

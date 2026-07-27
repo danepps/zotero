@@ -50,6 +50,21 @@
     </hbox>
   </groupbox>
   <groupbox>
+    <label><html:h2>Style updates</html:h2></label>
+    <description>
+      Automatically keeps your installed copies of the Epps Bluebook styles up
+      to date. Only styles you already have installed are updated; nothing is
+      installed automatically.
+    </description>
+    <checkbox id="bcf-style-sync-enabled"
+              preference="extensions.bluebook-citations-fixer.styleSync"
+              label="Automatically update the Epps Bluebook styles when a newer version is published"/>
+    <hbox align="center">
+      <button id="bcf-style-sync-check" label="Check for style updates"/>
+      <label id="bcf-style-sync-status" value=""/>
+    </hbox>
+  </groupbox>
+  <groupbox>
     <label><html:h2>About</html:h2></label>
     <description>
       Bluebook Citations Fixer was created by Dan Epps.

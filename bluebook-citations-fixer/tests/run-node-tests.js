@@ -41,6 +41,7 @@ load("lib/features/book-at.js");
 load("lib/features/id-suppress.js");
 load("lib/features/registry.js");
 load("lib/patch.js");
+load("lib/style-sync.js");
 
 const BCF = context.BCF;
 const Zotero = context.Zotero;
@@ -202,6 +203,22 @@ function withPrefs(prefs, fn) {
         }
     };
     try { return fn(); } finally { Zotero.Prefs = prev; }
+}
+
+// Async sibling of withPrefs that also records writes. `fn` receives the
+// recorded [name, value] pairs; values written are visible to later reads, so
+// a run's lastCheck stamp can be asserted on directly.
+async function withPrefsAsync(prefs, fn) {
+    const prev = Zotero.Prefs;
+    const writes = [];
+    Zotero.Prefs = {
+        get(name) {
+            if (Object.prototype.hasOwnProperty.call(prefs, name)) return prefs[name];
+            throw new Error("unset pref " + name);
+        },
+        set(name, value) { writes.push([name, value]); prefs[name] = value; }
+    };
+    try { return await fn(writes); } finally { Zotero.Prefs = prev; }
 }
 
 {
@@ -2159,6 +2176,422 @@ const NOID = String.fromCharCode(0x200B);
         Integration.Field = savedField;
         Integration.Session = savedSession;
         Integration.execCommand = savedExec;
+    }
+
+    // -----------------------------------------------------------------------
+    // style-sync: keep the installed Epps Bluebook styles current.
+    // -----------------------------------------------------------------------
+
+    // The two hard-wired built-ins; style-sync must source them from
+    // BCF.patch.BUILTIN_STYLE_IDS and nowhere else.
+    const SS_IDS = BCF.styleSync.styleIDs();
+    const SS_MAIN = SS_IDS[0];
+    const SS_EXP = SS_IDS[1];
+    const SS_LOCAL = "2026-05-31T00:00:00+00:00";
+    const SS_NEWER = "2026-06-15T00:00:00+00:00";
+    const SS_OLDER = "2025-01-02T00:00:00+00:00";
+    const SS_NOW = 1750000000000;
+
+    // Minimal CSL document: the <id> and <updated> elements are all the
+    // checker reads before validation.
+    const cslDoc = (id, updated) =>
+        `<?xml version="1.0"?><style><info><id>${id}</id>` +
+        `<updated>${updated}</updated></info></style>`;
+
+    // Both built-ins installed, carrying the same local <updated>.
+    const installedAt = (updated) => {
+        const styles = {};
+        SS_IDS.forEach((id) => { styles[id] = { styleID: id, updated }; });
+        return styles;
+    };
+
+    // Stub deps recording every call. Anything not supplied falls back to a
+    // benign default; BCF.styleSync._mergeDeps only replaces functions, so the
+    // real Zotero-touching implementations are never reached here.
+    function syncDeps(o) {
+        o = o || {};
+        const calls = { getStyle: [], fetch: [], validate: [], install: [] };
+        const deps = {
+            now: () => (o.now !== undefined ? o.now : SS_NOW),
+            getStyle: async (id) => {
+                calls.getStyle.push(id);
+                return (o.styles && Object.prototype.hasOwnProperty.call(o.styles, id))
+                    ? o.styles[id] : null;
+            },
+            fetch: async (id) => {
+                calls.fetch.push(id);
+                if (o.onFetch) await o.onFetch(id);
+                if (o.fetchError) throw new Error("network down");
+                return typeof o.csl === "function" ? o.csl(id)
+                    : (o.csl !== undefined ? o.csl : cslDoc(id, SS_NEWER));
+            },
+            validate: async (text) => {
+                calls.validate.push(text);
+                if (o.onValidate) await o.onValidate(text);
+                if (o.validateError) throw new Error("invalid CSL");
+            },
+            commandActive: () => !!o.commandActive,
+            commandPromise: () => (o.commandPromise ? o.commandPromise() : Promise.resolve()),
+            install: async (id, text) => {
+                calls.install.push([id, text]);
+                if (o.onInstall) o.onInstall(id, text);
+                if (o.installError) throw new Error("install failed");
+            }
+        };
+        return { deps, calls };
+    }
+
+    {
+        // parseUpdated: both RFC3339 offset forms (the published styles use
+        // "+00:00"), surrounding whitespace, and every unusable input.
+        assert.strictEqual(
+            BCF.styleSync.parseUpdated(cslDoc(SS_MAIN, "2026-05-31T00:00:00Z")),
+            Date.parse("2026-05-31T00:00:00Z"));
+        assert.strictEqual(
+            BCF.styleSync.parseUpdated(cslDoc(SS_MAIN, "2026-05-31T00:00:00+00:00")),
+            Date.parse("2026-05-31T00:00:00Z"));
+        assert.strictEqual(
+            BCF.styleSync.parseUpdated("<updated>\n  2026-05-31T00:00:00Z  \n</updated>"),
+            Date.parse("2026-05-31T00:00:00Z"));
+        assert.strictEqual(BCF.styleSync.parseUpdated("<style><info></info></style>"), null);
+        assert.strictEqual(BCF.styleSync.parseUpdated("<updated>not a date</updated>"), null);
+        assert.strictEqual(BCF.styleSync.parseUpdated(null), null);
+        assert.strictEqual(BCF.styleSync.parseUpdated(undefined), null);
+        assert.strictEqual(BCF.styleSync.parseUpdated(42), null);
+
+        // parseStyleID reads the first <id> element, trimmed.
+        assert.strictEqual(BCF.styleSync.parseStyleID(cslDoc(SS_MAIN, SS_LOCAL)), SS_MAIN);
+        assert.strictEqual(BCF.styleSync.parseStyleID("<style/>"), null);
+        assert.strictEqual(BCF.styleSync.parseStyleID(null), null);
+
+        // localUpdated: parseable -> ms; anything else -> null (never install
+        // on an indeterminate comparison).
+        assert.strictEqual(BCF.styleSync.localUpdated({ updated: SS_LOCAL }),
+            Date.parse(SS_LOCAL));
+        assert.strictEqual(BCF.styleSync.localUpdated({ updated: "garbage" }), null);
+        assert.strictEqual(BCF.styleSync.localUpdated({}), null);
+        assert.strictEqual(BCF.styleSync.localUpdated(null), null);
+    }
+
+    {
+        // isRemoteNewer is STRICTLY newer: equal must not reinstall (Zotero
+        // rewrites the file on install, so >= would loop forever).
+        const older = Date.parse(SS_OLDER);
+        const local = Date.parse(SS_LOCAL);
+        const newer = Date.parse(SS_NEWER);
+        assert.strictEqual(BCF.styleSync.isRemoteNewer(newer, local), true);
+        assert.strictEqual(BCF.styleSync.isRemoteNewer(local, local), false);
+        assert.strictEqual(BCF.styleSync.isRemoteNewer(older, local), false);
+        assert.strictEqual(BCF.styleSync.isRemoteNewer(null, local), false);
+        assert.strictEqual(BCF.styleSync.isRemoteNewer(newer, null), false);
+        assert.strictEqual(BCF.styleSync.isRemoteNewer(NaN, local), false);
+        assert.strictEqual(BCF.styleSync.isRemoteNewer(newer, NaN), false);
+        assert.strictEqual(BCF.styleSync.isRemoteNewer(Infinity, local), false);
+    }
+
+    {
+        // Remote strictly newer: both styles install, and the bytes installed
+        // are byte-identical to the bytes fetched and validated (no second
+        // download can slip different content in).
+        const fetched = {};
+        const { deps, calls } = syncDeps({
+            styles: installedAt(SS_LOCAL),
+            csl: (id) => {
+                const text = cslDoc(id, SS_NEWER);
+                fetched[id] = text;
+                return text;
+            }
+        });
+        const res = await BCF.styleSync.check(deps);
+        assert.strictEqual(res.counts.updated, 2);
+        assert.strictEqual(calls.install.length, 2);
+        calls.install.forEach(([id, text]) => {
+            assert.strictEqual(text, fetched[id]);
+            assert(calls.validate.indexOf(text) !== -1);
+        });
+        assert.strictEqual(BCF.styleSync.summaryLabel(res), "Updated 2 styles");
+    }
+
+    {
+        // Remote equal -> no install (strictly newer only).
+        const { deps, calls } = syncDeps({
+            styles: installedAt(SS_LOCAL),
+            csl: (id) => cslDoc(id, SS_LOCAL)
+        });
+        const res = await BCF.styleSync.check(deps);
+        assert.strictEqual(res.counts.upToDate, 2);
+        assert.strictEqual(calls.install.length, 0);
+        assert.strictEqual(BCF.styleSync.summaryLabel(res), "Up to date");
+    }
+
+    {
+        // Remote older -> no install.
+        const { deps, calls } = syncDeps({
+            styles: installedAt(SS_LOCAL),
+            csl: (id) => cslDoc(id, SS_OLDER)
+        });
+        const res = await BCF.styleSync.check(deps);
+        assert.strictEqual(res.counts.upToDate, 2);
+        assert.strictEqual(calls.install.length, 0);
+    }
+
+    {
+        // Style not installed -> never auto-installed, and no network round
+        // trip wasted on it.
+        const { deps, calls } = syncDeps({ styles: {} });
+        const res = await BCF.styleSync.check(deps);
+        assert.strictEqual(res.counts.notInstalled, 2);
+        assert.strictEqual(calls.fetch.length, 0);
+        assert.strictEqual(calls.install.length, 0);
+        assert.strictEqual(BCF.styleSync.summaryLabel(res),
+            "Epps Bluebook styles not installed");
+    }
+
+    {
+        // Network failure: check() RESOLVES (never rejects), nothing installs,
+        // the local style is untouched, and the label says so honestly.
+        const { deps, calls } = syncDeps({
+            styles: installedAt(SS_LOCAL),
+            fetchError: true
+        });
+        const res = await BCF.styleSync.check(deps);
+        assert.strictEqual(res.counts.failed, 2);
+        assert.strictEqual(calls.install.length, 0);
+        assert.strictEqual(BCF.styleSync.summaryLabel(res), "2 checks failed");
+    }
+
+    {
+        // Wrong remote <id> (redirect, mispublished file) -> failed, no
+        // install: those bytes are not the style we asked for.
+        const { deps, calls } = syncDeps({
+            styles: installedAt(SS_LOCAL),
+            csl: () => cslDoc("http://www.zotero.org/styles/apa", SS_NEWER)
+        });
+        const res = await BCF.styleSync.check(deps);
+        assert.strictEqual(res.counts.failed, 2);
+        assert.strictEqual(calls.validate.length, 0);
+        assert.strictEqual(calls.install.length, 0);
+    }
+
+    {
+        // Validation rejection -> failed, install never called.
+        const { deps, calls } = syncDeps({
+            styles: installedAt(SS_LOCAL),
+            validateError: true
+        });
+        const res = await BCF.styleSync.check(deps);
+        assert.strictEqual(res.counts.failed, 2);
+        assert.strictEqual(calls.validate.length, 2);
+        assert.strictEqual(calls.install.length, 0);
+    }
+
+    {
+        // Malformed remote (no parseable <updated>) -> skipped, not failed:
+        // bad metadata and a dead network are operationally different.
+        const { deps, calls } = syncDeps({
+            styles: installedAt(SS_LOCAL),
+            csl: (id) => `<style><info><id>${id}</id></info></style>`
+        });
+        const res = await BCF.styleSync.check(deps);
+        assert.strictEqual(res.counts.skipped, 2);
+        assert.strictEqual(calls.install.length, 0);
+        assert.strictEqual(BCF.styleSync.summaryLabel(res),
+            "2 styles skipped: invalid metadata");
+    }
+
+    {
+        // Unreadable local <updated> -> skipped BEFORE any fetch.
+        const styles = {};
+        styles[SS_MAIN] = { styleID: SS_MAIN, updated: "garbage" };
+        styles[SS_EXP] = { styleID: SS_EXP };
+        const { deps, calls } = syncDeps({ styles });
+        const res = await BCF.styleSync.check(deps);
+        assert.strictEqual(res.counts.skipped, 2);
+        assert.strictEqual(calls.fetch.length, 0);
+        assert.strictEqual(calls.install.length, 0);
+    }
+
+    {
+        // Mixed results: one update plus one failure must disclose BOTH — a
+        // partial failure can never hide behind an "Updated…" label.
+        const styles = installedAt(SS_LOCAL);
+        const { deps, calls } = syncDeps({
+            styles,
+            csl: (id) => {
+                if (id === SS_EXP) throw new Error("404");
+                return cslDoc(id, SS_NEWER);
+            }
+        });
+        const res = await BCF.styleSync.check(deps);
+        assert.strictEqual(res.counts.updated, 1);
+        assert.strictEqual(res.counts.failed, 1);
+        assert.strictEqual(calls.install.length, 1);
+        assert.strictEqual(BCF.styleSync.summaryLabel(res),
+            "Updated 1 style; 1 check failed");
+
+        // Remaining label shapes, from synthesized counts.
+        const label = (counts) => BCF.styleSync.summaryLabel({ counts });
+        assert.strictEqual(label({ updated: 1 }), "Updated 1 style");
+        assert.strictEqual(label({ updated: 1, skipped: 1 }),
+            "Updated 1 style; 1 style skipped: invalid metadata");
+        assert.strictEqual(label({ skipped: 1 }), "1 style skipped: invalid metadata");
+        assert.strictEqual(label({ upToDate: 1, notInstalled: 1 }), "Up to date");
+        assert.strictEqual(label({ failed: 1, upToDate: 1 }), "1 check failed");
+        assert.strictEqual(label({}), "Nothing to check");
+        assert.strictEqual(BCF.styleSync.summaryLabel(null), "Check failed");
+    }
+
+    {
+        // shouldCheck: 24h throttle, clock-rollback guard, enable pref.
+        const P_EN = BCF.styleSync.PREF_ENABLED;
+        const P_LC = BCF.styleSync.PREF_LAST_CHECK;
+        const HOUR = 60 * 60 * 1000;
+        // Unset prefs -> defaults (enabled, never checked) -> due.
+        withPrefs({}, () => assert.strictEqual(BCF.styleSync.shouldCheck(SS_NOW), true));
+        withPrefs({ [P_LC]: "0" }, () =>
+            assert.strictEqual(BCF.styleSync.shouldCheck(SS_NOW), true));
+        withPrefs({ [P_LC]: String(SS_NOW - HOUR) }, () =>
+            assert.strictEqual(BCF.styleSync.shouldCheck(SS_NOW), false));
+        withPrefs({ [P_LC]: String(SS_NOW - 25 * HOUR) }, () =>
+            assert.strictEqual(BCF.styleSync.shouldCheck(SS_NOW), true));
+        // Clock rolled back / junk future value must not disable sync forever.
+        withPrefs({ [P_LC]: String(SS_NOW + 100 * HOUR) }, () =>
+            assert.strictEqual(BCF.styleSync.shouldCheck(SS_NOW), true));
+        // Disabled beats staleness.
+        withPrefs({ [P_EN]: false, [P_LC]: String(SS_NOW - 25 * HOUR) }, () =>
+            assert.strictEqual(BCF.styleSync.shouldCheck(SS_NOW), false));
+        withPrefs({ [P_EN]: true, [P_LC]: String(SS_NOW - 25 * HOUR) }, () =>
+            assert.strictEqual(BCF.styleSync.shouldCheck(SS_NOW), true));
+    }
+
+    {
+        // lastCheck is stamped as a STRING ms epoch when a run finishes —
+        // after a successful run AND after a failed one, so a dead network
+        // can't turn the startup path into an every-launch fetch. The manual
+        // button also ignores the enable pref: check() never reads it.
+        const P_LC = BCF.styleSync.PREF_LAST_CHECK;
+        await withPrefsAsync({ [BCF.styleSync.PREF_ENABLED]: false }, async (writes) => {
+            const ok = syncDeps({ styles: installedAt(SS_LOCAL), now: SS_NOW });
+            const res = await BCF.styleSync.check(ok.deps);
+            assert.strictEqual(res.counts.updated, 2);
+            assert.deepStrictEqual(writes[writes.length - 1], [P_LC, String(SS_NOW)]);
+            assert.strictEqual(typeof writes[writes.length - 1][1], "string");
+
+            const bad = syncDeps({
+                styles: installedAt(SS_LOCAL),
+                fetchError: true,
+                now: SS_NOW + 1000
+            });
+            const res2 = await BCF.styleSync.check(bad.deps);
+            assert.strictEqual(res2.counts.failed, 2);
+            assert.deepStrictEqual(writes[writes.length - 1], [P_LC, String(SS_NOW + 1000)]);
+        });
+    }
+
+    {
+        // Reentrancy: the startup timer firing while the pane button is
+        // mid-check must share the one run, not double-fetch.
+        let release;
+        const gate = new Promise((r) => { release = r; });
+        const { deps, calls } = syncDeps({
+            styles: installedAt(SS_LOCAL),
+            csl: (id) => cslDoc(id, SS_LOCAL),
+            onFetch: () => gate
+        });
+        const p1 = BCF.styleSync.check(deps);
+        const p2 = BCF.styleSync.check(deps);
+        assert.strictEqual(p1, p2);
+        release();
+        await p1;
+        assert.strictEqual(calls.fetch.length, 2);   // one per style, not four
+        // A call after the run settles starts a fresh one.
+        const p3 = BCF.styleSync.check(deps);
+        assert.notStrictEqual(p3, p1);
+        await p3;
+        assert.strictEqual(calls.fetch.length, 4);
+    }
+
+    {
+        // Generation token: cancel() (shutdown) during a pending fetch stops
+        // the run before it can install anything.
+        let release, entered;
+        const gate = new Promise((r) => { release = r; });
+        const started = new Promise((r) => { entered = r; });
+        const { deps, calls } = syncDeps({
+            styles: installedAt(SS_LOCAL),
+            onFetch: () => { entered(); return gate; }
+        });
+        const p = BCF.styleSync.check(deps);
+        await started;                // the first fetch is in flight
+        BCF.styleSync.cancel();
+        release();
+        const res = await p;
+        assert.strictEqual(calls.install.length, 0);
+        assert.strictEqual(res.counts.updated, 0);
+        assert.strictEqual(res.counts.cancelled, 2);
+        assert.strictEqual(calls.fetch.length, 1);   // 2nd style aborts earlier
+    }
+
+    {
+        // ...and cancel() after validation but before installation likewise
+        // prevents the install (a timer cancel alone could not).
+        let release, entered;
+        const gate = new Promise((r) => { release = r; });
+        const started = new Promise((r) => { entered = r; });
+        const { deps, calls } = syncDeps({
+            styles: installedAt(SS_LOCAL),
+            onValidate: () => { entered(); return gate; }
+        });
+        const p = BCF.styleSync.check(deps);
+        await started;
+        BCF.styleSync.cancel();
+        release();
+        const res = await p;
+        assert.strictEqual(calls.validate.length, 1);
+        assert.strictEqual(calls.install.length, 0);
+        assert.strictEqual(res.counts.cancelled, 2);
+    }
+
+    {
+        // An active integration command must finish before we install:
+        // Styles.install -> reinit -> resetSessionStyles rebuilds every open
+        // session's engine, which mid-refresh would swap it underfoot.
+        let release, entered;
+        const gate = new Promise((r) => { release = r; });
+        const started = new Promise((r) => { entered = r; });
+        let commandDone = false;
+        const { deps, calls } = syncDeps({
+            styles: installedAt(SS_LOCAL),
+            commandActive: true,
+            commandPromise: () => { entered(); return gate.then(() => { commandDone = true; }); },
+            onInstall: () => { assert.strictEqual(commandDone, true); }
+        });
+        const p = BCF.styleSync.check(deps);
+        await started;
+        assert.strictEqual(calls.install.length, 0);   // still waiting
+        release();
+        const res = await p;
+        assert.strictEqual(res.counts.updated, 2);
+        assert.strictEqual(calls.install.length, 2);
+    }
+
+    {
+        // A generation bump DURING that wait still prevents the install.
+        let release, entered;
+        const gate = new Promise((r) => { release = r; });
+        const started = new Promise((r) => { entered = r; });
+        const { deps, calls } = syncDeps({
+            styles: installedAt(SS_LOCAL),
+            commandActive: true,
+            commandPromise: () => { entered(); return gate; }
+        });
+        const p = BCF.styleSync.check(deps);
+        await started;
+        BCF.styleSync.cancel();
+        release();
+        const res = await p;
+        assert.strictEqual(calls.install.length, 0);
+        assert.strictEqual(res.counts.cancelled, 2);
     }
 
     console.log("bluebook-citations-fixer node tests passed");

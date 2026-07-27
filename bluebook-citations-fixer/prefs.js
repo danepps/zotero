@@ -14,3 +14,11 @@ pref("extensions.bluebook-citations-fixer.styleID", "");
 // many times each such work must be cited for that path to fire.
 pref("extensions.bluebook-citations-fixer.hereinafter.crossFootnote", true);
 pref("extensions.bluebook-citations-fixer.hereinafter.frequencyThreshold", 3);
+
+// Style sync: keep the installed Epps Bluebook styles (the hard-wired
+// built-ins in lib/patch.js) current. Checked at most once per 24h shortly
+// after startup, plus on demand from the Settings pane. Never installs a
+// style that isn't already installed. lastCheck is a ms-epoch STRING because
+// Zotero prefs have no int64.
+pref("extensions.bluebook-citations-fixer.styleSync", true);
+pref("extensions.bluebook-citations-fixer.styleSync.lastCheck", "0");

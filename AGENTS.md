@@ -70,6 +70,22 @@ Key facts that anchor the design:
 - **`properties.custom`** short-circuits `_updateDocument`, but writing to it persists into the field code. We intentionally do *not* use it.
 - **Do not globally gate the feature chain on hereinafter eligibility.** `eligibleKeys` is only for Rule 4.2(b); the other features must continue to run even when no cite in the document qualifies for hereinafter treatment.
 
+### Style sync
+
+`lib/style-sync.js` keeps the *installed* Epps Bluebook styles current. Zotero's own style auto-update only covers styles hosted on zotero.org, so a stale local copy of the Epps styles passes the style gate silently and renders under outdated rules. The contract:
+
+- **Scope: built-ins only, installed only.** `BCF.styleSync.styleIDs()` returns `BCF.patch.BUILTIN_STYLE_IDS.slice()` and nothing else — if that constant is unavailable it logs and returns `[]` (fail closed; **never** add a second literal list here). A style that isn't installed is reported `not-installed` with **no fetch** and is never auto-installed — the pane's "Install style" button owns that case.
+- **Strictly newer `<updated>`.** `parseUpdated` regex-extracts the first `<updated>` element and `Date.parse`s it (RFC3339; the published styles use the `+00:00` offset form, not `Z`); `localUpdated` reads the installed `Style.updated`. `isRemoteNewer` is strict: equal → no install, because Zotero rewrites the style file on install and a `>=` compare would reinstall forever. Either side unparseable → `skipped`; never guess.
+- **One fetch, validated bytes.** Fetch once, require an **exact `<id>` match** with the expected built-in ID (mismatch → `failed`, no install), then `await deps.validate(text)` (`Zotero.Styles.validate`) and install *those same bytes* via `Zotero.Styles.install({ string: text }, id, true)`. Not `{ url }`: that re-downloads, so the bytes inspected wouldn't be the bytes installed, and `silent=true` makes the installer swallow validation errors and proceed after it has already deleted the existing style file. Pre-install failures leave the local style untouched; once `install()` starts, Zotero owns the file. **We never uninstall anything.**
+- **Command race.** `Styles.install` → `reinit` → `Zotero.Integration.resetSessionStyles()` rebuilds every open session's engine, so Zotero propagates an installed update to open documents by itself (no stale-style gap, no plugin-side session surgery) — but installing mid-command would swap a session's engine underneath a running Word/LibreOffice refresh. Before installing, if `deps.commandActive()` (default `!!Zotero.Integration.currentDoc`) the check awaits `deps.commandPromise()` (default `Zotero.Integration.currentCommandPromise`) and re-checks its generation afterward.
+- **Generation token.** `BCF.styleSync._generation` is captured by `scheduleStartupCheck()`/`check()`; `cancel()` (called first thing in `shutdown()`) increments it **and** cancels the timer. Every continuation after an `await` re-reads it and aborts silently (`cancelled`) if it moved; the check immediately before `install()` is mandatory. Cancelling the timer alone cannot stop an already-running check from installing.
+- **`check(deps)` never rejects.** It runs `styleIDs()` sequentially and resolves to `{ results, counts: {updated, upToDate, notInstalled, skipped, failed, cancelled}, checkedAt }`. Concurrent callers (startup timer firing while the pane button runs) share one run via the `_inFlight` promise, cleared on settle. It writes `lastCheck` on completion — success **or** failure, so a dead network can't become an every-launch fetch — and does **not** read the enable pref, so the manual button works with sync switched off. All Zotero access goes through `_defaultDeps()` closures (or injected deps), and async bodies capture `BCF.styleSync` / `BCF.diag` at entry, so nothing dereferences `BCF` after an `await`.
+- **Prefs + throttle.** `extensions.bluebook-citations-fixer.styleSync` (bool, default `true`) and `…styleSync.lastCheck` (**string** ms epoch, default `"0"` — Zotero prefs have no int64). `shouldCheck(now)` is the only reader of the enable pref: due when enabled and never-checked, ≥24h elapsed, or `lastCheck` is in the future (clock-rollback guard). `scheduleStartupCheck()` does two synchronous pref reads at startup and defers the network work 60s behind a one-shot `nsITimer` (pattern from `lib/patch.js`), re-testing `shouldCheck()` at fire time.
+- **Pane bridge.** `bootstrap.js` hangs a **minimal** object on the Zotero global — `Zotero.BluebookCitationsFixer = { checkStyleUpdates, styleUpdateSummary }`, not the `BCF` namespace — because the Settings pane script runs in its own `Cu.Sandbox`; `shutdown()` deletes it only if it's still the exact object this instance installed. `prefs-pane.js`'s `wireStyleSync()` drives the "Check for style updates" button through it.
+- **Honest status labels.** `summaryLabel(res)` is pure and never masks a partial failure with a success phrase: `Up to date`, `Updated 1 style`, `Updated 1 style; 1 check failed`, `1 style skipped: invalid metadata`, `Epps Bluebook styles not installed`. `failed` (network/HTTP/validation) and `skipped` (unusable metadata) stay distinct.
+
+Failures are silent to the user throughout — diag lines under the `style-sync` tag plus one Error Console report, never a dialog.
+
 ### File layout
 
 ```
@@ -78,9 +94,9 @@ bluebook-citations-fixer/
 ├── manifest.json
 ├── chrome.manifest
 ├── build.sh
-├── prefs.js                      # default diag + style-gate + hereinafter prefs
-├── prefs.xhtml                   # Settings pane (style gate + hereinafter options)
-├── prefs-pane.js                 # Settings pane script: style-gate checkbox picker
+├── prefs.js                      # default diag + style-gate + hereinafter + style-sync prefs
+├── prefs.xhtml                   # Settings pane (style gate + hereinafter + style updates)
+├── prefs-pane.js                 # Settings pane script: style-gate picker + style-sync button
 ├── locale/en-US/bluebook-citations-fixer.ftl
 ├── tests/run-node-tests.js       # pure helper tests for ambiguity + rewrites
 └── lib/
@@ -90,6 +106,7 @@ bluebook-citations-fixer/
     ├── dialog.js                 # citation-dialog "Break id." checkbox (NOID sentinel on prefix)
     ├── session-run.js            # per-run context cached on currentSession (ambiguity map)
     ├── patch.js                  # patch Session/Field integration seams + run feature chain
+    ├── style-sync.js             # keep the installed Epps Bluebook CSL styles up to date
     └── features/
         ├── registry.js           # ordered list of features
         ├── id-suppress.js        # manual "Break id." -> correct short form (supra / reporter)

@@ -85,12 +85,46 @@
         });
     }
 
+    // Manual "Check for style updates". The check itself lives in
+    // lib/style-sync.js and is reached through the minimal bridge bootstrap.js
+    // hangs on the Zotero object — this pane sandbox can't see BCF. The button
+    // deliberately bypasses both the 24h throttle and the enable pref (it
+    // calls check() directly), though the run still stamps lastCheck, pushing
+    // the next automatic check out a full interval.
+    function wireStyleSync() {
+        var btn = document.getElementById("bcf-style-sync-check");
+        var status = document.getElementById("bcf-style-sync-status");
+        if (!btn || !status) return;
+        if (btn.getAttribute("data-bcf-wired") === "1") return;
+        btn.setAttribute("data-bcf-wired", "1");
+        btn.addEventListener("command", function () {
+            var api = null;
+            try { api = Zotero.BluebookCitationsFixer; } catch (_) {}
+            if (!api || typeof api.checkStyleUpdates !== "function") {
+                status.value = "Check unavailable";
+                return;
+            }
+            btn.disabled = true;
+            status.value = "Checking…";
+            Promise.resolve()
+                .then(function () { return api.checkStyleUpdates(); })
+                .then(function (res) {
+                    status.value = typeof api.styleUpdateSummary === "function"
+                        ? api.styleUpdateSummary(res)
+                        : "Check complete";
+                })
+                .catch(function (e) { report(e); status.value = "Check failed"; })
+                .then(function () { btn.disabled = false; });
+        });
+    }
+
     async function init() {
         var allBox = document.getElementById("bcf-style-all");
         var listBox = document.getElementById("bcf-style-list");
         var manual = document.getElementById("bcf-style-manual");
         if (!allBox || !listBox || !manual) return false;
         wireLinks();
+        wireStyleSync();
         if (listBox.getAttribute("data-bcf-built") === "1") return true;
 
         await Zotero.Styles.init();
