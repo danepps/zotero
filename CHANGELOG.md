@@ -5,6 +5,21 @@ prefix in each section header identifies which plugin shipped.
 
 ## bluebook-citations-fixer
 
+### v1.3.1 — 2026-07-26
+
+- **Embedded italics in short titles render with flip-flop, not flattened.** A
+  Short Title carrying `<i>`/`<em>` markup (e.g. "\<i>Katz\</i> as
+  Originalism") previously had the tags stripped and the whole title rendered
+  in uniform italics — or uniform small caps for books — in `[hereinafter ...]`
+  brackets, supra injections, and "Break id." short forms. The marked span now
+  flips to roman inside an italic title and stays italic inside a small-caps
+  book title, matching how citeproc renders the full cite. New helpers:
+  `BCF.cite.titleSegments`/`shortTitleRaw` (cite.js) and
+  `BCF.rtf.italicTitle`/`smallCapsTitle` (rtf.js), shared by `hereinafter` and
+  `id-suppress` via `hereinafter._titleFrag`. Output is byte-identical to the
+  old path when a title has no markup, and `BCF.cite.shortTitle` remains the
+  plain projection, so idempotency checks are unchanged.
+
 ### v1.3 — 2026-07-18
 
 - **New rule: suppress the redundant statute year (Bluebook 12.3.2).** When a

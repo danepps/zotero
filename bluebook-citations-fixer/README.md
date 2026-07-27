@@ -13,7 +13,7 @@ that are awkward or impossible to express cleanly in CSL alone.
 
 ## Install
 
-Download [Bluebook_Citations_Fixer_v1.3.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.3/Bluebook_Citations_Fixer_v1.3.xpi)
+Download [Bluebook_Citations_Fixer_v1.3.1.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.3.1/Bluebook_Citations_Fixer_v1.3.1.xpi)
 and install it via **Zotero → Tools → Plugins → gear menu → Install Plugin From File**.
 
 > 💡 Pairs with [Bluebook Signals](../bluebook-signals/README.md) —
@@ -124,13 +124,22 @@ only — Word and LibreOffice work; Google Docs is not yet supported.
 
 ## Latest Released Version
 
-- `1.3`
-- Git tag: `bluebook-citations-fixer-v1.3`
-- GitHub release asset: [Bluebook_Citations_Fixer_v1.3.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.3/Bluebook_Citations_Fixer_v1.3.xpi)
+- `1.3.1`
+- Git tag: `bluebook-citations-fixer-v1.3.1`
+- GitHub release asset: [Bluebook_Citations_Fixer_v1.3.1.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.3.1/Bluebook_Citations_Fixer_v1.3.1.xpi)
 
 ## Release History
 
 See [`../CHANGELOG.md`](../CHANGELOG.md) for the full history. Recent releases:
+
+### v1.3.1
+
+- **Embedded italics in short titles render with flip-flop, not flattened.** A
+  Short Title with `<i>`/`<em>` markup (e.g. a case name inside an article
+  title) previously rendered in uniform italics — or uniform small caps for
+  books — in `[hereinafter ...]` brackets, supra injections, and "Break id."
+  short forms. The marked span now flips to roman inside an italic title and
+  stays italic inside a small-caps book title, matching the full cite.
 
 ### v1.3
 
