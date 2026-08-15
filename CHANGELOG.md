@@ -5,6 +5,20 @@ prefix in each section header identifies which plugin shipped.
 
 ## bluebook-citations-fixer
 
+### v1.3.2 — 2026-08-15
+
+- **Hereinafter survives "Omit Author" on subsequent cites.** The
+  subsequent-cite rewrite in `lib/features/hereinafter.js` located its
+  insertion point by searching for `, supra note` — the comma that follows the
+  author's surname. With Omit Author ticked, citeproc drops the author and
+  renders a bare `supra note N`; the anchor missed and the cite lost both
+  author *and* short title. A fallback now injects the short title directly
+  before the bare `supra` (italic for articles, small caps for books),
+  producing `Short Title, supra note N`. The fallback is gated on the cite's
+  own `suppress-author` flag so an oddly-rendered authored cite can't pick up
+  a stray title, and the insertion point is computed to land outside the
+  italic group wrapping `supra` so the injected comma stays roman.
+
 ### v1.3.1 — 2026-07-26
 
 - **Embedded italics in short titles render with flip-flop, not flattened.** A
