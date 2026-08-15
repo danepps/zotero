@@ -102,7 +102,7 @@ BCF.features.hereinafter = {
             BCF.features.hereinafter._hasSupraNote(segRtf);
 
         if (isSubsequent) {
-            return BCF.features.hereinafter._rewriteSubsequent(segRtf, itemData, shortTitle, isBook);
+            return BCF.features.hereinafter._rewriteSubsequent(segRtf, itemData, shortTitle, isBook, citItem);
         }
         return BCF.features.hereinafter._rewriteFirst(segRtf, itemData, shortTitle, isBook, citItem);
     },
@@ -190,7 +190,7 @@ BCF.features.hereinafter = {
         return name(surnames[0]) + " " + BCF.rtf.italic("et al.");
     },
 
-    _rewriteSubsequent: function (segRtf, itemData, shortTitle, isBook) {
+    _rewriteSubsequent: function (segRtf, itemData, shortTitle, isBook, citItem) {
         var plain = BCF.rtf.plainish(segRtf);
         // Idempotency: short title already appears before "supra note".
         var beforeSupra = new RegExp(
@@ -199,14 +199,42 @@ BCF.features.hereinafter = {
         );
         if (beforeSupra.test(plain)) return null;
 
+        var titleFrag = BCF.features.hereinafter._titleFrag(itemData, isBook);
+
         // Find ", supra note" in the plainish projection, insert before it
         // in the RTF at the equivalent offset.
         var needle = /,\s+supra\s+note\b/i;
         var rtfOffset = BCF.rtf.findPlainOffset(segRtf, needle);
-        if (rtfOffset < 0) return null;
+        if (rtfOffset >= 0) {
+            return segRtf.slice(0, rtfOffset) + ", " + titleFrag + segRtf.slice(rtfOffset);
+        }
 
-        var titleFrag = BCF.features.hereinafter._titleFrag(itemData, isBook);
-        var injection = ", " + titleFrag;
-        return segRtf.slice(0, rtfOffset) + injection + segRtf.slice(rtfOffset);
+        // "Suppress Author" cite: citeproc drops the author entirely, so the
+        // render is a bare "supra note N" (possibly behind a signal) with no
+        // author comma to anchor on. Rule 4.2(b) still wants the hereinafter
+        // name — inject the short title before "supra". Gated on the cite's
+        // own suppress-author flag so an oddly-rendered authored cite can't
+        // pick up a stray title.
+        if (!citItem ||
+            !(citItem["suppress-author"] || citItem.suppressAuthor)) return null;
+        var range = BCF.rtf.findPlainRange(segRtf, /(^|\s)supra\s+note\b/i);
+        if (!range) return null;
+        var insertAt;
+        if (!range.match[1]) {
+            // "supra" opens the segment; insert at the very start so the
+            // title lands before any formatting group wrapping "supra".
+            insertAt = 0;
+        } else if (/\s/.test(segRtf.charAt(range.start))) {
+            // range.start is the literal whitespace before "supra"; insert
+            // just after it, outside any group that wraps "supra" itself.
+            insertAt = range.start + 1;
+        } else {
+            // The whitespace came from an RTF escape; fall back to the
+            // offset of "supra" itself.
+            insertAt = BCF.rtf.plainIndexToRtf(
+                segRtf, range.match.index + range.match[1].length
+            );
+        }
+        return segRtf.slice(0, insertAt) + titleFrag + ", " + segRtf.slice(insertAt);
     }
 };
