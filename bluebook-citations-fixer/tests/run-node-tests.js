@@ -789,6 +789,78 @@ function eligibleRun(initialCitationsByIndex, items) {
 }
 
 {
+    // Apostrophes in AUTHOR NAMES get the same treatment as titles: citeproc
+    // renders "O'Connor" as "O’Connor" (its flip-flop parser forces the
+    // curly form), so an injected hereinafter / supra author must match.
+    const STRAIGHT = String.fromCharCode(0x0027);
+    const CURLY    = String.fromCharCode(0x2019);
+    const OPEN     = String.fromCharCode(0x2018);
+
+    assert.strictEqual(
+        BCF.cite.surnames({ author: [{ family: "O" + STRAIGHT + "Connor" }] })[0],
+        "O" + CURLY + "Connor"
+    );
+    // Literal / institutional names take the same path.
+    assert.strictEqual(
+        BCF.cite.surnames({ author: [{ literal: "Farmers" + STRAIGHT + " Union" }] })[0],
+        "Farmers" + CURLY + " Union"
+    );
+    // A leading apostrophe in a name is a particle, not an opening quote.
+    assert.strictEqual(
+        BCF.cite.surnames({ author: [{ family: STRAIGHT + "t Hooft" }] })[0],
+        CURLY + "t Hooft"
+    );
+    // Ambiguity buckets: the two spellings of one name must collide.
+    assert.strictEqual(
+        BCF.cite.authorKey({ author: [{ family: "O" + STRAIGHT + "Connor" }] }),
+        BCF.cite.authorKey({ author: [{ family: "O" + CURLY + "Connor" }] })
+    );
+
+    // Titles: word-final possessives and quoted phrases, not just the
+    // intra-word case. Already-curly input is left alone (idempotent).
+    assert.strictEqual(
+        BCF.cite.smartApostrophes("The Regents" + STRAIGHT + " Powers"),
+        "The Regents" + CURLY + " Powers"
+    );
+    assert.strictEqual(
+        BCF.cite.smartApostrophes("The " + STRAIGHT + "Reasonable" + STRAIGHT + " Officer"),
+        "The " + OPEN + "Reasonable" + CURLY + " Officer"
+    );
+    assert.strictEqual(
+        BCF.cite.smartApostrophes("Children" + CURLY + "s Rights"),
+        "Children" + CURLY + "s Rights"
+    );
+
+    // End to end: the hereinafter bracket carries the curly form, RTF-encoded.
+    const item = cit("Apos3", "O" + STRAIGHT + "Connor", "Short Piece", "A Short Piece",
+        undefined, undefined, { type: "article-journal" });
+    const item2 = cit("Apos4", "O" + STRAIGHT + "Connor", "Other Work", "Other Work",
+        undefined, undefined, { type: "article-journal" });
+    const run = eligibleRun({
+        1: citation(1, [item]),
+        2: citation(1, [item2])
+    }, [item, item2]);
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [item] },
+        run,
+        text: "Sandra Day O\\uc0\\u8217{}Connor, A Short Piece (2020)",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Sandra Day O\\uc0\\u8217{}Connor, A Short Piece (2020) " +
+        "[hereinafter O\\uc0\\u8217{}Connor, {\\i{}Short Piece}]"
+    );
+
+    // Book-like items render the name in small caps; the escape rides inside.
+    assert.strictEqual(
+        BCF.features.hereinafter._authorPrefix(
+            { author: [{ family: "O" + STRAIGHT + "Connor" }] }, true),
+        "{\\scaps O\\uc0\\u8217{}Connor}"
+    );
+}
+
+{
     // titleSegments preserves <i>/<em> spans (case names inside titles) and
     // otherwise normalizes like normalizeTitleMarkup: other tags stripped,
     // entities decoded. Concatenating the texts equals shortTitle's output.
@@ -1383,6 +1455,34 @@ const NOID = String.fromCharCode(0x200B);
         text: out,
         rtf: BCF.rtf
     }), out);
+}
+
+{
+    // The synthesized supra author carries the curly apostrophe citeproc uses
+    // in the first cite, so "O’Connor, supra note 1" matches note 1's author.
+    const a = cit("IDapos", "O'Connor", "Federalism", "Our Judicial Federalism",
+        undefined, undefined, { type: "article-journal" });
+    const aFlag = cit("IDapos", "O'Connor", "Federalism", "Our Judicial Federalism",
+        undefined, undefined, { type: "article-journal" });
+    aFlag.prefix = NOID;
+    aFlag.locator = "3";
+    const b = cit("IDaposB", "Brown", "Other", "Other Piece",
+        undefined, undefined, { type: "article-journal" });
+    const run = buildRun({
+        1: citation(1, [a]),
+        2: citation(2, [b]),
+        3: citation(3, [aFlag])
+    });
+    const out = BCF.features.idSuppress.rewrite({
+        codeJson: { citationItems: [aFlag] },
+        run,
+        text: NOID_RTF + "id. at 3",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "O\\uc0\\u8217{}Connor, {\\i{}supra} note 1, at 3"
+    );
 }
 
 {

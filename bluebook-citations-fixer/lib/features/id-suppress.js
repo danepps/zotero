@@ -120,8 +120,11 @@ BCF.features.idSuppress = {
 
         if (t === "case" || t === "legal_case") {
             var vol = data.volume != null ? String(data.volume).trim() : "";
+            // Smart-quoted like every other metadata string we inject, so the
+            // idempotency check below and the emitted text both match what
+            // citeproc rendered.
             var reporter = data["container-title"] != null
-                ? String(data["container-title"]).trim() : "";
+                ? BCF.cite.smartApostrophes(String(data["container-title"]).trim()) : "";
             if (!vol || !reporter) {
                 BCF.diag.event("skip:id-suppress", "case-reporter-missing " + BCF.cite.itemKey(item));
                 return BCF.cite.stripNoId(segRtf);
