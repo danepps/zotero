@@ -53,14 +53,50 @@ BCF.cite.itemKey = function (citItem) {
     return "";
 };
 
+// Convert straight apostrophes (U+0027, what a user typically types into
+// Zotero) to the typographic marks citeproc emits, so text we inject agrees
+// with the surrounding citeproc-rendered text. citeproc-js runs every string
+// blob through its flip-flop parser, which turns an apostrophe that isn't part
+// of a matched quote pair into U+2019 and a matched pair into U+2018/U+2019
+// (see CSL.Util.FlipFlopper._apostropheForce in citeproc.js). Already-curly
+// input is untouched, so this is idempotent.
+//
+// Known divergence: a title *opening* with an apostrophe that is not a quote
+// ("’Tis the Season") comes out as U+2018 here but U+2019 from citeproc.
+BCF.cite.smartApostrophes = function (s) {
+    if (s == null) return "";
+    s = String(s);
+    // 1. Between word characters: possessives, contractions, and names
+    //    ("O'Connor", "don't"). Never a quote mark.
+    s = s.replace(/(\w)'(\w)/g, "$1\u2019$2");
+    // 2. Opening single quote: string start, or after whitespace / an opening
+    //    bracket, with a non-space following.
+    s = s.replace(/(^|[\s(\[{])'(?=\S)/g, "$1\u2018");
+    // 3. Anything left is a closing quote or a word-final possessive ("the
+    //    Regents' powers") — both render as U+2019.
+    s = s.replace(/'/g, "\u2019");
+    return s;
+};
+
+// Personal-name variant. Names get no quote-pair treatment: a leading
+// apostrophe is a name particle ("'t Hooft"), not an opening quote, and
+// citeproc renders every apostrophe in a name as U+2019.
+BCF.cite.smartNameApostrophes = function (s) {
+    if (s == null) return "";
+    return String(s).replace(/'/g, "\u2019");
+};
+
 // Author surnames (or literal/name fallbacks) from an itemData object.
+// Apostrophes are normalized to the curly form citeproc renders, so an
+// injected "O’Connor, supra note 4" matches the author as the first cite
+// spelled it, and two spellings of one name share an ambiguity bucket.
 BCF.cite.surnames = function (itemData) {
     var authors = (itemData && itemData.author) || [];
     var out = [];
     for (var i = 0; i < authors.length; i++) {
         var a = authors[i] || {};
         var s = a.family || a.literal || a.name || "";
-        if (s) out.push(s);
+        if (s) out.push(BCF.cite.smartNameApostrophes(s));
     }
     return out;
 };
@@ -84,10 +120,9 @@ BCF.cite.normalizeTitleMarkup = function (s) {
     s = s.replace(/&quot;/gi, "\"");
     s = s.replace(/&#39;/gi, "'");
     s = s.replace(/&nbsp;/gi, " ");
-    // Convert apostrophes between word characters to the typographic right
-    // single quotation mark (U+2019), matching citeproc's smart-quotes pass
-    // so injected short titles agree with the rendered first cite.
-    s = s.replace(/(\w)'(\w)/g, "$1’$2");
+    // Match citeproc's smart-quotes pass so injected short titles agree with
+    // the rendered first cite.
+    s = BCF.cite.smartApostrophes(s);
     return s;
 };
 
