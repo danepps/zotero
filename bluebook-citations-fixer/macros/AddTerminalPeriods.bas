@@ -25,6 +25,12 @@ Option Explicit
 '     ending in "Co.", a title ending in "?"), nothing is added.
 '   • The inserted period is roman: italic / small caps / bold / underline
 '     inherited from the end of the citation are cleared.
+'   • Cleanup layer: if a Zotero citation already ends in punctuation and is
+'     immediately followed by a plain-text period, that period is deleted.
+'     This heals the case where a cite that got its period on an earlier run
+'     ("Smith, supra note 3" + ".") is later re-rendered by Zotero as "Id."
+'     — the stranded period would otherwise read "Id..". Only a period that
+'     directly follows a Zotero field is ever touched.
 '   • Safe to re-run: a note that already has its period is left alone.
 '
 ' Workflow: Zotero → Refresh, then run AddTerminalPeriods (bind it to a
@@ -51,48 +57,71 @@ Public Sub AddTerminalPeriods()
     Application.UndoRecord.StartCustomRecord "Add terminal periods"
     On Error GoTo 0
 
-    Dim added As Long
-    added = AddTerminalPeriodsIn(doc)
+    Dim added As Long, removed As Long
+    added = AddTerminalPeriodsIn(doc, removed)
 
     On Error Resume Next
     Application.UndoRecord.EndCustomRecord
     On Error GoTo 0
 
     Application.ScreenUpdating = wasUpdating
-    Application.StatusBar = "Bluebook: added " & added & " terminal period(s)."
+    Application.StatusBar = "Bluebook: added " & added & " terminal period(s), removed " & _
+                            removed & " doubled period(s)."
 End Sub
 
-' Process every footnote and endnote in doc; returns the number of periods added.
-Public Function AddTerminalPeriodsIn(doc As Document) As Long
+' Process every footnote and endnote in doc. Returns the number of periods
+' added; `removed` receives the number of doubled periods deleted.
+Public Function AddTerminalPeriodsIn(doc As Document, ByRef removed As Long) As Long
     Dim added As Long
+    removed = 0
     Dim fn As Footnote
     For Each fn In doc.Footnotes
-        added = added + ProcessNote(fn.Range)
+        added = added + ProcessNote(fn.Range, removed)
     Next fn
     Dim en As Endnote
     For Each en In doc.Endnotes
-        added = added + ProcessNote(en.Range)
+        added = added + ProcessNote(en.Range, removed)
     Next en
     AddTerminalPeriodsIn = added
 End Function
 
-' One note. At most one field can qualify (only the last thing in the note
-' has nothing after it), but checking every Zotero field keeps the logic
-' uniform and order-independent.
-Private Function ProcessNote(noteRange As Range) As Long
+' One note. At most one field can need a period (only the last thing in the
+' note has nothing after it), but checking every Zotero field keeps the logic
+' uniform and order-independent — and the doubled-period cleanup applies to
+' any Zotero field in the note, not just the last one.
+Private Function ProcessNote(noteRange As Range, ByRef removed As Long) As Long
     Dim fld As Field
     Dim added As Long
     For Each fld In noteRange.Fields
         If IsZoteroCitation(fld) Then
-            If NothingFollows(fld, noteRange) Then
-                If Not EndsWithTerminalPunctuation(fld.Result.Text) Then
-                    InsertPeriodAfter fld
-                    added = added + 1
-                End If
+            If EndsWithTerminalPunctuation(fld.Result.Text) Then
+                If RemoveDoubledPeriod(fld, noteRange) Then removed = removed + 1
+            ElseIf NothingFollows(fld, noteRange) Then
+                InsertPeriodAfter fld
+                added = added + 1
             End If
         End If
     Next fld
     ProcessNote = added
+End Function
+
+' If the character immediately after the field's end-of-field marker is a
+' period, delete it and return True. Only called for fields whose rendered
+' text already ends in terminal punctuation, so the deleted period is always
+' a doubled one ("Id.." -> "Id.").
+Private Function RemoveDoubledPeriod(fld As Field, noteRange As Range) As Boolean
+    RemoveDoubledPeriod = False
+    Dim r As Range
+    Set r = fld.Result.Duplicate
+    r.Collapse wdCollapseEnd
+    r.Move wdCharacter, 1          ' step over the end-of-field marker (Chr(21))
+    If r.Start >= noteRange.End Then Exit Function
+    r.MoveEnd wdCharacter, 1       ' r now spans the one character after the field
+    If r.End > noteRange.End Then Exit Function
+    If r.Text = "." Then
+        r.Delete
+        RemoveDoubledPeriod = True
+    End If
 End Function
 
 Private Function IsZoteroCitation(fld As Field) As Boolean
@@ -143,6 +172,8 @@ Private Function EndsWithTerminalPunctuation(resultText As String) As Boolean
 End Function
 
 Private Function IsClosingQuote(ch As String) As Boolean
+    IsClosingQuote = False
+    If Len(ch) = 0 Then Exit Function     ' VBA's And doesn't short-circuit
     Select Case AscW(ch)
         Case 34, 39, 8217, 8221, 187, 8250   ' " ' ’ ” » ›
             IsClosingQuote = True
@@ -172,7 +203,7 @@ End Function
 
 ' =============================================================================
 ' Self-test: builds a new document with fixture footnotes, runs the macro
-' twice (the second run must add nothing), and writes PASS/FAIL lines into
+' twice (the second run must change nothing), and writes PASS/FAIL lines into
 ' the document body. Nothing outside the new document is touched.
 ' =============================================================================
 Public Sub AddTerminalPeriods_SelfTest()
@@ -185,7 +216,7 @@ Public Sub AddTerminalPeriods_SelfTest()
     Const BARE_ID As String = "Id."             ' already ends with "." -> none
 
     ' fixture: fields/text in order, expected note text after the macro
-    Dim names(1 To 8) As String, expected(1 To 8) As String
+    Dim names(1 To 11) As String, expected(1 To 11) As String
 
     names(1) = "cite alone at end of note"
     AddFixture doc, Array(F(CITE))
@@ -219,12 +250,24 @@ Public Sub AddTerminalPeriods_SelfTest()
     AddFixture doc, Array(F("Smith, Is This a Title?"))
     expected(8) = "Smith, Is This a Title?"
 
-    Dim firstRun As Long, secondRun As Long
-    firstRun = AddTerminalPeriodsIn(doc)
-    secondRun = AddTerminalPeriodsIn(doc)
+    names(9) = "cleanup: Id. followed by a stranded period"
+    AddFixture doc, Array(F(BARE_ID), T("."))
+    expected(9) = BARE_ID
+
+    names(10) = "cleanup: Id.. followed by free text"
+    AddFixture doc, Array(F(BARE_ID), T(". (discussing the point)."))
+    expected(10) = BARE_ID & " (discussing the point)."
+
+    names(11) = "cleanup ignores non-Zotero fields"
+    AddFixture doc, Array(F("Not a citation.", "ADDIN SOMETHING_ELSE"), T("."))
+    expected(11) = "Not a citation.."
+
+    Dim firstRun As Long, secondRun As Long, firstRemoved As Long, secondRemoved As Long
+    firstRun = AddTerminalPeriodsIn(doc, firstRemoved)
+    secondRun = AddTerminalPeriodsIn(doc, secondRemoved)
 
     Dim report As String, failures As Long, i As Long, actual As String
-    For i = 1 To 8
+    For i = 1 To 11
         actual = NoteText(doc.Footnotes(i))
         If actual = expected(i) Then
             report = report & "PASS  " & names(i) & vbCr
@@ -241,11 +284,18 @@ Public Sub AddTerminalPeriods_SelfTest()
     Else
         report = report & "PASS  first run added 4 periods" & vbCr
     End If
-    If secondRun <> 0 Then
+    If firstRemoved <> 2 Then
         failures = failures + 1
-        report = report & "FAIL  second run added " & secondRun & " period(s); expected 0 (idempotency)" & vbCr
+        report = report & "FAIL  first run removed " & firstRemoved & " doubled period(s); expected 2" & vbCr
     Else
-        report = report & "PASS  second run added 0 periods (idempotent)" & vbCr
+        report = report & "PASS  first run removed 2 doubled periods" & vbCr
+    End If
+    If secondRun <> 0 Or secondRemoved <> 0 Then
+        failures = failures + 1
+        report = report & "FAIL  second run added " & secondRun & " / removed " & secondRemoved & _
+                 "; expected 0 / 0 (idempotency)" & vbCr
+    Else
+        report = report & "PASS  second run changed nothing (idempotent)" & vbCr
     End If
 
     doc.Content.InsertParagraphAfter

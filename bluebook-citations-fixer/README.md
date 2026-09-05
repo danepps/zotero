@@ -140,7 +140,9 @@ party name ending in *Co.*) are left alone, as is any citation followed by
 typed text — a parenthetical, a closing quote, another sentence. The period is
 regular document text, not part of the Zotero field, so Refresh never touches
 it and you can delete it like any other character. Running the macro again
-adds nothing.
+adds nothing. It also cleans up after itself: if a cite that once ended a
+note later becomes an *Id.* (because you cited the same source in the
+preceding note), the leftover period that would read *Id..* is removed.
 
 **Install (Word for Mac or Windows):** Tools → Macro → Visual Basic Editor →
 select the *Normal* project → File → Import File… → choose
