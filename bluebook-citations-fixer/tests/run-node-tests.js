@@ -789,6 +789,44 @@ function eligibleRun(initialCitationsByIndex, items) {
 }
 
 {
+    // Same normalization must apply to author surnames: "O'Connor" arrives
+    // from CSL JSON with a straight apostrophe, while citeproc renders U+2019.
+    // Without this the injected supra cite / hereinafter bracket disagrees
+    // with the rendered first cite.
+    const STRAIGHT = String.fromCharCode(0x0027);
+    const CURLY    = String.fromCharCode(0x2019);
+    assert.deepStrictEqual(
+        Array.from(BCF.cite.surnames({ author: [{ family: "O" + STRAIGHT + "Connor" }] })),
+        ["O" + CURLY + "Connor"]
+    );
+    assert.strictEqual(
+        BCF.cite.authorKey({ author: [{ family: "D" + STRAIGHT + "Amato" }] }),
+        ("D" + CURLY + "Amato").toLowerCase()
+    );
+    // The hereinafter bracket renders the surname with the RTF escape for
+    // U+2019 (decimal 8217), matching what citeproc wrote for the long cite.
+    const item = cit("ApAuth", "O" + STRAIGHT + "Connor", "First Work", "First Work",
+        undefined, undefined, { type: "article-journal" });
+    const item2 = cit("ApAuth2", "O" + STRAIGHT + "Connor", "Other Work", "Other Work",
+        undefined, undefined, { type: "article-journal" });
+    const run = eligibleRun({
+        1: citation(1, [item]),
+        2: citation(1, [item2])
+    }, [item, item2]);
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [item] },
+        run,
+        text: "Sandra O\\uc0\\u8217{}Connor, First Work (2020)",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Sandra O\\uc0\\u8217{}Connor, First Work (2020) " +
+        "[hereinafter O\\uc0\\u8217{}Connor, {\\i{}First Work}]"
+    );
+}
+
+{
     // titleSegments preserves <i>/<em> spans (case names inside titles) and
     // otherwise normalizes like normalizeTitleMarkup: other tags stripped,
     // entities decoded. Concatenating the texts equals shortTitle's output.
