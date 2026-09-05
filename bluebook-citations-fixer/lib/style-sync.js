@@ -150,8 +150,13 @@ BCF.styleSync.summaryLabel = function (res) {
     var updated = c.updated || 0;
     var failed = c.failed || 0;
     var skipped = c.skipped || 0;
+    var unverified = c.unverified || 0;
     var parts = [];
     if (updated) parts.push("Updated " + updated + (updated === 1 ? " style" : " styles"));
+    if (unverified) {
+        parts.push(unverified + (unverified === 1 ? " style" : " styles") +
+            " installed but not verified");
+    }
     if (failed) parts.push(failed + (failed === 1 ? " check failed" : " checks failed"));
     if (skipped) {
         parts.push(skipped + (skipped === 1 ? " style" : " styles") +
@@ -240,8 +245,11 @@ BCF.styleSync._mergeDeps = function (deps) {
 
 // Returns { id, status, remote?, local?, error? } with status one of
 // "updated" | "up-to-date" | "not-installed" | "skipped" | "failed" |
-// "cancelled". Pre-install failures leave the local style untouched; once
-// install() has started, Zotero owns the file and recovery is its business.
+// "unverified" | "cancelled". Pre-install failures ("failed"/"skipped") leave
+// the local style untouched; once install() has started, Zotero owns the file
+// and recovery is its business — "unverified" means install() resolved but the
+// re-read installed style did not carry the fetched <updated> (or couldn't be
+// re-read), so the pane must not claim "Updated".
 BCF.styleSync.checkStyle = async function (id, deps, generation) {
     // Captured at entry: shutdown sets BCF = null, and this body outlives it.
     var sync = BCF.styleSync;
@@ -306,6 +314,23 @@ BCF.styleSync.checkStyle = async function (id, deps, generation) {
         // Mandatory final check: nothing may start an install after cancel().
         if (!live()) return { id: id, status: "cancelled" };
         await d.install(id, text);
+
+        // Post-install verification: install() resolving proves nothing about
+        // what is on disk (silent=true swallows installer errors). Re-read the
+        // style and require its <updated> to equal the bytes we installed.
+        var after = null;
+        try {
+            after = sync.localUpdated(await d.getStyle(id));
+        } catch (e) {
+            try { diag.err("style-sync post-install re-read " + id, e); } catch (_) {}
+        }
+        if (after !== remote) {
+            diag.event("style-sync", "installed but unverified: " + id +
+                " installed=" + (after === null ? "(unreadable)" : new Date(after).toISOString()) +
+                " expected=" + new Date(remote).toISOString());
+            return { id: id, status: "unverified", remote: remote, local: local,
+                     installed: after, error: "post-install <updated> mismatch" };
+        }
         diag.event("style-sync", "updated " + id + " -> " + new Date(remote).toISOString());
         return { id: id, status: "updated", remote: remote, local: local };
     } catch (e) {
@@ -324,6 +349,7 @@ BCF.styleSync._COUNT_KEYS = {
     "not-installed": "notInstalled",
     "skipped": "skipped",
     "failed": "failed",
+    "unverified": "unverified",
     "cancelled": "cancelled"
 };
 
@@ -351,7 +377,7 @@ BCF.styleSync._run = async function (deps) {
     var ids = sync.styleIDs();
     var counts = {
         updated: 0, upToDate: 0, notInstalled: 0,
-        skipped: 0, failed: 0, cancelled: 0
+        skipped: 0, failed: 0, unverified: 0, cancelled: 0
     };
     var results = [];
 

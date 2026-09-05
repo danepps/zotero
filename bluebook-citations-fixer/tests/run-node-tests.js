@@ -1878,6 +1878,48 @@ const NOID = String.fromCharCode(0x200B);
 }
 
 {
+    // earlierNote: numbered beats unnumbered (0) regardless of order; among
+    // numbered the smaller wins; both unnumbered keeps the unknown.
+    const en = BCF.run.earlierNote;
+    assert.strictEqual(en(undefined, 0), 0);
+    assert.strictEqual(en(undefined, 4), 4);
+    assert.strictEqual(en(0, 4), 4);
+    assert.strictEqual(en(4, 0), 4);
+    assert.strictEqual(en(7, 4), 4);
+    assert.strictEqual(en(4, 7), 4);
+    assert.strictEqual(en(0, 0), 0);
+    assert.strictEqual(en(0, undefined), 0);
+}
+
+{
+    // A body-text cite (noteIndex 0) of a source must not hide its first
+    // NUMBERED note: firstNoteFor -> 4, so id-suppress can still emit
+    // "supra note 4". Both the key map and the signature map (duplicate
+    // library item with a different key) must follow the same rule.
+    const body = cit("NZa", "Zero", "Body", "Cited in the Body First",
+        undefined, undefined, { type: "article-journal" });
+    const dup = cit("NZb", "Zero", "Body", "Cited in the Body First",
+        undefined, undefined, { type: "article-journal" });   // same signature
+    const run = buildRun({
+        0: citation(0, [body]),      // epigraph / body text: unnumbered
+        1: citation(4, [body]),
+        2: citation(7, [dup])
+    });
+    assert.strictEqual(run.itemFirstNotes.get(BCF.cite.itemKey(body)), 4);
+    assert.strictEqual(run.itemFirstNotes.get(BCF.cite.itemKey(dup)), 7);
+    assert.strictEqual(BCF.run.firstNoteFor(run, body, body.itemData), 4);
+    assert.strictEqual(BCF.run.firstNoteFor(run, dup, dup.itemData), 4);
+
+    // Numbered first, unnumbered later: unchanged answer.
+    const run2 = buildRun({ 0: citation(4, [body]), 1: citation(0, [body]) });
+    assert.strictEqual(BCF.run.firstNoteFor(run2, body, body.itemData), 4);
+
+    // Never numbered: stays 0 so id-suppress keeps refusing "supra note 0".
+    const run3 = buildRun({ 0: citation(0, [body]), 1: citation(0, [body]) });
+    assert.strictEqual(BCF.run.firstNoteFor(run3, body, body.itemData), 0);
+}
+
+{
     // parseFieldCode is string-aware: a brace inside a citation prefix/suffix
     // (JSON does NOT escape literal braces) must not fool the boundary scanner.
     // Unmatched closer in a suffix: a naive depth counter stops early and
@@ -2361,6 +2403,17 @@ const NOID = String.fromCharCode(0x200B);
                 calls.install.push([id, text]);
                 if (o.onInstall) o.onInstall(id, text);
                 if (o.installError) throw new Error("install failed");
+                // A real install rewrites the style file, so a later getStyle()
+                // sees the fetched <updated>. `afterInstall` overrides that to
+                // simulate a silent no-op / vanished / unreadable style.
+                if (o.styles) {
+                    if (o.afterInstall) {
+                        o.styles[id] = o.afterInstall(id, text);
+                    } else {
+                        const m = /<updated>\s*([^<]*?)\s*<\/updated>/.exec(text);
+                        o.styles[id] = { updated: m ? m[1] : undefined };
+                    }
+                }
             }
         };
         return { deps, calls };
@@ -2435,6 +2488,60 @@ const NOID = String.fromCharCode(0x200B);
             assert(calls.validate.indexOf(text) !== -1);
         });
         assert.strictEqual(BCF.styleSync.summaryLabel(res), "Updated 2 styles");
+    }
+
+    {
+        // Post-install verification: install() resolving is not success. If the
+        // re-read style still carries the OLD <updated> (silent no-op), the
+        // result is "unverified", never "updated", and the label says so.
+        const { deps, calls } = syncDeps({
+            styles: installedAt(SS_LOCAL),
+            afterInstall: () => ({ updated: SS_LOCAL })
+        });
+        const res = await BCF.styleSync.check(deps);
+        assert.strictEqual(calls.install.length, 2);
+        assert.strictEqual(res.counts.updated, 0);
+        assert.strictEqual(res.counts.unverified, 2);
+        assert.strictEqual(res.counts.failed, 0);
+        res.results.forEach((r) => {
+            assert.strictEqual(r.status, "unverified");
+            assert.strictEqual(r.installed, Date.parse(SS_LOCAL));
+            assert.strictEqual(r.remote, Date.parse(SS_NEWER));
+        });
+        assert.strictEqual(BCF.styleSync.summaryLabel(res),
+            "2 styles installed but not verified");
+    }
+
+    {
+        // Style gone after install (getStyle -> null) and style present with an
+        // unparseable <updated>: both unverified, not failed.
+        for (const after of [() => null, () => ({ updated: "garbage" })]) {
+            const { deps } = syncDeps({ styles: installedAt(SS_LOCAL), afterInstall: after });
+            const res = await BCF.styleSync.check(deps);
+            assert.strictEqual(res.counts.unverified, 2);
+            assert.strictEqual(res.counts.updated, 0);
+            res.results.forEach((r) => assert.strictEqual(r.installed, null));
+        }
+    }
+
+    {
+        // Post-install re-read THROWING is still "unverified" (the install may
+        // well have succeeded) — and one good + one unverified reports both.
+        let installs = 0;
+        const base = syncDeps({ styles: installedAt(SS_LOCAL) });
+        const origGet = base.deps.getStyle;
+        base.deps.getStyle = async (id) => {
+            // Second style: blow up only on the re-read after its install.
+            if (id === SS_EXP && installs === 2) throw new Error("styles offline");
+            return origGet(id);
+        };
+        const origInstall = base.deps.install;
+        base.deps.install = async (id, text) => { installs++; return origInstall(id, text); };
+        const res = await BCF.styleSync.check(base.deps);
+        assert.strictEqual(res.counts.updated, 1);
+        assert.strictEqual(res.counts.unverified, 1);
+        assert.strictEqual(BCF.styleSync.summaryLabel(res),
+            "Updated 1 style; 1 style installed but not verified");
     }
 
     {

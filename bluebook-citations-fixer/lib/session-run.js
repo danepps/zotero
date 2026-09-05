@@ -2,10 +2,12 @@
 
 // Per-run state cached on a Zotero.Integration.Session.
 //
-// Zotero creates a Session when a command like addCitation/refresh starts;
-// it's available as Zotero.Integration.currentSession during the run and
-// cleared in the finally block afterward. citationsByIndex is an object keyed
-// by field index; each value holds the full CSL_CITATION shape.
+// Zotero creates a Session when a command like addCitation/refresh starts and
+// exposes it as Zotero.Integration.currentSession. It is NOT cleared when the
+// command ends (only currentDoc/currentWindow are), so a truthy currentSession
+// can be stale; "a command is running" is BCF.patch._activeSession().
+// citationsByIndex is an object keyed by field index; each value holds the
+// full CSL_CITATION shape.
 //
 // Hereinafter eligibility is computed once per run and stashed on the session.
 // A work qualifies when:
@@ -113,8 +115,8 @@ BCF.run._build = function (session) {
     var items = new Map();              // itemKey -> itemData
     var authorBuckets = new Map();      // authorKey -> Set<itemKey>
     var itemCounts = new Map();         // itemKey -> count
-    var itemFirstNotes = new Map();     // itemKey -> first note index
-    var itemFirstNotesBySig = new Map();// author+title signature -> earliest note
+    var itemFirstNotes = new Map();     // itemKey -> earliest NUMBERED note (0 only if never numbered)
+    var itemFirstNotesBySig = new Map();// author+title signature -> same, by signature
     var noteFirstBuckets = new Map();   // authorKey -> Map<groupKey, Set<itemKey>>
     var enriched = 0;
     var liveHadData = 0;
@@ -174,8 +176,14 @@ BCF.run._build = function (session) {
             }
             itemCounts.set(key, (itemCounts.get(key) || 0) + 1);
 
-            if (!itemFirstNotes.has(key)) {
-                itemFirstNotes.set(key, noteIndex);
+            // First-note maps prefer the earliest POSITIVE note. A note index
+            // of 0 means "unnumbered" (a body-text cite in a footnoted paper,
+            // or an unreadable index); it must never beat a real note number,
+            // or id-suppress would refuse a valid `supra note N` for a source
+            // that also happens to be cited once in the body.
+            var firstSeen = !itemFirstNotes.has(key);
+            itemFirstNotes.set(key, BCF.run.earlierNote(itemFirstNotes.get(key), noteIndex));
+            if (firstSeen) {
                 if (authorKey) {
                     if (!noteFirstBuckets.has(authorKey)) noteFirstBuckets.set(authorKey, new Map());
                     var byNote = noteFirstBuckets.get(authorKey);
@@ -192,13 +200,10 @@ BCF.run._build = function (session) {
             // Track earliest note by author+title signature too, so two cites
             // of the same source that resolve to different item keys (duplicate
             // library items, or URI variance across insertions) still share a
-            // first-note target for `supra`. Records the minimum note index.
+            // first-note target for `supra`. Earliest positive note wins.
             var sig = BCF.run._sigFor(data);
             if (sig) {
-                var prevSig = itemFirstNotesBySig.get(sig);
-                if (prevSig == null || noteIndex < prevSig) {
-                    itemFirstNotesBySig.set(sig, noteIndex);
-                }
+                itemFirstNotesBySig.set(sig, BCF.run.earlierNote(itemFirstNotesBySig.get(sig), noteIndex));
             }
         }
     }
@@ -318,10 +323,23 @@ BCF.run._sigFor = function (data) {
     return ak + "||" + title;
 };
 
+// "Earlier" for note indexes: positive (numbered) notes always beat 0/unknown,
+// and among positive notes the smaller wins. Only when neither side is numbered
+// does the unknown value survive. `prev` may be undefined (first observation).
+BCF.run.earlierNote = function (prev, next) {
+    var p = (typeof prev === "number" && prev > 0) ? prev : null;
+    var n = (typeof next === "number" && next > 0) ? next : null;
+    if (p !== null && n !== null) return Math.min(p, n);
+    if (p !== null) return p;
+    if (n !== null) return n;
+    return prev == null ? next : prev;
+};
+
 // Earliest note index at which a work first appears, for `supra note N`.
-// Combines the URI-keyed first-note map with the author+title signature map and
-// returns the smaller, so a duplicate library item / URI mismatch can't make a
-// repeat cite point at itself. Returns undefined when the work isn't tracked.
+// Combines the URI-keyed first-note map with the author+title signature map via
+// earlierNote(), so a duplicate library item / URI mismatch can't make a repeat
+// cite point at itself, and an unnumbered (0) sighting can't hide a numbered
+// one. Returns undefined when the work isn't tracked.
 BCF.run.firstNoteFor = function (ctx, citItem, data) {
     if (!ctx) return undefined;
     var notes = [];
@@ -336,7 +354,9 @@ BCF.run.firstNoteFor = function (ctx, citItem, data) {
         }
     }
     if (!notes.length) return undefined;
-    return Math.min.apply(null, notes);
+    var best;
+    for (var i = 0; i < notes.length; i++) best = BCF.run.earlierNote(best, notes[i]);
+    return best;
 };
 
 BCF.run.itemData = function (ctx, citItem) {

@@ -49,24 +49,38 @@ Public Sub AddTerminalPeriods()
     Dim doc As Document
     Set doc = ActiveDocument
 
-    Dim wasUpdating As Boolean
+    Dim wasUpdating As Boolean, undoStarted As Boolean
     wasUpdating = Application.ScreenUpdating
     Application.ScreenUpdating = False
 
+    ' UndoRecord is missing from some Word builds; treat that as "no record".
     On Error Resume Next
     Application.UndoRecord.StartCustomRecord "Add terminal periods"
-    On Error GoTo 0
+    undoStarted = (Err.Number = 0)
+    Err.Clear
+    On Error GoTo Failed
 
     Dim added As Long, removed As Long
     added = AddTerminalPeriodsIn(doc, removed)
-
-    On Error Resume Next
-    Application.UndoRecord.EndCustomRecord
-    On Error GoTo 0
-
-    Application.ScreenUpdating = wasUpdating
     Application.StatusBar = "Bluebook: added " & added & " terminal period(s), removed " & _
                             removed & " doubled period(s)."
+    GoTo Cleanup
+
+Failed:
+    ' A protected document, a damaged field, or a locked note can raise here.
+    ' Report it, then fall through to Cleanup so Word is never left with
+    ' screen updating off or an undo record open.
+    Dim msg As String
+    msg = "AddTerminalPeriods stopped: " & Err.Description & " (error " & Err.Number & ")." & vbCr & _
+          "Periods added before the error remain; use Undo to revert them."
+    Application.StatusBar = "Bluebook: AddTerminalPeriods stopped — " & Err.Description
+    Resume Cleanup
+
+Cleanup:
+    On Error Resume Next
+    If undoStarted Then Application.UndoRecord.EndCustomRecord
+    Application.ScreenUpdating = wasUpdating
+    If Len(msg) > 0 Then MsgBox msg, vbExclamation, "Bluebook Citations Fixer"
 End Sub
 
 ' Process every footnote and endnote in doc. Returns the number of periods

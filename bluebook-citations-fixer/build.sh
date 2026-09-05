@@ -1,5 +1,5 @@
 #!/bin/bash
-# Usage: ./build.sh 1.3.1.1
+# Usage: ./build.sh 1.3.3.1   (ALWAYS pass a version; see CLAUDE.md "Version numbering")
 #
 # The version argument (default: the manifest's own version) is INJECTED into
 # the staged manifest.json before zipping, so the archived add-on version
