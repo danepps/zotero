@@ -125,6 +125,32 @@ Ctrl+S signal picker for the citation-dialog Prefix field (*See*, *E.g.*,
 *Accord*, etc.). The two are built for the same law-review workflow and are
 meant to be used together — **installing both is recommended.**
 
+## Companion Word macro: terminal periods
+
+A Bluebook footnote that ends in a citation ends in a period — but Zotero can't
+add it. The style has to leave the citation's suffix empty (a cite can also sit
+in the middle of a sentence), and no Zotero plugin can see whether anything
+follows a citation in the note. Word can, so this ships as a small Word macro
+instead: **[`macros/AddTerminalPeriods.bas`](macros/AddTerminalPeriods.bas)**.
+
+Run it after **Zotero → Refresh**. For every footnote and endnote whose last
+Zotero citation has nothing after it, it inserts an ordinary plain-text period
+right after the citation. Citations that already end in punctuation (*Id.*, a
+party name ending in *Co.*) are left alone, as is any citation followed by
+typed text — a parenthetical, a closing quote, another sentence. The period is
+regular document text, not part of the Zotero field, so Refresh never touches
+it and you can delete it like any other character. Running the macro again
+adds nothing.
+
+**Install (Word for Mac or Windows):** Tools → Macro → Visual Basic Editor →
+select the *Normal* project → File → Import File… → choose
+`AddTerminalPeriods.bas`. Then Tools → Customize Keyboard → category
+**Macros** → `AddTerminalPeriods` → assign a shortcut. Run
+`AddTerminalPeriods_SelfTest` once after installing: it opens a new document
+with test footnotes and prints PASS/FAIL lines so you can confirm the macro
+behaves in your copy of Word. Zotero's Bookmarks field mode is not supported;
+LibreOffice is not covered.
+
 ## Compatibility
 
 Zotero 7 and Zotero 10 beta on macOS, Windows, and Linux. RTF output

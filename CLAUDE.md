@@ -114,6 +114,7 @@ bluebook-citations-fixer/
 ├── prefs-pane.js                 # Settings pane script: style-gate picker + style-sync button
 ├── locale/en-US/bluebook-citations-fixer.ftl
 ├── tests/run-node-tests.js       # pure helper tests for ambiguity + rewrites
+├── macros/AddTerminalPeriods.bas # companion Word VBA macro (NOT packaged in the XPI): plain-text period after note-ending cites
 └── lib/
     ├── rtf.js                    # escape, italic(), plainish projection, findPlainOffset, segments
     ├── cite.js                   # CSL_CITATION parse, authorKey, shortTitle, position, item-type predicates
@@ -192,6 +193,10 @@ Every feature must be idempotent — both the `_updateDocument` prewrite pass an
 ### Diagnostics
 
 Off by default via root `prefs.js`. Set `extensions.bluebook-citations-fixer.diag = true` in about:config, restart Zotero, and lines appear in `/tmp/bluebook-citations-fixer-diag.txt`. Errors always surface via `Components.utils.reportError` (Error Console) regardless of the pref.
+
+### Companion Word macro (`macros/`)
+
+`macros/AddTerminalPeriods.bas` is a Word VBA module, **not** plugin code — `build.sh` packages an explicit file list, so it never enters the XPI. It exists because one Bluebook rule cannot be implemented inside the plugin: a citation sentence that ends a footnote ends in a period, but the Epps style leaves the citation `<layout suffix="">` empty (a cite can also sit mid-sentence), and the Zotero integration API gives a plugin no view of what follows a field. `Zotero.Integration.Field.INTERFACE` is exactly `delete, removeCode, select, setText, getText, setCode, getCode, equals, getNoteIndex, isAdjacentToNextField`, and the only outside-the-field write, `Document.insertText`, inserts at the cursor (Zotero uses it once, after deleting a field, for note insertion). So "is this cite the last thing in the note?" is undecidable from Zotero, and the answer lives in Word: the macro walks every footnote/endnote, and when the last `ADDIN ZOTERO_ITEM` field has nothing but whitespace/field markers after it and its rendered text doesn't already end in `.`/`?`/`!` (so `Id.` and `…Co.` are left alone), it inserts a **plain-text**, roman `.` immediately after the end-of-field marker. Because the period is document text rather than field text, Refresh never sees or regenerates it, and re-running the macro is a no-op. Run it after Zotero → Refresh. `AddTerminalPeriods_SelfTest` builds a throwaway document with fixture notes and reports PASS/FAIL in place — the macro has no automated harness, so that self-test is the verification path. Bookmarks field mode is not handled. **Do not try to move this into the feature chain**: a chain feature can only put the period *inside* the field, which is the option the user rejected.
 
 ### Known limitations
 
