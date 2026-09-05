@@ -13,7 +13,7 @@ that are awkward or impossible to express cleanly in CSL alone.
 
 ## Install
 
-Download [Bluebook_Citations_Fixer_v1.3.2.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.3.2/Bluebook_Citations_Fixer_v1.3.2.xpi)
+Download [Bluebook_Citations_Fixer_v1.3.3.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.3.3/Bluebook_Citations_Fixer_v1.3.3.xpi)
 and install it via **Zotero → Tools → Plugins → gear menu → Install Plugin From File**.
 
 > 💡 Pairs with [Bluebook Signals](../bluebook-signals/README.md) —
@@ -124,13 +124,22 @@ only — Word and LibreOffice work; Google Docs is not yet supported.
 
 ## Latest Released Version
 
-- `1.3.2`
-- Git tag: `bluebook-citations-fixer-v1.3.2`
-- GitHub release asset: [Bluebook_Citations_Fixer_v1.3.2.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.3.2/Bluebook_Citations_Fixer_v1.3.2.xpi)
+- `1.3.3`
+- Git tag: `bluebook-citations-fixer-v1.3.3`
+- GitHub release asset: [Bluebook_Citations_Fixer_v1.3.3.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.3.3/Bluebook_Citations_Fixer_v1.3.3.xpi)
 
 ## Release History
 
 See [`../CHANGELOG.md`](../CHANGELOG.md) for the full history. Recent releases:
+
+### v1.3.3
+
+- **Curly apostrophes in author surnames.** v1.2.2 fixed this for short
+  titles; surnames took the same path into the document but kept the straight
+  apostrophe from Zotero’s item data. A name like *O’Connor* now uses the
+  typographic right single quotation mark (U+2019) in `[hereinafter ...]`
+  brackets, supra cites, and "Break id." short forms, matching what citeproc
+  emits for the first cite.
 
 ### v1.3.2
 

@@ -5,6 +5,22 @@ prefix in each section header identifies which plugin shipped.
 
 ## bluebook-citations-fixer
 
+### v1.3.3 — 2026-09-05
+
+- **Curly apostrophes in author surnames.** v1.2.2 converted straight
+  apostrophes (U+0027) to the typographic right single quotation mark
+  (U+2019) in short titles, matching citeproc’s smart-quotes pass — but only
+  in titles. Author surnames took the same path into the document and never
+  got the same treatment: `BCF.cite.surnames` returned the CSL `family` field
+  verbatim, so a surname like *O’Connor* was injected into a
+  `[hereinafter ...]` bracket, a `supra` cite, or a "Break id." short form
+  with a straight apostrophe, disagreeing with the U+2019 citeproc had
+  already written into the rendered first cite. The conversion is now
+  factored out as `BCF.cite.smartApostrophes` and applied by both
+  `normalizeTitleMarkup` and `surnames`. Because `authorKey` buckets off
+  `surnames`, ambiguity grouping also now survives a straight/curly mismatch
+  between two library items for the same author.
+
 ### v1.3.2 — 2026-08-15
 
 - **Hereinafter survives "Omit Author" on subsequent cites.** The
