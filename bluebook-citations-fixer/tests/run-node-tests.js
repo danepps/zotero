@@ -355,6 +355,93 @@ function eligibleRun(initialCitationsByIndex, items) {
 }
 
 {
+    // Suppress Author on a subsequent cite: citeproc renders a bare
+    // "supra note N" (no author, no leading comma). The short title must
+    // still be injected — before "supra", outside its italic group.
+    const a = cit("SA1", "Epps", "Checks", "Checks and Balances", 1);
+    a["suppress-author"] = true;
+    const b = cit("SA2", "Epps", "Asymmetry", "Adversarial Asymmetry");
+    const run = eligibleRun({
+        1: citation(1, [a]),
+        2: citation(1, [b])
+    }, [a, b]);
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: "See {\\i{}supra} note 4, at 10",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "See {\\i{}Checks}, {\\i{}supra} note 4, at 10");
+    // Idempotency: the injected form passes through unchanged.
+    assert.strictEqual(BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: out,
+        rtf: BCF.rtf
+    }), out);
+}
+
+{
+    // Suppress Author, no signal: "supra" opens the segment. The title lands
+    // at the very start, before any group wrapping "supra".
+    const a = cit("SA3", "Epps", "Checks", "Checks and Balances", 1);
+    a["suppress-author"] = true;
+    const b = cit("SA4", "Epps", "Asymmetry", "Adversarial Asymmetry");
+    const run = eligibleRun({
+        1: citation(1, [a]),
+        2: citation(1, [b])
+    }, [a, b]);
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: "{\\i{}supra} note 4",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "{\\i{}Checks}, {\\i{}supra} note 4");
+}
+
+{
+    // Suppress Author on a book: title injects in small caps.
+    const a = cit(
+        "SAB1", "Taslitz", "Reconstructing", "Reconstructing the Fourth Amendment",
+        1, undefined, { type: "book" }
+    );
+    a["suppress-author"] = true;
+    const b = cit(
+        "SAB2", "Taslitz", "Treatise", "A Treatise on Search & Seizure",
+        undefined, undefined, { type: "book" }
+    );
+    const run = eligibleRun({
+        1: citation(1, [a]),
+        2: citation(1, [b])
+    }, [a, b]);
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: "See {\\i{}supra} note 4",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(out, "See {\\scaps Reconstructing}, {\\i{}supra} note 4");
+}
+
+{
+    // Without the suppress-author flag, a bare "supra note" (no author
+    // comma) is left alone — the fallback is gated on the flag.
+    const a = cit("SA5", "Epps", "Checks", "Checks and Balances", 1);
+    const b = cit("SA6", "Epps", "Asymmetry", "Adversarial Asymmetry");
+    const run = eligibleRun({
+        1: citation(1, [a]),
+        2: citation(1, [b])
+    }, [a, b]);
+    assert.strictEqual(BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [a] },
+        run,
+        text: "See {\\i{}supra} note 4",
+        rtf: BCF.rtf
+    }), "See {\\i{}supra} note 4");
+}
+
+{
     const a = cit("Aid", "Kerr", "Theory", "An Equilibrium-Adjustment Theory of the Fourth Amendment");
     const b = cit("Bid", "Kerr", "Other", "The Curious History of Fourth Amendment Searches");
     const run = eligibleRun({
@@ -718,6 +805,44 @@ function eligibleRun(initialCitationsByIndex, items) {
         out,
         "Jane Doe, Children\\uc0\\u8217{}s Rights (2020) " +
         "[hereinafter Doe, {\\i{}Children\\uc0\\u8217{}s Rights}]"
+    );
+}
+
+{
+    // Same normalization must apply to author surnames: "O'Connor" arrives
+    // from CSL JSON with a straight apostrophe, while citeproc renders U+2019.
+    // Without this the injected supra cite / hereinafter bracket disagrees
+    // with the rendered first cite.
+    const STRAIGHT = String.fromCharCode(0x0027);
+    const CURLY    = String.fromCharCode(0x2019);
+    assert.deepStrictEqual(
+        Array.from(BCF.cite.surnames({ author: [{ family: "O" + STRAIGHT + "Connor" }] })),
+        ["O" + CURLY + "Connor"]
+    );
+    assert.strictEqual(
+        BCF.cite.authorKey({ author: [{ family: "D" + STRAIGHT + "Amato" }] }),
+        ("D" + CURLY + "Amato").toLowerCase()
+    );
+    // The hereinafter bracket renders the surname with the RTF escape for
+    // U+2019 (decimal 8217), matching what citeproc wrote for the long cite.
+    const item = cit("ApAuth", "O" + STRAIGHT + "Connor", "First Work", "First Work",
+        undefined, undefined, { type: "article-journal" });
+    const item2 = cit("ApAuth2", "O" + STRAIGHT + "Connor", "Other Work", "Other Work",
+        undefined, undefined, { type: "article-journal" });
+    const run = eligibleRun({
+        1: citation(1, [item]),
+        2: citation(1, [item2])
+    }, [item, item2]);
+    const out = BCF.features.hereinafter.rewrite({
+        codeJson: { citationItems: [item] },
+        run,
+        text: "Sandra O\\uc0\\u8217{}Connor, First Work (2020)",
+        rtf: BCF.rtf
+    });
+    assert.strictEqual(
+        out,
+        "Sandra O\\uc0\\u8217{}Connor, First Work (2020) " +
+        "[hereinafter O\\uc0\\u8217{}Connor, {\\i{}First Work}]"
     );
 }
 

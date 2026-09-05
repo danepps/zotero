@@ -13,7 +13,7 @@ that are awkward or impossible to express cleanly in CSL alone.
 
 ## Install
 
-Download [Bluebook_Citations_Fixer_v1.3.1.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.3.1/Bluebook_Citations_Fixer_v1.3.1.xpi)
+Download [Bluebook_Citations_Fixer_v1.3.3.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.3.3/Bluebook_Citations_Fixer_v1.3.3.xpi)
 and install it via **Zotero → Tools → Plugins → gear menu → Install Plugin From File**.
 
 > 💡 Pairs with [Bluebook Signals](../bluebook-signals/README.md) —
@@ -132,13 +132,32 @@ only — Word and LibreOffice work; Google Docs is not yet supported.
 
 ## Latest Released Version
 
-- `1.3.1`
-- Git tag: `bluebook-citations-fixer-v1.3.1`
-- GitHub release asset: [Bluebook_Citations_Fixer_v1.3.1.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.3.1/Bluebook_Citations_Fixer_v1.3.1.xpi)
+- `1.3.3`
+- Git tag: `bluebook-citations-fixer-v1.3.3`
+- GitHub release asset: [Bluebook_Citations_Fixer_v1.3.3.xpi](https://github.com/danepps/zotero/releases/download/bluebook-citations-fixer-v1.3.3/Bluebook_Citations_Fixer_v1.3.3.xpi)
 
 ## Release History
 
 See [`../CHANGELOG.md`](../CHANGELOG.md) for the full history. Recent releases:
+
+### v1.3.3
+
+- **Curly apostrophes in author surnames.** v1.2.2 fixed this for short
+  titles; surnames took the same path into the document but kept the straight
+  apostrophe from Zotero’s item data. A name like *O’Connor* now uses the
+  typographic right single quotation mark (U+2019) in `[hereinafter ...]`
+  brackets, supra cites, and "Break id." short forms, matching what citeproc
+  emits for the first cite.
+
+### v1.3.2
+
+- **Hereinafter survives "Omit Author" on subsequent cites.** Suppressing the
+  author on a subsequent cite of a hereinafter'd work made citeproc render a
+  bare `supra note N` — and the plugin, which anchored its short-title
+  injection on the comma after the author, silently dropped the title too.
+  The short title is now injected before the bare `supra` (italic for
+  articles, small caps for books), so the cite renders
+  `Short Title, supra note N`. Gated on the cite's own Omit Author flag.
 
 ### v1.3.1
 

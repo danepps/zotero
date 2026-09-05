@@ -5,6 +5,36 @@ prefix in each section header identifies which plugin shipped.
 
 ## bluebook-citations-fixer
 
+### v1.3.3 — 2026-09-05
+
+- **Curly apostrophes in author surnames.** v1.2.2 converted straight
+  apostrophes (U+0027) to the typographic right single quotation mark
+  (U+2019) in short titles, matching citeproc’s smart-quotes pass — but only
+  in titles. Author surnames took the same path into the document and never
+  got the same treatment: `BCF.cite.surnames` returned the CSL `family` field
+  verbatim, so a surname like *O’Connor* was injected into a
+  `[hereinafter ...]` bracket, a `supra` cite, or a "Break id." short form
+  with a straight apostrophe, disagreeing with the U+2019 citeproc had
+  already written into the rendered first cite. The conversion is now
+  factored out as `BCF.cite.smartApostrophes` and applied by both
+  `normalizeTitleMarkup` and `surnames`. Because `authorKey` buckets off
+  `surnames`, ambiguity grouping also now survives a straight/curly mismatch
+  between two library items for the same author.
+
+### v1.3.2 — 2026-08-15
+
+- **Hereinafter survives "Omit Author" on subsequent cites.** The
+  subsequent-cite rewrite in `lib/features/hereinafter.js` located its
+  insertion point by searching for `, supra note` — the comma that follows the
+  author's surname. With Omit Author ticked, citeproc drops the author and
+  renders a bare `supra note N`; the anchor missed and the cite lost both
+  author *and* short title. A fallback now injects the short title directly
+  before the bare `supra` (italic for articles, small caps for books),
+  producing `Short Title, supra note N`. The fallback is gated on the cite's
+  own `suppress-author` flag so an oddly-rendered authored cite can't pick up
+  a stray title, and the insertion point is computed to land outside the
+  italic group wrapping `supra` so the injected comma stays roman.
+
 ### v1.3.1 — 2026-07-26
 
 - **Embedded italics in short titles render with flip-flop, not flattened.** A
