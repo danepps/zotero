@@ -1,13 +1,6 @@
 "use strict";
 
 const XUL_NS = 'http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul';
-const XHTML_NS = 'http://www.w3.org/1999/xhtml';
-
-// Italic preview of how signals will appear in the citation. A serif face with
-// a true italic is used because the macOS system menu font (SF) can render the
-// menu upright even when font-style: italic is set.
-const ITEM_STYLE = 'font-family: "Times New Roman", Times, Georgia, serif !important; '
-                 + 'font-style: italic !important; font-size: 14px !important;';
 
 // ---------------------------------------------------------------------------
 // Preferences
@@ -42,6 +35,20 @@ function italicize(str) {
     return '<i>' + str + '</i>';
 }
 
+// Menu labels can't be styled: on macOS the popup is drawn as a native menu,
+// which ignores CSS. So preview the italics with Unicode Mathematical Italic
+// letters (U+1D434 A, U+1D44E a; italic h lives at U+210E). Display only --
+// the inserted text is still plain letters wrapped in <i>.
+function italicLabel(str) {
+    return Array.from(str, function (ch) {
+        var c = ch.charCodeAt(0);
+        if (ch === 'h') return '\u210E';
+        if (c >= 65 && c <= 90)  return String.fromCodePoint(0x1D434 + c - 65);
+        if (c >= 97 && c <= 122) return String.fromCodePoint(0x1D44E + c - 97);
+        return ch;
+    }).join('');
+}
+
 // ---------------------------------------------------------------------------
 // Inject signals popup into citation dialog
 // ---------------------------------------------------------------------------
@@ -57,20 +64,6 @@ function injectUI(doc) {
     // popup chain so clicking a menuitem doesn't collapse the itemDetails panel.
     var popup = doc.createElementNS(XUL_NS, 'menupopup');
     popup.id = 'bluebook-signals-popup';
-
-    // Style: italic labels to preview how signals will appear in citation.
-    // Target the menuitem's inner .menu-text label too, so no toolkit rule on
-    // the label can reset the inherited style.
-    var style = doc.createElementNS(XHTML_NS, 'style');
-    style.textContent = [
-        '#bluebook-signals-popup,',
-        '#bluebook-signals-popup menuitem,',
-        '#bluebook-signals-popup menuitem > label,',
-        '#bluebook-signals-popup .menu-text {',
-        '  ' + ITEM_STYLE,
-        '}'
-    ].join('\n');
-    (doc.head || doc.documentElement).appendChild(style);
 
     function insertSignal(value) {
         var prefixField = doc.getElementById('prefix');
@@ -91,8 +84,7 @@ function injectUI(doc) {
 
     function addItem(label, insertValue) {
         var item = doc.createElementNS(XUL_NS, 'menuitem');
-        item.setAttribute('label', label);
-        item.setAttribute('style', ITEM_STYLE);
+        item.setAttribute('label', italicLabel(label));
         item.addEventListener('command', function () {
             insertSignal(insertValue);
         });
