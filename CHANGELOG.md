@@ -374,6 +374,14 @@ For the underlying commits, see the [git history on `main`](https://github.com/d
 
 ## bluebook-signals
 
+### v3.0.2 — 2026-10-31
+
+- **Sans-serif italic menu labels.** v3.0.1's Mathematical Italic letters are
+  a serif design, so the Ctrl+S menu looked like Times. Labels now use Unicode
+  Mathematical Sans-Serif Italic (U+1D608 A, U+1D622 a), which is contiguous,
+  so the italic-h special case is gone. Font size can't be changed: the native
+  macOS menu ignores CSS. Display only — inserted text is unchanged.
+
 ### v3.0.1 — 2026-10-31
 
 - **Italic signals in the Ctrl+S menu.** The menu tried to italicize its

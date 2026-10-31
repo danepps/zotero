@@ -6,7 +6,7 @@ Bluebook signals and insert the chosen one.
 
 ## Install
 
-Download [Bluebook_Signals_v3.0.1.xpi](https://github.com/danepps/zotero/releases/download/bluebook-signals-v3.0.1/Bluebook_Signals_v3.0.1.xpi)
+Download [Bluebook_Signals_v3.0.2.xpi](https://github.com/danepps/zotero/releases/download/bluebook-signals-v3.0.2/Bluebook_Signals_v3.0.2.xpi)
 and install it via **Zotero → Tools → Plugins → gear menu → Install Plugin From File**.
 
 > 💡 Pairs with [Bluebook Citations Fixer](../bluebook-citations-fixer/README.md) —
@@ -39,6 +39,8 @@ meant to be used together — **installing both is recommended.**
 
 ## Release history
 
+- **v3.0.2** (2026-10-31) — Menu signals now use a sans-serif italic instead of a
+  serif one.
 - **v3.0.1** (2026-10-31) — Signals display in italics in the Ctrl+S menu.
   Also fixes the plugin's packaging so it builds correctly from the repo.
 - **v3.0.0** (2026-04-03) — Initial release, updated for Zotero 7/9.
