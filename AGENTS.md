@@ -41,7 +41,8 @@ Each writes `releases/<Name>_v<version>.xpi` inside the plugin dir. The `release
 Shipping a real release requires three things in lock-step:
 1. Create a GitHub release with the XPI attached. Tag convention:
    - `bluebook-citations-fixer` → `bluebook-citations-fixer-v<version>` (match the tag to what the update JSON's `update_link` says — v1.2.0 shipped under the tag `bluebook-citations-fixer-v1.2`, so verify the link resolves before pushing to main)
-2. Update `update-bluebook-citations.json` at the repo root with the new version + download link.
+   - `bluebook-signals` → `bluebook-signals-v<version>`
+2. Update the plugin's update JSON at the repo root with the new version + download link: `update-bluebook-citations.json` for `bluebook-citations-fixer`, `update.json` for `bluebook-signals`.
 3. Push to main so GitHub Pages serves the updated JSON.
 
 There is no CI. `bluebook-citations-fixer` has a small Node helper test harness at `bluebook-citations-fixer/tests/run-node-tests.js`; broader validation is manual: install the XPI in Zotero, run the feature, and read the diagnostic written to `/tmp/bluebook-citations-fixer-diag.txt` (enabled via the `extensions.bluebook-citations-fixer.diag` pref in about:config). Errors also surface in the Error Console regardless of the pref.
