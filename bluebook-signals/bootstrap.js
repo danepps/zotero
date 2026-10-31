@@ -36,15 +36,15 @@ function italicize(str) {
 }
 
 // Menu labels can't be styled: on macOS the popup is drawn as a native menu,
-// which ignores CSS. So preview the italics with Unicode Mathematical Italic
-// letters (U+1D434 A, U+1D44E a; italic h lives at U+210E). Display only --
+// which ignores CSS. So preview the italics with Unicode Mathematical
+// Sans-Serif Italic letters (U+1D608 A, U+1D622 a; contiguous, no holes) --
+// the plain Mathematical Italic block is a serif design. Display only --
 // the inserted text is still plain letters wrapped in <i>.
 function italicLabel(str) {
     return Array.from(str, function (ch) {
         var c = ch.charCodeAt(0);
-        if (ch === 'h') return '\u210E';
-        if (c >= 65 && c <= 90)  return String.fromCodePoint(0x1D434 + c - 65);
-        if (c >= 97 && c <= 122) return String.fromCodePoint(0x1D44E + c - 97);
+        if (c >= 65 && c <= 90)  return String.fromCodePoint(0x1D608 + c - 65);
+        if (c >= 97 && c <= 122) return String.fromCodePoint(0x1D622 + c - 97);
         return ch;
     }).join('');
 }
