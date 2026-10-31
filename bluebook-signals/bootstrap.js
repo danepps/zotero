@@ -1,6 +1,13 @@
 "use strict";
 
 const XUL_NS = 'http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul';
+const XHTML_NS = 'http://www.w3.org/1999/xhtml';
+
+// Italic preview of how signals will appear in the citation. A serif face with
+// a true italic is used because the macOS system menu font (SF) can render the
+// menu upright even when font-style: italic is set.
+const ITEM_STYLE = 'font-family: "Times New Roman", Times, Georgia, serif !important; '
+                 + 'font-style: italic !important; font-size: 14px !important;';
 
 // ---------------------------------------------------------------------------
 // Preferences
@@ -51,16 +58,19 @@ function injectUI(doc) {
     var popup = doc.createElementNS(XUL_NS, 'menupopup');
     popup.id = 'bluebook-signals-popup';
 
-    // Style: italic labels to preview how signals will appear in citation
-    var style = doc.createElement('style');
+    // Style: italic labels to preview how signals will appear in citation.
+    // Target the menuitem's inner .menu-text label too, so no toolkit rule on
+    // the label can reset the inherited style.
+    var style = doc.createElementNS(XHTML_NS, 'style');
     style.textContent = [
         '#bluebook-signals-popup,',
-        '#bluebook-signals-popup menuitem {',
-        '  font-style: italic;',
-        '  font-size: 13px;',
+        '#bluebook-signals-popup menuitem,',
+        '#bluebook-signals-popup menuitem > label,',
+        '#bluebook-signals-popup .menu-text {',
+        '  ' + ITEM_STYLE,
         '}'
     ].join('\n');
-    doc.head.appendChild(style);
+    (doc.head || doc.documentElement).appendChild(style);
 
     function insertSignal(value) {
         var prefixField = doc.getElementById('prefix');
@@ -82,6 +92,7 @@ function injectUI(doc) {
     function addItem(label, insertValue) {
         var item = doc.createElementNS(XUL_NS, 'menuitem');
         item.setAttribute('label', label);
+        item.setAttribute('style', ITEM_STYLE);
         item.addEventListener('command', function () {
             insertSignal(insertValue);
         });
