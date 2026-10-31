@@ -35,6 +35,20 @@ function italicize(str) {
     return '<i>' + str + '</i>';
 }
 
+// Menu labels can't be styled: on macOS the popup is drawn as a native menu,
+// which ignores CSS. So preview the italics with Unicode Mathematical Italic
+// letters (U+1D434 A, U+1D44E a; italic h lives at U+210E). Display only --
+// the inserted text is still plain letters wrapped in <i>.
+function italicLabel(str) {
+    return Array.from(str, function (ch) {
+        var c = ch.charCodeAt(0);
+        if (ch === 'h') return '\u210E';
+        if (c >= 65 && c <= 90)  return String.fromCodePoint(0x1D434 + c - 65);
+        if (c >= 97 && c <= 122) return String.fromCodePoint(0x1D44E + c - 97);
+        return ch;
+    }).join('');
+}
+
 // ---------------------------------------------------------------------------
 // Inject signals popup into citation dialog
 // ---------------------------------------------------------------------------
@@ -50,17 +64,6 @@ function injectUI(doc) {
     // popup chain so clicking a menuitem doesn't collapse the itemDetails panel.
     var popup = doc.createElementNS(XUL_NS, 'menupopup');
     popup.id = 'bluebook-signals-popup';
-
-    // Style: italic labels to preview how signals will appear in citation
-    var style = doc.createElement('style');
-    style.textContent = [
-        '#bluebook-signals-popup,',
-        '#bluebook-signals-popup menuitem {',
-        '  font-style: italic;',
-        '  font-size: 13px;',
-        '}'
-    ].join('\n');
-    doc.head.appendChild(style);
 
     function insertSignal(value) {
         var prefixField = doc.getElementById('prefix');
@@ -81,7 +84,7 @@ function injectUI(doc) {
 
     function addItem(label, insertValue) {
         var item = doc.createElementNS(XUL_NS, 'menuitem');
-        item.setAttribute('label', label);
+        item.setAttribute('label', italicLabel(label));
         item.addEventListener('command', function () {
             insertSignal(insertValue);
         });

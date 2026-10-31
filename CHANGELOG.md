@@ -371,3 +371,22 @@ Bug-fix release from a full code review of the rewrite pipeline.
   XPI filename all renamed in lock-step.
 
 For the underlying commits, see the [git history on `main`](https://github.com/danepps/zotero/commits/main/bluebook-citations-fixer).
+
+## bluebook-signals
+
+### v3.0.1 — 2026-10-31
+
+- **Italic signals in the Ctrl+S menu.** The menu tried to italicize its
+  labels with CSS (`font-style: italic`), but on macOS the popup is drawn as a
+  native menu that ignores CSS, so the signals always showed upright. Labels
+  are now built from Unicode Mathematical Italic letters (`italicLabel` in
+  `bootstrap.js`), which render slanted in any menu. Display only — the text
+  inserted into the Prefix field is unchanged.
+- **Packaging fix.** A source reorganization (5f279cf) had nested the plugin's
+  `chrome/` directory as `chrome/chrome/`, so any build from the repo lacked
+  `chrome/content/defaultprefs.js`; startup threw and the plugin did nothing.
+  The directory is back at `bluebook-signals/chrome/`.
+
+### v3.0.0 — 2026-04-03
+
+- Initial release: Frank Bennett's signal picker updated for Zotero 7/9.
