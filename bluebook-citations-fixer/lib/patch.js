@@ -21,9 +21,75 @@ BCF.patch._origSessionWriteDelayedCitation = null;
 BCF.patch._origSessionInternalUpdateDocument = null;
 BCF.patch._sessionWrappers = {};
 BCF.patch._instrumentedFieldProtos = new WeakSet();
-BCF.patch._wrappedFieldProtos = [];
+BCF.patch._records = [];
+BCF.patch._enabled = false;
+BCF.patch._lifetime = null;
+
+// Records live on the exact target and wrapper, not a boolean prototype flag.
+// A foreign wrapper is opaque: never unwrap it. Retired BCF dispatchers that
+// remain beneath it delegate without retaining feature-module closures.
+BCF.patch._unwrapInactive = function (fn) {
+    while (typeof fn === "function") {
+        var record = Object.prototype.hasOwnProperty.call(fn, "__bcfHookRecord") && fn.__bcfHookRecord;
+        if (!record || record.protocol !== "bcf-hook-v1" || record.wrapper !== fn || record.handler) break;
+        fn = record.original;
+    }
+    return fn;
+};
+
+BCF.patch._release = function (record) {
+    record.handler = null;
+    if (record.target[record.name] === record.wrapper) {
+        record.target[record.name] = BCF.patch._unwrapInactive(record.original);
+    } else {
+        BCF.diag.event("patch", record.key + " changed by another patch; retired wrapper left inactive");
+    }
+    if (record.target[record.marker] === record && record.target[record.name] !== record.wrapper) {
+        // Keep identity metadata while buried under a foreign wrapper. A later
+        // instance can retire it without guessing what the foreign code calls.
+        if (record.target[record.name] === BCF.patch._unwrapInactive(record.original)) {
+            delete record.target[record.marker];
+        }
+    }
+};
+
+BCF.patch._wrap = function (target, name, key, makeHandler) {
+    var marker = "__bcfHook_" + key;
+    var previous = Object.prototype.hasOwnProperty.call(target, marker) && target[marker];
+    if (previous && previous.protocol === "bcf-hook-v1" && previous.target === target && previous.name === name) {
+        if (previous.lifetime !== BCF.patch._lifetime) {
+            // Retire the entire prior instance, including diagnostic seams the
+            // replacement has not encountered yet and any queued install retry.
+            previous.lifetime.active = false;
+            previous.lifetime.records.forEach(function (r) { r.handler = null; });
+        }
+        BCF.patch._release(previous);
+    }
+    var original = BCF.patch._unwrapInactive(target[name]);
+    var record = { protocol: "bcf-hook-v1", target: target, name: name,
+        marker: marker, key: key, original: original, handler: null, wrapper: null,
+        lifetime: BCF.patch._lifetime };
+    var wrapper = function () {
+        var handler = record.handler;
+        return (handler || original).apply(this, arguments);
+    };
+    record.wrapper = wrapper;
+    record.handler = makeHandler(original, record);
+    Object.defineProperty(wrapper, "__bcfHookRecord", { value: record });
+    Object.defineProperty(target, marker, { value: record, writable: true, configurable: true });
+    target[name] = wrapper;
+    BCF.patch._records.push(record);
+    return record;
+};
 
 BCF.patch.install = function () {
+    var patchMod = BCF.patch;
+    if (!patchMod._enabled) {
+        patchMod._lifetime = { active: true, records: patchMod._records };
+        patchMod._enabled = true;
+    }
+    if (!patchMod._lifetime.active) return;
+    var lifetime = patchMod._lifetime;
     BCF.patch._installExecCommandPatch();
     BCF.patch._installSessionPatches();
     BCF.patch._installFieldPatch();
@@ -42,7 +108,7 @@ BCF.patch.install = function () {
             BCF.patch._retryTimer = Components.classes["@mozilla.org/timer;1"]
                 .createInstance(Components.interfaces.nsITimer);
             BCF.patch._retryTimer.initWithCallback(
-                { notify: function () { BCF.patch.install(); } },
+                { notify: function () { if (lifetime.active) patchMod.install(); } },
                 1000,
                 Components.interfaces.nsITimer.TYPE_ONE_SHOT
             );
@@ -66,140 +132,89 @@ BCF.patch._installFieldPatch = function () {
         return;
     }
     var Field = Zotero.Integration.Field;
-    if (Field.prototype.__lcfPatched) {
-        // A previous plugin instance patched setText and its uninstall never
-        // ran (crash, upgrade-in-place). Recover the true original it stashed
-        // on the prototype rather than adopting the stale wrapper as ours.
-        if (typeof Field.prototype.__bcfOrigSetText === "function") {
-            Field.prototype.setText = Field.prototype.__bcfOrigSetText;
-            delete Field.prototype.__lcfPatched;
-            delete Field.prototype.__bcfOrigSetText;
-            BCF.diag.event("patch", "recovered original setText from stale patch");
-        } else {
-            BCF.patch._orig = Field.prototype.setText;
-            return;
-        }
+    // Legacy booleans do not identify the live function. Recovering from one
+    // could erase another plugin's wrapper. Leave it untouched until restart.
+    if (Field.prototype.__lcfPatched && !Field.prototype.__bcfHook_fieldSetText) {
+        BCF.diag.event("patch", "unidentified legacy setText patch; restart Zotero to recover");
+        BCF.diag.err("patch", new Error("Unidentified legacy setText patch; restart Zotero to recover safely"));
+        BCF.patch._orig = Field.prototype.setText;
+        return;
     }
-    BCF.patch._orig = Field.prototype.setText;
-    // Capture everything the wrapper needs NOW. A hot disable/upgrade can
-    // null BCF.patch._orig while a write is mid-flight; the wrapper must
-    // still be able to complete Zotero's original setText afterward, so it
-    // never looks anything up through the global namespace after yielding.
-    var orig = BCF.patch._orig;
     var patchMod = BCF.patch;
     var diagMod = BCF.diag;
-    var wrapper = function (text) {
-        var field = this;
-        // Run our pipeline, then delegate. Always return the original's result
-        // so the Integration Field interface contract (isRich) is preserved.
-        return Promise.resolve()
-            .then(function () { return patchMod.run(field, text); })
-            .catch(function (e) {
-                try { diagMod.err("patch.run", e); } catch (_) {}
-                return text;
-            })
-            .then(function (rewritten) { return orig.call(field, rewritten); });
-    };
-    BCF.patch._wrapper = wrapper;
-    Field.prototype.setText = wrapper;
-    Field.prototype.__bcfOrigSetText = orig;
-    Field.prototype.__lcfPatched = true;
+    var record = patchMod._wrap(Field.prototype, "setText", "fieldSetText", function (orig, state) {
+        return function (text) {
+            var field = this;
+            var args = Array.prototype.slice.call(arguments);
+            return Promise.resolve()
+                .then(function () { return state.handler ? patchMod.run(field, text) : text; })
+                .catch(function (e) {
+                    try { diagMod.err("patch.run", e); } catch (_) {}
+                    return text;
+                })
+                .then(function (rewritten) {
+                    args[0] = rewritten;
+                    return orig.apply(field, args);
+                });
+        };
+    });
+    patchMod._orig = record.original;
+    patchMod._wrapper = record.wrapper;
     BCF.diag.event("patch", "installed on Zotero.Integration.Field.prototype.setText");
 };
 
 BCF.patch.uninstall = function () {
+    var patchMod = BCF.patch;
+    patchMod._enabled = false;
+    if (patchMod._lifetime) patchMod._lifetime.active = false;
     try {
-        if (BCF.patch._retryTimer) {
-            BCF.patch._retryTimer.cancel();
-            BCF.patch._retryTimer = null;
-        }
+        if (patchMod._retryTimer) patchMod._retryTimer.cancel();
     } catch (_) {}
-    BCF.patch._uninstrumentFields();
-    // Identity-checked restoration throughout: restore a method only when the
-    // installed function is still OUR wrapper. If another plugin wrapped on
-    // top of us, putting our saved original back would silently drop their
-    // wrapper; instead leave the chain intact (our wrappers are closure-safe
-    // after teardown — they hold their original and modules captured) and log.
-    // Restore the setText patch only if it was installed (install() sets _orig
-    // last, after the exec/session patches), but DON'T gate the exec/session
-    // restores below on _orig: a shutdown during the Field-retry window leaves
-    // those installed while _orig is still null.
-    if (BCF.patch._orig) {
-        try {
-            var Field = Zotero.Integration.Field;
-            if (Field && Field.prototype) {
-                if (Field.prototype.setText === BCF.patch._wrapper) {
-                    Field.prototype.setText = BCF.patch._orig;
-                    delete Field.prototype.__lcfPatched;
-                    delete Field.prototype.__bcfOrigSetText;
-                } else {
-                    BCF.diag.event("patch", "setText overwrapped by another patch; leaving chain in place");
-                }
-            }
-        } catch (_) {}
-        BCF.patch._orig = null;
-        BCF.patch._wrapper = null;
+    patchMod._retryTimer = null;
+    // Reverse installation order also handles diagnostics wrapping our primary
+    // field seam. Even buried dispatchers become inert before globals unload.
+    for (var i = patchMod._records.length - 1; i >= 0; i--) {
+        var record = patchMod._records[i];
+        record.handler = null;
+        try { patchMod._release(record); }
+        catch (e) { try { BCF.diag.err("uninstall:" + record.key, e); } catch (_) {} }
     }
-    if (BCF.patch._origExecCommand) {
-        try {
-            if (Zotero.Integration.execCommand === BCF.patch._execWrapper) {
-                Zotero.Integration.execCommand = BCF.patch._origExecCommand;
-            } else {
-                BCF.diag.event("patch", "execCommand overwrapped by another patch; leaving chain in place");
-            }
-        } catch (_) {}
-        BCF.patch._origExecCommand = null;
-        BCF.patch._execWrapper = null;
-    }
-    var sessionRestores = [
-        ["updateDocument", "_origSessionUpdateDocument"],
-        ["writeDelayedCitation", "_origSessionWriteDelayedCitation"],
-        ["_updateDocument", "_origSessionInternalUpdateDocument"]
-    ];
-    for (var ri = 0; ri < sessionRestores.length; ri++) {
-        var name = sessionRestores[ri][0];
-        var slot = sessionRestores[ri][1];
-        if (BCF.patch[slot] && Zotero.Integration && Zotero.Integration.Session) {
-            try {
-                var proto = Zotero.Integration.Session.prototype;
-                if (proto[name] === BCF.patch._sessionWrappers[name]) {
-                    proto[name] = BCF.patch[slot];
-                } else {
-                    BCF.diag.event("patch", "Session." + name + " overwrapped by another patch; leaving chain in place");
-                }
-            } catch (_) {}
-            BCF.patch[slot] = null;
-            delete BCF.patch._sessionWrappers[name];
-        }
-    }
+    patchMod._records = [];
+    patchMod._instrumentedFieldProtos = new WeakSet();
+    patchMod._orig = patchMod._wrapper = null;
+    patchMod._origExecCommand = patchMod._execWrapper = null;
+    patchMod._origSessionUpdateDocument = null;
+    patchMod._origSessionWriteDelayedCitation = null;
+    patchMod._origSessionInternalUpdateDocument = null;
+    patchMod._sessionWrappers = {};
 };
 
 BCF.patch._installExecCommandPatch = function () {
     if (BCF.patch._origExecCommand) return;
     if (!Zotero.Integration || typeof Zotero.Integration.execCommand !== "function") return;
-    var orig = Zotero.Integration.execCommand;
     var patchMod = BCF.patch;
     var diagMod = BCF.diag;
-    BCF.patch._origExecCommand = orig;
-    var wrapper = async function (agent, command, docId, templateVersion) {
-        try {
-            diagMod.event("execCommand", {
-                agent: agent,
-                command: command,
-                docId: docId || "",
-                templateVersion: templateVersion == null ? "" : templateVersion
-            });
-        } catch (_) {}
-        try {
-            return await orig.apply(this, arguments);
-        } finally {
-            // Diagnostics only — a failure here (or a mid-command teardown)
-            // must never mask the command's own result.
-            try { patchMod._inspectLiveSession("execCommand:finally"); } catch (_) {}
-        }
-    };
-    BCF.patch._execWrapper = wrapper;
-    Zotero.Integration.execCommand = wrapper;
+    var record = patchMod._wrap(Zotero.Integration, "execCommand", "execCommand", function (orig, state) {
+        return async function (agent, command, docId, templateVersion) {
+            try {
+                diagMod.event("execCommand", {
+                    agent: agent,
+                    command: command,
+                    docId: docId || "",
+                    templateVersion: templateVersion == null ? "" : templateVersion
+                });
+            } catch (_) {}
+            try {
+                return await orig.apply(this, arguments);
+            } finally {
+                // Diagnostics only — a failure here (or a mid-command teardown)
+                // must never mask the command's own result.
+                try { if (state.handler) patchMod._inspectLiveSession("execCommand:finally"); } catch (_) {}
+            }
+        };
+    });
+    BCF.patch._origExecCommand = record.original;
+    BCF.patch._execWrapper = record.wrapper;
     BCF.diag.event("patch", "installed on Zotero.Integration.execCommand");
 };
 
@@ -215,77 +230,78 @@ BCF.patch._installSessionPatches = function () {
     var diagMod = BCF.diag;
     var runMod = BCF.run;
     if (!BCF.patch._origSessionUpdateDocument && typeof proto.updateDocument === "function") {
-        var origUpdate = proto.updateDocument;
-        BCF.patch._origSessionUpdateDocument = origUpdate;
-        var updateWrapper = async function () {
-            try {
-                diagMod.event("session.updateDocument", {
-                    fieldCount: patchMod._fieldCount(this),
-                    outputFormat: this.outputFormat || (this.data && this.data.prefs && this.data.prefs.outputFormat) || ""
-                });
-                patchMod._instrumentSessionFields(this, "updateDocument:before");
-            } catch (_) {}
-            try {
-                return await origUpdate.apply(this, arguments);
-            } finally {
-                // Diagnostics only — never mask the command's own result.
-                try { patchMod._instrumentSessionFields(this, "updateDocument:after"); } catch (_) {}
-            }
-        };
-        BCF.patch._sessionWrappers.updateDocument = updateWrapper;
-        proto.updateDocument = updateWrapper;
+        var record = patchMod._wrap(proto, "updateDocument", "session.updateDocument", function (origUpdate, state) {
+            return async function () {
+                try {
+                    diagMod.event("session.updateDocument", {
+                        fieldCount: patchMod._fieldCount(this),
+                        outputFormat: this.outputFormat || (this.data && this.data.prefs && this.data.prefs.outputFormat) || ""
+                    });
+                    patchMod._instrumentSessionFields(this, "updateDocument:before");
+                } catch (_) {}
+                try {
+                    return await origUpdate.apply(this, arguments);
+                } finally {
+                    // Diagnostics only — never mask the command's own result.
+                    try { if (state.handler) patchMod._instrumentSessionFields(this, "updateDocument:after"); } catch (_) {}
+                }
+            };
+        });
+        BCF.patch._origSessionUpdateDocument = record.original;
+        BCF.patch._sessionWrappers.updateDocument = record.wrapper;
         BCF.diag.event("patch", "installed on Session.updateDocument");
     }
     if (!BCF.patch._origSessionWriteDelayedCitation && typeof proto.writeDelayedCitation === "function") {
-        var origDelayed = proto.writeDelayedCitation;
-        BCF.patch._origSessionWriteDelayedCitation = origDelayed;
-        var delayedWrapper = async function (field, citation) {
-            try {
-                diagMod.event("session.writeDelayedCitation", {
-                    citationID: citation && citation.citationID ? citation.citationID : "",
-                    hasField: !!field
-                });
-                // The cached run context predates this citation (it was built
-                // during the last full update); rebuild so eligibility and
-                // first-note maps see the document as it now stands.
-                runMod.clearSession(this);
-                patchMod._instrumentField(field, "writeDelayedCitation");
-            } catch (_) {}
-            return await origDelayed.apply(this, arguments);
-        };
-        BCF.patch._sessionWrappers.writeDelayedCitation = delayedWrapper;
-        proto.writeDelayedCitation = delayedWrapper;
+        var record = patchMod._wrap(proto, "writeDelayedCitation", "session.writeDelayedCitation", function (origDelayed, state) {
+            return async function (field, citation) {
+                try {
+                    diagMod.event("session.writeDelayedCitation", {
+                        citationID: citation && citation.citationID ? citation.citationID : "",
+                        hasField: !!field
+                    });
+                    // The cached run context predates this citation (it was built
+                    // during the last full update); rebuild so eligibility and
+                    // first-note maps see the document as it now stands.
+                    runMod.clearSession(this);
+                    patchMod._instrumentField(field, "writeDelayedCitation");
+                } catch (_) {}
+                return await origDelayed.apply(this, arguments);
+            };
+        });
+        BCF.patch._origSessionWriteDelayedCitation = record.original;
+        BCF.patch._sessionWrappers.writeDelayedCitation = record.wrapper;
         BCF.diag.event("patch", "installed on Session.writeDelayedCitation");
     }
     if (!BCF.patch._origSessionInternalUpdateDocument && typeof proto._updateDocument === "function") {
-        var origInternal = proto._updateDocument;
-        BCF.patch._origSessionInternalUpdateDocument = origInternal;
-        var internalWrapper = async function () {
-            // Never let a bug in the prewrite pass break document updates —
-            // and if the pass failed, leave the per-field setText path armed
-            // so each field still gets its independent fallback rewrite.
-            var prewriteOk = false;
-            try {
-                prewriteOk = patchMod._prepareCitationTexts(this) === true;
-            } catch (e) {
-                try { diagMod.err("prepareCitationTexts", e); } catch (_) {}
-            }
-            // While the original _updateDocument fans the (already rewritten)
-            // cluster texts out to field writes, the setText hook would re-run
-            // the whole chain — including a getCode() round trip to the word
-            // processor per field. Flag the session so patch.run can skip —
-            // but only when the prewrite pass actually handled this update.
-            if (prewriteOk) {
-                try { this.__bcfPrewriteActive = true; } catch (_) {}
-            }
-            try {
-                return await origInternal.apply(this, arguments);
-            } finally {
-                try { this.__bcfPrewriteActive = false; } catch (_) {}
-            }
-        };
-        BCF.patch._sessionWrappers._updateDocument = internalWrapper;
-        proto._updateDocument = internalWrapper;
+        var record = patchMod._wrap(proto, "_updateDocument", "session._updateDocument", function (origInternal, state) {
+            return async function () {
+                // Never let a bug in the prewrite pass break document updates —
+                // and if the pass failed, leave the per-field setText path armed
+                // so each field still gets its independent fallback rewrite.
+                var previousPrewrite = this.__bcfPrewriteActive;
+                var prewriteOk = false;
+                try {
+                    prewriteOk = patchMod._prepareCitationTexts(this) === true;
+                } catch (e) {
+                    try { diagMod.err("prepareCitationTexts", e); } catch (_) {}
+                }
+                // While the original _updateDocument fans the (already rewritten)
+                // cluster texts out to field writes, the setText hook would re-run
+                // the whole chain — including a getCode() round trip to the word
+                // processor per field. Flag the session so patch.run can skip —
+                // but only when the prewrite pass actually handled this update.
+                if (prewriteOk) {
+                    try { this.__bcfPrewriteActive = true; } catch (_) {}
+                }
+                try {
+                    return await origInternal.apply(this, arguments);
+                } finally {
+                    try { this.__bcfPrewriteActive = previousPrewrite || false; } catch (_) {}
+                }
+            };
+        });
+        BCF.patch._origSessionInternalUpdateDocument = record.original;
+        BCF.patch._sessionWrappers._updateDocument = record.wrapper;
         BCF.diag.event("patch", "installed on Session._updateDocument");
     }
 };
@@ -342,50 +358,42 @@ BCF.patch._instrumentField = function (field, tag) {
                 }).join(",")
             });
         }
+        var patchMod = BCF.patch;
+        var diagMod = BCF.diag;
         ["setText", "setCode", "getText", "getCode", "delete", "removeCode"].forEach(function (name) {
-            if (typeof proto[name] !== "function" || proto["__bcfWrapped_" + name]) return;
-            var orig = proto[name];
-            proto[name] = function () {
-                BCF.diag.event("field." + name, tag);
-                return orig.apply(this, arguments);
-            };
-            proto["__bcfWrapped_" + name] = true;
-            proto["__bcfOrig_" + name] = orig;
-            if (BCF.patch._wrappedFieldProtos.indexOf(proto) === -1) {
-                BCF.patch._wrappedFieldProtos.push(proto);
-            }
+            if (typeof proto[name] !== "function") return;
+            var key = "diag." + name;
+            if (patchMod._records.some(function (r) { return r.target === proto && r.key === key && r.handler; })) return;
+            patchMod._wrap(proto, name, key, function (orig) {
+                return function () {
+                    try { diagMod.event("field." + name, tag); } catch (_) {}
+                    return orig.apply(this, arguments);
+                };
+            });
         });
     } catch (e) {
         BCF.diag.err("instrumentField", e);
     }
 };
 
-// Undo every diagnostic wrapper _instrumentField installed, so a disabled or
-// upgraded plugin doesn't leave stale closures on the word-processor field
-// prototypes.
 BCF.patch._uninstrumentFields = function () {
-    var protos = BCF.patch._wrappedFieldProtos;
-    for (var i = 0; i < protos.length; i++) {
-        var proto = protos[i];
-        ["setText", "setCode", "getText", "getCode", "delete", "removeCode"].forEach(function (name) {
-            try {
-                if (proto["__bcfWrapped_" + name] && typeof proto["__bcfOrig_" + name] === "function") {
-                    proto[name] = proto["__bcfOrig_" + name];
-                }
-                delete proto["__bcfWrapped_" + name];
-                delete proto["__bcfOrig_" + name];
-            } catch (_) {}
-        });
-    }
-    BCF.patch._wrappedFieldProtos = [];
+    var patchMod = BCF.patch;
+    patchMod._records = patchMod._records.filter(function (record) {
+        if (record.key.indexOf("diag.") !== 0) return true;
+        patchMod._release(record);
+        return false;
+    });
+    if (patchMod._lifetime) patchMod._lifetime.records = patchMod._records;
+    patchMod._instrumentedFieldProtos = new WeakSet();
 };
 
 // Hard-wired style IDs: the Epps Bluebook style and its experimental variant.
 // These are the styles the rules are written against, so the gate ALWAYS
 // allows them — no configuration involved, nothing to drift out of sync when
 // a document switches between the two.
+BCF.patch.PRIMARY_STYLE_ID = "https://danepps.github.io/bluebook/BluebookDSEStyle.csl";
 BCF.patch.BUILTIN_STYLE_IDS = [
-    "https://danepps.github.io/bluebook/BluebookDSEStyle.csl",
+    BCF.patch.PRIMARY_STYLE_ID,
     "https://danepps.github.io/bluebook/BluebookDSEStyle-Experimental.csl"
 ];
 

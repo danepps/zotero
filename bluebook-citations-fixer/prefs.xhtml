@@ -50,15 +50,62 @@
     </hbox>
   </groupbox>
   <groupbox>
+    <label><html:h2>Author-list truncation</html:h2></label>
+    <description>
+      Choose when the Epps Bluebook styles use the first author followed by
+      et al. in citations and bibliographies.
+    </description>
+    <html:label for="bcf-et-al-min">First citation and bibliography: use et al. at</html:label>
+    <html:select id="bcf-et-al-min" aria-label="First citation and bibliography threshold">
+      <html:option value="0">Style default</html:option>
+      <html:option value="3">3</html:option>
+      <html:option value="4">4</html:option>
+      <html:option value="5">5</html:option>
+      <html:option value="6">6</html:option>
+      <html:option value="7">7</html:option>
+      <html:option value="8">8</html:option>
+      <html:option value="9">9</html:option>
+      <html:option value="10">10</html:option>
+      <html:option value="11">11</html:option>
+    </html:select>
+    <html:label for="bcf-et-al-subsequent-min">Subsequent citations: use et al. at</html:label>
+    <html:select id="bcf-et-al-subsequent-min" aria-label="Subsequent citation threshold">
+      <html:option value="0">Style default</html:option>
+      <html:option value="3">3</html:option>
+      <html:option value="4">4</html:option>
+      <html:option value="5">5</html:option>
+      <html:option value="6">6</html:option>
+      <html:option value="7">7</html:option>
+      <html:option value="8">8</html:option>
+      <html:option value="9">9</html:option>
+      <html:option value="10">10</html:option>
+      <html:option value="11">11</html:option>
+    </html:select>
+    <description>Choose the minimum number of authors, or Style default for that setting. For example, 9 lists all eight authors.</description>
+    <description>
+      Refresh your document after changing this setting. Author names in
+      hereinafter labels and Break id. short forms keep their usual format.
+    </description>
+  </groupbox>
+  <groupbox>
     <label><html:h2>Style updates</html:h2></label>
+    <label id="bcf-style-setup-status"/>
     <description>
       Automatically keeps your installed copies of the Epps Bluebook styles up
-      to date. Only styles you already have installed are updated; nothing is
-      installed automatically.
+      to date. Startup checks restore the main Epps style if missing. The
+      experimental style is updated only if you already installed it.
+      The missing-style repair runs regardless of the checkbox below.
     </description>
     <checkbox id="bcf-style-sync-enabled"
               preference="extensions.bluebook-citations-fixer.styleSync"
               label="Automatically update the Epps Bluebook styles when a newer version is published"/>
+    <label value="Installed style revisions:"/>
+    <vbox id="bcf-style-versions" style="margin-left: 1.6em;">
+      <label value="Revision dates unavailable"/>
+    </vbox>
+    <label class="text-link" is="text-link"
+           href="https://danepps.github.io/bluebook/#changelog"
+           value="Latest style release notes"/>
     <hbox align="center">
       <button id="bcf-style-sync-check" label="Check for style updates"/>
       <label id="bcf-style-sync-status" value=""/>

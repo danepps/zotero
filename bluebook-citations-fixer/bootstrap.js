@@ -127,9 +127,10 @@ async function startup(data) {
         // After patch.js: style-sync reads BCF.patch.BUILTIN_STYLE_IDS as the
         // single source of truth for which styles it may update.
         load("lib/style-sync.js");
+        load("lib/et-al-override.js");
 
         // Minimal bridge for the Settings pane script, which runs in its own
-        // Cu.Sandbox and cannot see this BCF. Deliberately two functions, not
+        // Cu.Sandbox and cannot see this BCF. Deliberately a few functions, not
         // the namespace — the pane has no business reaching into internals.
         try {
             // Capture the module: the pane can call this after a teardown has
@@ -137,7 +138,10 @@ async function startup(data) {
             var sync = BCF.styleSync;
             BCF.paneAPI = {
                 checkStyleUpdates: function () { return sync.check(); },
-                styleUpdateSummary: function (res) { return sync.summaryLabel(res); }
+                styleUpdateSummary: function (res) { return sync.summaryLabel(res); },
+                installedStyleVersions: function () { return sync.installedVersions(); },
+                styleSetupStatus: function () { return sync.setupStatus(); },
+                installStyle: function (url) { return sync.installStyle(url); }
             };
             Zot.BluebookCitationsFixer = BCF.paneAPI;
         } catch (_) {}
@@ -145,6 +149,7 @@ async function startup(data) {
         BCF.diag.init();
         BCF.diag.event("startup", "loaded");
         BCF.patch.install();
+        BCF.etAl.install();
         BCF.dialog.install();
         _registerPrefsPane(Zot, rootURI);
         BCF.styleSync.scheduleStartupCheck();
@@ -181,11 +186,14 @@ async function startup(data) {
     }
 }
 
-function shutdown() {
+async function shutdown(data, reason) {
     // First: stop the startup timer and bump the generation token so any
     // in-flight check can no longer begin a style installation.
     try { if (BCF && BCF.styleSync) BCF.styleSync.cancel(); } catch (_) {}
     try { if (BCF && BCF.dialog) BCF.dialog.uninstall(); } catch (_) {}
+    // Zotero awaits async shutdown. Disable/upgrade restores session engines
+    // before removing the command barrier; application exit needs no rebuild.
+    try { if (BCF && BCF.etAl) await BCF.etAl.uninstall(reason === 2); } catch (_) {}
     try { if (BCF && BCF.patch) BCF.patch.uninstall(); } catch (_) {}
     try {
         if (BCF && BCF.prefsPaneID && BCF.Zotero && BCF.Zotero.PreferencePanes &&

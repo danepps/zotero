@@ -17,8 +17,18 @@ pref("extensions.bluebook-citations-fixer.hereinafter.frequencyThreshold", 3);
 
 // Style sync: keep the installed Epps Bluebook styles (the hard-wired
 // built-ins in lib/patch.js) current. Checked at most once per 24h shortly
-// after startup, plus on demand from the Settings pane. Never installs a
-// style that isn't already installed. lastCheck is a ms-epoch STRING because
+// after startup, plus on demand from the Settings pane. Routine updates only
+// touch installed styles; separate startup repair restores missing main.
+// lastCheck is a ms-epoch STRING because
 // Zotero prefs have no int64.
 pref("extensions.bluebook-citations-fixer.styleSync", true);
 pref("extensions.bluebook-citations-fixer.styleSync.lastCheck", "0");
+
+// Built-in Epps styles only: 0 = installed style default; otherwise 3–11.
+// The existing min preference now controls first citations and bibliographies.
+pref("extensions.bluebook-citations-fixer.etAl.min", 0);
+pref("extensions.bluebook-citations-fixer.etAl.subsequentMin", 0);
+
+// Main-style startup repair status, separate from the routine update throttle.
+pref("extensions.bluebook-citations-fixer.styleSetup.lastAttempt", "0");
+pref("extensions.bluebook-citations-fixer.styleSetup.status", "");

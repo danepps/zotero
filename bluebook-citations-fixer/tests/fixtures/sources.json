@@ -1,0 +1,14 @@
+{
+  "BluebookDSEStyle.csl": {
+    "source": "https://danepps.github.io/bluebook/BluebookDSEStyle.csl",
+    "sha256": "4fceec1eafa39b66142cfd07f9ca6293a93df45c9c1410dbffa7084dfc842cc3"
+  },
+  "BluebookDSEStyle-Experimental.csl": {
+    "source": "https://danepps.github.io/bluebook/BluebookDSEStyle-Experimental.csl",
+    "sha256": "526d67d2ba568dc5225b55780413b2e0d9ed67a7b91364a08940586d07c5dbef"
+  },
+  "locales-en-US.xml": {
+    "source": "Installed Zotero app/omni.ja: chrome/content/zotero/locale/csl/locales-en-US.xml",
+    "sha256": "ac864c7c21166b4390d82c31792cdc509400727fa0060b43d8aa17e07f9cb079"
+  }
+}

@@ -1,65 +1,133 @@
-# Plan: Evaluate user-configurable "et al." thresholds (overriding the installed style)
+# Et-al threshold override: 2.0 implementation plan
 
-> **Status note (2026-07-27):** this document is still a *feasibility-study plan* — its
-> deliverable is a research doc, not code. Before building the 2.0 feature, rewrite it
-> as an implementation plan per [`2.0-plan-review.md`](./2.0-plan-review.md)
-> §"Configurable et al." Adopted decisions that supersede passages below: **never
-> delete `Zotero.Integration.sessions` entries** — propagation is `clearEngineCache()`
-> + `await Zotero.Integration.resetSessionStyles()` (sessions never pass `cache` to
-> `getCiteProc`, so the global engine cache isn't the issue this plan assumed); the
-> global `getCiteProc` hook **fails closed** on an unreadable styleID (unlike the
-> RTF-chain gate); initial scope is the built-in Epps styles only; prefer a single
-> `et-al-min` pref (3/4/5 or "use style default") with `use-first` fixed at 1; the
-> override applies in **all output formats** (it changes citeproc input, not RTF); the
-> XML rewriter needs a dependency-injected parse/serialize seam (the node harness has
-> no `DOMParser`). The obsolete separate-branch/draft-PR step is void — work lands on
-> `v2.0`.
+> **Status: implemented in test build 1.3.3.6; live acceptance pending. Revised 2026-09-12.** This replaces the
+> feasibility-study assignment. Work lands on `v2.0`; the [roadmap](v2.0-roadmap.md)
+> controls milestones. July Zotero-source findings in [the review](2.0-plan-review.md)
+> have been rechecked against Zotero 7.0.0 source and installed Zotero 10.0.2.
+> Original source snapshots are in `.codex-memo/runs/et-al-20260912/`; split-threshold verification is in `.codex-memo/runs/et-al-split-20260912/`.
 
-## Context
+## User-visible contract
 
-The user wants an evaluation of a feature that would let them change the "et al." thresholds — CSL's `et-al-min` (how many authors trigger truncation) and `et-al-use-first` (how many names to keep) — from the **bluebook-citations-fixer settings pane**, overriding whatever the installed CSL style hardcodes. Today those values are baked into the Epps Bluebook style's XML; changing them means editing/forking the style. Bluebook Rule 15.1 genuinely permits either "first author et al." or listing all authors for 3+ author works, so this is a legitimate user preference, not a correctness fix.
+**Author-list truncation** has independent dropdowns for **First citation and bibliography** and **Subsequent citations**. Each offers Style default and 3 through 11 authors. For eight names on first appearance, set the first threshold to 9. Preferences are `extensions.bluebook-citations-fixer.etAl.min` (retained from the earlier single-setting build) and `…etAl.subsequentMin`, each defaulting to 0. The native CSL options are `et-al-min` / `et-al-use-first` and `et-al-subsequent-min` / `et-al-subsequent-use-first`, respectively; each override retains one name before et al. First-only changes preserve the installed subsequent default, even if it previously inherited the first threshold. Subsequent-only changes leave the bibliography unchanged.
 
-This repo has an established convention for exactly this kind of request: **committed feasibility studies** in `research/` (`journal-abbreviation-feasibility.md` and `journal-abbreviation-render-time-feasibility.md`, the latter marked "Status: feasibility study, not slated for implementation"). The deliverable is a new research doc in that series — **evaluation only, no plugin code changes**.
+The published style defaults are first/bibliography 5 and subsequent 4. These produce all four names on a four-author work's first citation and et al. on subsequent citations, while three-author works retain all names. Native citeproc-js can expand the first list when the subsequent threshold exceeds the first; this processor behavior is not patched here.
+Apply to the two IDs from `BCF.patch.BUILTIN_STYLE_IDS`, in citations and
+bibliographies, in all output formats, including HTML and text. Previews and
+Create Bibliography under these styles use the same preference. This changes
+citeproc input; it does not extend the RTF feature chain to Google Docs.
 
-## Key findings from research (feed these into the doc)
+Unknown/unreadable style IDs, missing built-in metadata, and other styles
+pass through. The RTF chain's extra-style list and `allStyles` do not expand
+this feature's scope. Preserve the existing RTF-chain gate; this global hook
+has its own strict gate.
 
-**The plugin has no pre-render seam today.** All five patched methods in `lib/patch.js` (`Field.setText`, `Session._updateDocument`, etc.) run *after* citeproc has already applied the style's et-al truncation. Post-render RTF surgery could truncate an author list but expanding one means re-synthesizing citeproc's name formatting (initials, delimiters, small caps for books, disambiguation) from `itemData.author` — fragile, no anchor prior art (every existing feature anchors on segment tails).
+Keep `hereinafter._authorPrefix()` and `id-suppress` short forms unchanged.
+Explain that distinction in the pane. Do not expose `use-first`, extra styles, or an unlimited-author option in 2.0.
 
-**A clean pre-render seam exists in Zotero core** (verified against `zotero/zotero@main`, July 2026):
-- `Zotero.Integration.Session.prototype.setData` builds the session engine via `getStyle.getCiteProc(data.style.locale, this.outputFormat, { automaticJournalAbbreviations })`; it rebuilds only when the style ID changes or `resetStyle` is passed.
-- `Zotero.Style.prototype.getCiteProc(locale, format, options)` parses `this.getXML()` with `DOMParser` and constructs `new Zotero.CiteProc.CSL.Engine(sys, xml, locale, overrideLocale)` (or `Zotero.CiteprocRs.Engine` when the `cite.useCiteprocRs` pref is on). **Engines are cached** in `this._cachedEngines`, keyed only on `{locale, automaticJournalAbbreviations}` — an override must purge this cache on pref change.
-- Because both engines consume the same XML, a **pre-parse XML rewrite** is engine-agnostic and works regardless of *where* the style places the attributes (CSL allows them on `<style>`, `<citation>`, `<bibliography>`, `<names>`, or `<name>`; citeproc-js stores root/citation-level values in `opt.inheritedAttributes` but name-element values in per-token `strings`, so post-build mutation only works for some placements).
+## Files
 
-**Style placement — verified locally** (the style repo lives at `~/ClaudeCode/bluebook`): both `BluebookDSEStyle.csl` and `BluebookDSEStyle-Experimental.csl` set `et-al-min="5" et-al-use-first="1"` on the `<citation>` element (line 622) and the `<bibliography>` element (line 804), and **never on `<name>` tokens**. Two consequences: (1) Seam B (post-build `inheritedAttributes` mutation) is *viable for the built-in styles* — element-level placement is exactly the case where it works — though Seam A remains the recommendation because user-configured extra styles may place the attributes anywhere and Seam A also covers citeproc-rs. (2) The motivation sharpens: with min=5 / use-first=1, three- and four-author works currently list **all** authors, and Rule 15.1 permits "first author et al." from three up — so the meaningful pref space is precisely `et-al-min ∈ {3, 4, 5}`. Neither style sets any `disambiguate-*` attribute (CSL's `disambiguate-add-names` defaults to off), so the re-expansion interaction is moot for the built-ins; neither sets `et-al-subsequent-*`, which supports deferring subsequent-cite prefs.
+| File | Planned change |
+|---|---|
+| `bluebook-citations-fixer/lib/et-al-override.js` | Options, XML transformer, engine wrapper, preference observer, serialized propagation and lifecycle |
+| `bluebook-citations-fixer/bootstrap.js` | Load, install after API readiness, and tear down the module |
+| `bluebook-citations-fixer/prefs.js` | Default both threshold preferences to `0` |
+| `bluebook-citations-fixer/prefs.xhtml` and `prefs-pane.js` | Accessible dropdown controls and short-form explanation |
+| `bluebook-citations-fixer/tests/run-node-tests.js` | Transformer, gate, propagation, and lifecycle tests |
+| Plugin README, changelog, and `AGENTS.md` | Document the implemented feature and its distinct format scope |
 
-**Interactions to cover:** `hereinafter.js:180-191` `_authorPrefix` hardcodes the Rule 15.1 *short-form* thresholds (2 → "X & Y", 3+ → "X *et al.*") for the `[hereinafter …]` bracket, **and `id-suppress.js:174` calls the same `_authorPrefix` for its `supra` rewrites** — the hardcoded short forms affect both features; `disambiguate-add-names` re-expansion (a note only — absent from the built-in styles, relevant just for user-added extras); `et-al-subsequent-min`/`et-al-subsequent-use-first` exist as separate CSL knobs (also absent from the built-ins).
+No installed CSL file is edited. This module is not a feature-chain entry;
+the existing build already packages `lib/`. Claude-owned instructions remain
+read-only: provide any needed sister-document delta for the user to give
+Claude unless specifically authorized to edit it.
 
-## Deliverable
+## Engine seam and XML transformer
 
-One new file: **`research/et-al-threshold-override-feasibility.md`**, matching the structure and register of `research/journal-abbreviation-render-time-feasibility.md`:
+1. Verify `Style.prototype.getCiteProc`, `getXML`, `clearEngineCache`, session
+   engine construction, preference-observer APIs, and shutdown semantics in
+   the exact supported Zotero builds. Record source revisions in hidden evidence.
+2. Wrap `getCiteProc`, capturing the original and module references at install.
+   Default settings and disallowed styles delegate directly.
+3. Candidate seam: temporarily override the instance's `getXML` while the
+   original constructor consumes transformed XML, restoring in `finally`.
+   Use this only after confirming synchronous XML consumption. Preserve the
+   original own-property descriptor, or remove the temporary own property if
+   the method was inherited. Test nested calls and exceptions. If construction
+   can yield, choose and document a seam that never leaves a shared method
+   replaced across an await before implementation proceeds.
+4. Parse with namespace awareness. Rewrite existing `et-al-min` and
+   `et-al-use-first` on supported CSL formatting elements and supply defaults
+   on existing `citation` and `bibliography` elements. Do not invent a missing
+   bibliography. Independently preserve or override subsequent-citation options.
+   Preserve metadata, locales, and unrelated formatting.
+5. Verify built-in fixtures for conflicting `et-al-use-last`,
+   and disambiguation options. Unsupported combinations delegate unchanged
+   with a diagnostic until their semantics are explicitly supported.
+6. Transformer failure logs and supplies original XML. Original constructor
+   errors restore temporary state and propagate normally; do not retry the
+   constructor and duplicate its side effects.
 
-1. **Status header** — feasibility study, not slated for implementation; part of the research series.
-2. **Context / problem** — style hardcodes et-al thresholds; Bluebook 15.1 permits either form; goal is a per-machine pref override without forking the style.
-3. **Verdict** — technically feasible with a small, low-risk seam (recommended: XML rewrite at `getCiteProc` time). Real costs: pref-change propagation (engine + session caching) and the decision about whether the same pref drives the plugin's own short-form author rendering.
-4. **The seam: candidates, head-to-head**
-   - **Seam A (recommended): pre-parse CSL rewrite.** Wrap `Zotero.Style.prototype.getCiteProc`; when the override prefs are set and the style ID is in `BCF.patch.BUILTIN_STYLE_IDS`/extras (reuse `_styleAllowed`-style gating against `this.styleID`), temporarily swap `this.getXML` to return XML with `et-al-min`/`et-al-use-first` attributes rewritten wherever they appear (and injected on `<citation>`/`<bibliography>` if absent), then delegate. Engine-agnostic (covers citeproc-rs), placement-agnostic, and citeproc renders natively — no RTF surgery, idempotent by construction, covers citations and bibliography. **Fail-open:** if the XML rewrite throws for any reason, return the original XML untouched — matching the plugin's existing posture (unreadable styleID fails open, `segments()` null → pass-through). Same shape as the abbreviation doc's "Seam A".
-   - **Seam B: post-build engine mutation** (`engine.citation.opt.inheritedAttributes["et-al-min"] = n` after `getCiteProc` returns). Cheaper, and **now verified viable for the built-in styles** (both set the attributes at `<citation>`/`<bibliography>` level, never on `<name>` tokens). Still the fallback, not the recommendation: it doesn't cover citeproc-rs, and a user-added extra style could place the attributes on `<name>` tokens where the mutation is silently ignored.
-   - **Seam C: RTF post-processing feature** in the existing chain — rejected: truncation-only is feasible but expansion re-implements citeproc name rendering; no anchor precedent; disambiguation conflicts.
-   - **Seam D: zero-code — edit/fork the style.** The baseline the feature is explicitly meant to avoid (style drift, re-install churn, affects all users of the style); include for the comparison table.
-5. **Prefs & UI design** — two int prefs (`extensions.bluebook-citations-fixer.etAl.min`, `…etAl.useFirst`, plus an enable checkbox or a `0 = use style` sentinel), following the exact existing patterns: defaults in `prefs.js`, a groupbox in `prefs.xhtml` copying the `checkbox`/`html:input type="number"` auto-binding shapes at lines 42–50, a clamped `options()`-style reader beside `BCF.run.options` (`lib/session-run.js:36-49`), `withPrefs` coverage in `tests/run-node-tests.js`. Defer `et-al-subsequent-*` as an open question.
-6. **Propagation problem (the honest hard part)** — `_cachedEngines` is keyed without our prefs, and integration sessions keep their engine until style reset. Design: a pref observer purges the allowed styles' `_cachedEngines` and drops `Zotero.Integration.sessions` entries so the next command rebuilds; document the fallback UX ("reopen Document Preferences / restart") if session-dropping proves risky.
-7. **Interactions** — the hardcoded short-form thresholds in `hereinafter._authorPrefix`, shared by `id-suppress` (`id-suppress.js:174`) for its `supra` rewrites (recommend: leave both at Rule 15.1 defaults, note the option of wiring the pref through); `disambiguate-add-names` re-expansion (extras only — absent from the built-in styles); scope of the style gate (patching `getCiteProc` fires outside integration too — style previews, Create Bibliography — argue that's desirable consistency under a gated style).
-8. **Verification plan (when/if built)** — node-harness fixtures for the XML rewriter (attribute present at each placement / absent / already-overridden), manual: side-load, set thresholds, insert 3+-author cites in Word/LibreOffice, Refresh stability, non-allowed style + Google Docs pass-through, pref-change propagation.
-9. **Open questions** — whether subsequent-cite thresholds get their own prefs (the built-in styles don't set `et-al-subsequent-*`, favoring deferral); whether the pref should also drive the plugin's own short-form rendering (`hereinafter` + `id-suppress` via the shared `_authorPrefix`). The former open item — where the Epps style places its et-al attributes — is **resolved**: `<citation>`/`<bibliography>` element level, verified against the local style repo (see "Style placement — verified locally" above).
+Inject `parse` and `serialize` dependencies. The runtime adapter uses Zotero's
+XML APIs. Node tests use pinned @xmldom/xmldom and citeproc development dependencies,
+including 1728 real first/subsequent citation and bibliography outputs from published built-in CSL
+fixtures. The same output suite passes against the processor extracted from
+installed Zotero 10.0.2. Native Firefox parser and application integration checks
+still require Zotero. Do not replace this with broad XML regex surgery.
 
-## Steps
+## Lifecycle and propagation
 
-1. Write `research/et-al-threshold-override-feasibility.md` per the outline above.
-2. Cross-link it from the two existing research docs only if they have a "companion" header pattern that warrants it (they cross-reference each other; a one-line pointer is optional — do not restructure them). **No changes** to `CLAUDE.md`/`AGENTS.md` (no plugin/build/architecture change) and no plugin code changes.
-3. Commit on branch `claude/et-al-threshold-settings-6hd1hz` with a descriptive message, push with `git push -u origin`, and open a **draft PR** (no open PR exists for this branch; repo has no PR template — check `.github/` to confirm before writing the body).
+Implementation note (2026-09-12): the shared wrapper mechanism covers the new
+`Style.getCiteProc` hook and an additional `Integration.execCommand` barrier.
+A coordinator on the Style prototype queues complete style installations and
+coalesces resets, accounts for commands already running, and keeps later commands
+behind pending engine changes. New instances adopt the coordinator and command
+hook synchronously before awaiting initialization so upgrades preserve the gate.
+The command barrier stays until disable cleanup finishes. Bootstrap now awaits
+asynchronous shutdown before removing shared wrappers and clearing BCF; both
+Zotero 7 and 10 source support this. Application exit skips new rebuilds but waits for already-running installations
+to settle before releasing the command gate.
 
-## Verification
 
-- The doc renders cleanly as Markdown and follows the existing research-doc structure (status header, Verdict, seam comparison, open questions).
-- Every Zotero-core claim in the doc carries its source (file + symbol, traced against `zotero/zotero@main`), matching the "Research findings (verified …)" convention of the prior doc.
-- Branch pushed, draft PR open.
+Complete shared wrapper hardening before adding this global hook. Use
+instance-owned wrapper metadata and exact-identity restoration; do not remove
+another plugin's wrapper during stale recovery.
+
+On install, relevant preference changes, and uninstall, clear optional engine
+caches on affected installed styles with `clearEngineCache()` and arrange
+`Zotero.Integration.resetSessionStyles()`. Never delete integration sessions.
+Global cache clearing alone does not rebuild session-held engines.
+
+Serialize/coalesce resets so repeated changes settle on the latest preference.
+Wait for active integration commands and recheck activity immediately before a
+reset. Use generation tokens to invalidate obsolete feature work, capture all
+references across awaits, and unregister observers on teardown. Restore the
+owned hook before the teardown reset so existing engines return to style
+defaults. Keep required cleanup separate from cancelled enable/change work.
+Bootstrap shutdown awaits cleanup; deferred cleanup must
+use the current hook and must never reinstall an old instance.
+
+Style sync installs original published bytes. Engine rebuilds then apply the
+current preference through this hook; do not maintain patched style files or
+an independent XML cache. Test update, preference change, disable/re-enable,
+and upgrade while a reset is waiting.
+
+## Acceptance and delivery
+
+- Default, all thresholds, invalid values, unknown identity, both built-ins,
+  and another style; boundary renders with two through five authors.
+- XML placements, missing attributes/bibliography, namespaces, repeated
+  transformation, malformed XML, unsupported options, and unchanged metadata.
+- Citations and bibliographies preserve native formatting; hereinafter and
+  Break id. author prefixes remain unchanged.
+- Cached previews and open documents pick up changed preferences; selecting
+  style default restores installed-style behavior without deleting sessions.
+- Nested/throwing construction, coalesced changes, active-command deferral,
+  observer cleanup, third-party wrappers, and two-instance upgrades.
+- Style sync with override on/off; Word and LibreOffice RTF; HTML/text engines
+  and Google Docs according to this feature's scope. Check each claimed
+  processor backend and keep the RTF chain inactive for HTML.
+
+After build guardrails land, choose the next unused fourth-component version
+from the latest release and shared branch build history. Side-load an untracked
+XPI; do not reuse historical example versions or publish a test through the
+production update JSON. Record artifact/application versions and results in
+the roadmap. Mark verified only after automated and live acceptance checks pass.

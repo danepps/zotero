@@ -1,2 +1,4 @@
 **/.DS_Store
 **/releases/
+**/node_modules/
+.codex-memo/

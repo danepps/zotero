@@ -5,6 +5,37 @@ prefix in each section header identifies which plugin shipped.
 
 ## bluebook-citations-fixer
 
+### Unreleased — 2.0 branch
+
+- **Release scope.** The terminal-period Word macro is deferred from 2.0.
+  Its source is retained for possible later work; it is not a release asset.
+
+- **Release-review fixes.** Style updates now wait for Zotero’s asynchronous
+  document-engine rebuilds before admitting new citation commands, including
+  during disable and upgrade. Automatic repair and Settings installs preserve
+  conflicting legacy/custom styles and files. Style identity and revision checks
+  parse actual CSL metadata rather than matching XML comments.
+
+- **Style-update coordination.** Style installations and author-threshold changes
+  now wait for active citation commands and keep new commands waiting until
+  engine changes finish. The protection survives disable and upgrade; failed
+  installations release waiting commands.
+
+- **Automatic main-style installation and repair.** Each startup checks for
+  the Epps main style and silently installs it if missing. Verified installs
+  show a brief notice; failed or unverified installs show a warning and Settings
+  status. Removed main styles are restored on the next startup. Experimental
+  remains opt-in, and document style selections are preserved.
+
+- **Configurable et-al thresholds.** Settings now offers independent first-citation/
+  bibliography and subsequent-citation thresholds (3–11 authors), each with
+  an installed-style-default option. The former single setting is retained for
+  first citations; subsequent citations initially follow the style default. Applies to
+  citations and bibliographies under the standard and experimental Epps styles
+  in text, HTML, and RTF. Installed CSL files and the plugin's hereinafter /
+  Break id. author prefixes are unchanged. Refresh an open document after
+  changing the setting. Engine resets wait for an active document command.
+
 ### v1.3.3 — 2026-09-05
 
 - **Curly apostrophes in author surnames.** v1.2.2 converted straight

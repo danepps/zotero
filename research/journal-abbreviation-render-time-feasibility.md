@@ -1,6 +1,10 @@
 # Feasibility analysis: render-time Bluebook journal abbreviation (alternative to MEDLINE)
 
-> **Status: feasibility study, not slated for implementation.** Companion to
+> **Status: deferred beyond 2.0 by user decision, 2026-09-11.** This historical
+> study is not an implementation specification or a 2.0 release gate. Before
+> reviving it, reconcile its provider examples with the later decisions in
+> [the roadmap](v2.0-roadmap.md), including identity fallback and active-session,
+> output-format, and item-type safety. Companion to
 > [`journal-abbreviation-feasibility.md`](./journal-abbreviation-feasibility.md),
 > which studies the *library-write* pathway (sweep selected items, persist a
 > Bluebook abbreviation into the `journalAbbreviation` field). This document

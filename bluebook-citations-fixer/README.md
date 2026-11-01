@@ -109,14 +109,38 @@ and install it via **Zotero → Tools → Plugins → gear menu → Install Plug
   styles" switch. Styles missing from the current machine get a one-click
   **Install style** button. If the active style can't be read for any reason,
   the gate fails open so the plugin never silently stops working.
-- **Style updates.** Your installed copies of the Epps Bluebook styles are
-  kept current automatically: the plugin quietly checks the published styles
-  shortly after Zotero starts (at most once a day) and installs a newer
-  version when one exists. Only styles you already have installed are ever
-  touched — nothing is installed behind your back, and nothing is ever
-  removed. There's no prompt and no interruption; if the network is down, the
-  check simply does nothing and tries again another day. Turn it off, or run
-  a check on demand, under **Settings → BB Citations Fixer → Style updates**.
+
+## Unreleased on the 2.0 branch
+
+These features are in development test builds and are not included in the stable
+1.3.3 download above.
+
+The terminal-period Word macro is deferred and is not part of the 2.0 release.
+
+- **Author-list truncation.** Under **Settings → BB Citations Fixer → Author-list
+  truncation**, set separate thresholds for **First citation and bibliography**
+  and **Subsequent citations** (3–11 authors). Choose **Style default** in either dropdown to use
+  its installed style default. For example, 9 and 4 lists all eight authors on
+  first appearance, then uses the first author plus et al. on subsequent cites.
+  The September 12 style defaults are 5 and 4. The overrides apply to text, HTML,
+  and RTF engines; refresh your document after changing them. Native citeproc-js
+  can expand first-citation names if the subsequent threshold is higher than
+  the first. Hereinafter labels and Break id. short-form author names keep their
+  usual formatting; installed style files are unchanged by the overrides.
+- **Main-style setup and repair.** About five seconds after each startup, the
+  plugin checks for the main Epps Bluebook style and installs it silently if
+  missing—even if it was removed after an earlier installation. Successful
+  installation shows a brief notice. A failure shows a warning and records the
+  result in Settings; another attempt occurs on the next startup. Existing
+  document style selections stay as they are. Experimental is never installed
+  automatically.
+- **Style updates.** Already-installed Epps styles are checked for newer
+  published revisions at most once per day, shortly after startup. Toggle
+  automatic updates or check manually under **Settings → BB Citations Fixer →
+  Style updates**. This toggle controls updates; the missing-main-style check
+  still runs. Routine update failures are logged without a popup. Style installs
+  and author-threshold changes wait for active citation commands; new commands
+  wait until those engine changes finish.
 
 ## Companion plugin
 
@@ -124,34 +148,6 @@ This plugin pairs with **[Bluebook Signals](../bluebook-signals/README.md)**, a
 Ctrl+S signal picker for the citation-dialog Prefix field (*See*, *E.g.*,
 *Accord*, etc.). The two are built for the same law-review workflow and are
 meant to be used together — **installing both is recommended.**
-
-## Companion Word macro: terminal periods
-
-A Bluebook footnote that ends in a citation ends in a period — but Zotero can't
-add it. The style has to leave the citation's suffix empty (a cite can also sit
-in the middle of a sentence), and no Zotero plugin can see whether anything
-follows a citation in the note. Word can, so this ships as a small Word macro
-instead: **[`macros/AddTerminalPeriods.bas`](macros/AddTerminalPeriods.bas)**.
-
-Run it after **Zotero → Refresh**. For every footnote and endnote whose last
-Zotero citation has nothing after it, it inserts an ordinary plain-text period
-right after the citation. Citations that already end in punctuation (*Id.*, a
-party name ending in *Co.*) are left alone, as is any citation followed by
-typed text — a parenthetical, a closing quote, another sentence. The period is
-regular document text, not part of the Zotero field, so Refresh never touches
-it and you can delete it like any other character. Running the macro again
-adds nothing. It also cleans up after itself: if a cite that once ended a
-note later becomes an *Id.* (because you cited the same source in the
-preceding note), the leftover period that would read *Id..* is removed.
-
-**Install (Word for Mac or Windows):** Tools → Macro → Visual Basic Editor →
-select the *Normal* project → File → Import File… → choose
-`AddTerminalPeriods.bas`. Then Tools → Customize Keyboard → category
-**Macros** → `AddTerminalPeriods` → assign a shortcut. Run
-`AddTerminalPeriods_SelfTest` once after installing: it opens a new document
-with test footnotes and prints PASS/FAIL lines so you can confirm the macro
-behaves in your copy of Word. Zotero's Bookmarks field mode is not supported;
-LibreOffice is not covered.
 
 ## Compatibility
 

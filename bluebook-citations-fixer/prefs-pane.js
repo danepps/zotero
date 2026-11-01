@@ -85,6 +85,76 @@
         });
     }
 
+    var installedRowUpdaters = {};
+    var versionRead = 0;
+    var versionObserver = null;
+    var setupObserver = null;
+    var versionsDisposed = false;
+
+    async function refreshStyleVersions() {
+        var container = document.getElementById("bcf-style-versions");
+        if (!container || versionsDisposed) return;
+        var request = ++versionRead;
+        var versions = [];
+        try {
+            var api = Zotero.BluebookCitationsFixer;
+            var setupStatus = document.getElementById("bcf-style-setup-status");
+            if (setupStatus && api && typeof api.styleSetupStatus === "function") {
+                var summary = api.styleSetupStatus();
+                setupStatus.value = summary ? "Startup check: " + summary : "";
+            }
+            if (api && typeof api.installedStyleVersions === "function") {
+                versions = await api.installedStyleVersions();
+            }
+        } catch (e) { report(e); }
+        if (versionsDisposed || request !== versionRead ||
+                document.getElementById("bcf-style-versions") !== container) return;
+        container.replaceChildren();
+        BUILTINS.forEach(function (builtin) {
+            var version = versions.find(function (v) { return v.id === builtin.id; });
+            if (version && version.status === "installed" && installedRowUpdaters[builtin.id]) {
+                installedRowUpdaters[builtin.id]();
+            }
+            var revision = "Revision date unavailable";
+            var timestamp = "";
+            if (version && version.status === "not-installed") {
+                revision = "Not installed";
+            } else if (version && version.status === "installed" &&
+                    typeof version.updated === "number" && isFinite(version.updated)) {
+                timestamp = new Date(version.updated).toISOString();
+                revision = timestamp.slice(0, 10);
+            }
+            var label = document.createXULElement("label");
+            label.setAttribute("value", builtin.title + ": " + revision);
+            if (timestamp) label.setAttribute("tooltiptext", "Updated " +
+                timestamp.replace("T", " ").replace(".000Z", " UTC"));
+            container.appendChild(label);
+        });
+    }
+
+    function wireStyleVersions() {
+        refreshStyleVersions();
+        if (versionObserver !== null) return;
+        try {
+            versionObserver = Zotero.Prefs.registerObserver(
+                "extensions.bluebook-citations-fixer.styleSync.lastCheck",
+                refreshStyleVersions, true);
+            setupObserver = Zotero.Prefs.registerObserver(
+                "extensions.bluebook-citations-fixer.styleSetup.lastAttempt",
+                refreshStyleVersions, true);
+        } catch (e) { report(e); }
+    }
+
+    window.addEventListener("unload", function () {
+        versionsDisposed = true;
+        versionRead++;
+        [versionObserver, setupObserver].forEach(function (observer) {
+            if (observer !== null) {
+                try { Zotero.Prefs.unregisterObserver(observer); } catch (e) { report(e); }
+            }
+        });
+    }, { once: true });
+
     // Manual "Check for style updates". The check itself lives in
     // lib/style-sync.js and is reached through the minimal bridge bootstrap.js
     // hangs on the Zotero object — this pane sandbox can't see BCF. The button
@@ -114,7 +184,29 @@
                         : "Check complete";
                 })
                 .catch(function (e) { report(e); status.value = "Check failed"; })
-                .then(function () { btn.disabled = false; });
+                .then(function () { btn.disabled = false; return refreshStyleVersions(); });
+        });
+    }
+
+    function wireEtAl() {
+        [["bcf-et-al-min", "min"], ["bcf-et-al-subsequent-min", "subsequentMin"]].forEach(function (setting) {
+            var input = document.getElementById(setting[0]);
+            if (!input || input.getAttribute("data-bcf-wired") === "1") return;
+            var pref = "extensions.bluebook-citations-fixer.etAl." + setting[1];
+            function valid(n) { return Number.isInteger(n) && n >= 3 && n <= 11; }
+            function read() {
+                var value = 0;
+                try { value = Zotero.Prefs.get(pref, true); } catch (_) {}
+                input.value = valid(value) ? String(value) : "0";
+            }
+            read();
+            input.setAttribute("data-bcf-wired", "1");
+            input.addEventListener("change", function () {
+                var value = Number(input.value);
+                if (value !== 0 && !valid(value)) { read(); return; }
+                try { Zotero.Prefs.set(pref, value, true); read(); }
+                catch (e) { report(e); read(); }
+            });
         });
     }
 
@@ -125,6 +217,8 @@
         if (!allBox || !listBox || !manual) return false;
         wireLinks();
         wireStyleSync();
+        wireStyleVersions();
+        wireEtAl();
         if (listBox.getAttribute("data-bcf-built") === "1") return true;
 
         await Zotero.Styles.init();
@@ -220,20 +314,30 @@
             hbox.setAttribute("align", "center");
             var btn = document.createXULElement("button");
             btn.setAttribute("label", "Install style");
+            installedRowUpdaters[row.id] = function () {
+                btn.hidden = true;
+                cb.setAttribute("label", rowLabel(row, true));
+            };
             btn.addEventListener("command", function () {
                 btn.disabled = true;
                 Promise.resolve()
                     .then(function () {
-                        return Zotero.Styles.install({ url: row.id }, row.id, true);
+                        var api = Zotero.BluebookCitationsFixer;
+                        if (!api || typeof api.installStyle !== "function") throw new Error("Style installation unavailable");
+                        return api.installStyle(row.id);
                     })
                     .then(function () {
                         btn.hidden = true;
                         cb.setAttribute("label", rowLabel(row, true));
+                        return refreshStyleVersions();
                     })
                     .catch(function (e) {
                         report(e);
                         btn.disabled = false;
                         btn.setAttribute("label", "Install failed — retry");
+                        btn.setAttribute("tooltiptext", String(e.message || e));
+                        var status = document.getElementById("bcf-style-sync-status");
+                        if (status) status.value = String(e.message || e);
                     });
             });
             hbox.appendChild(cb);

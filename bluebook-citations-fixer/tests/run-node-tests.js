@@ -4,6 +4,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
+const { DOMParser } = require("@xmldom/xmldom");
 
 const root = path.resolve(__dirname, "..");
 const context = {
@@ -12,6 +13,7 @@ const context = {
     Services: {},
     Components: { classes: {}, interfaces: {}, utils: { reportError() {} } },
     Zotero: {
+        getMainWindow: () => ({ DOMParser }),
         Integration: {
             currentSession: null,
             currentDoc: false,
@@ -2362,7 +2364,7 @@ const NOID = String.fromCharCode(0x200B);
     // Minimal CSL document: the <id> and <updated> elements are all the
     // checker reads before validation.
     const cslDoc = (id, updated) =>
-        `<?xml version="1.0"?><style><info><id>${id}</id>` +
+        `<?xml version="1.0"?><style xmlns="http://purl.org/net/xbiblio/csl"><info><id>${id}</id><title>${id}</title>` +
         `<updated>${updated}</updated></info></style>`;
 
     // Both built-ins installed, carrying the same local <updated>.
@@ -2379,6 +2381,15 @@ const NOID = String.fromCharCode(0x200B);
         o = o || {};
         const calls = { getStyle: [], fetch: [], validate: [], install: [] };
         const deps = {
+            getInstalledStyles: () => Object.values(o.styles || {}).filter(Boolean),
+            installTargets: () => [],
+            withStyleChange: async (task, current) => {
+                while (deps.commandActive()) {
+                    await deps.commandPromise();
+                    if (!current()) return undefined;
+                }
+                return task();
+            },
             now: () => (o.now !== undefined ? o.now : SS_NOW),
             getStyle: async (id) => {
                 calls.getStyle.push(id);
@@ -2398,7 +2409,7 @@ const NOID = String.fromCharCode(0x200B);
                 if (o.validateError) throw new Error("invalid CSL");
             },
             commandActive: () => !!o.commandActive,
-            commandPromise: () => (o.commandPromise ? o.commandPromise() : Promise.resolve()),
+            commandPromise: () => (o.commandPromise ? o.commandPromise() : Promise.resolve()).finally(() => { o.commandActive = false; }),
             install: async (id, text) => {
                 calls.install.push([id, text]);
                 if (o.onInstall) o.onInstall(id, text);
@@ -2429,7 +2440,7 @@ const NOID = String.fromCharCode(0x200B);
             BCF.styleSync.parseUpdated(cslDoc(SS_MAIN, "2026-05-31T00:00:00+00:00")),
             Date.parse("2026-05-31T00:00:00Z"));
         assert.strictEqual(
-            BCF.styleSync.parseUpdated("<updated>\n  2026-05-31T00:00:00Z  \n</updated>"),
+            BCF.styleSync.parseUpdated(cslDoc(SS_MAIN, "\n  2026-05-31T00:00:00Z  \n")),
             Date.parse("2026-05-31T00:00:00Z"));
         assert.strictEqual(BCF.styleSync.parseUpdated("<style><info></info></style>"), null);
         assert.strictEqual(BCF.styleSync.parseUpdated("<updated>not a date</updated>"), null);
@@ -2449,6 +2460,61 @@ const NOID = String.fromCharCode(0x200B);
         assert.strictEqual(BCF.styleSync.localUpdated({ updated: "garbage" }), null);
         assert.strictEqual(BCF.styleSync.localUpdated({}), null);
         assert.strictEqual(BCF.styleSync.localUpdated(null), null);
+
+        // Zotero strips the positive timezone offset and replaces T with a
+        // space in Style.updated. Read the actual CSL, not this display value.
+        for (const stamp of ["2026-09-12T13:53:44+00:00", "2026-09-12T13:53:44+05:30",
+            "2026-01-12T13:53:44Z", "2026-09-12T13:53:44-04:00"]) {
+            const style = { updated: "2026-09-12 13:53:44",
+                getXML: () => cslDoc(SS_MAIN, stamp) };
+            assert.strictEqual(BCF.styleSync.localUpdated(style), Date.parse(stamp));
+        }
+        assert.strictEqual(BCF.styleSync.localUpdated({ updated: "2026-09-12 13:53:44" }), null);
+        assert.strictEqual(BCF.styleSync.localUpdated({ updated: SS_LOCAL, getXML: () => "<style/>" }), null);
+        assert.strictEqual(BCF.styleSync.localUpdated({ updated: SS_LOCAL,
+            getXML() { throw new Error("file unavailable"); } }), null);
+    }
+
+    {
+        // Opening Settings reads installed revisions without checking the
+        // network, installing styles, or stamping the last-check preference.
+        const styles = installedAt(SS_LOCAL);
+        styles[SS_MAIN] = { getXML: () => cslDoc(SS_MAIN, "2026-09-12T14:14:28+00:00") };
+        delete styles[SS_EXP];
+        const { deps, calls } = syncDeps({ styles });
+        const versions = await BCF.styleSync.installedVersions(deps);
+        assert.strictEqual(versions[0].status, "installed");
+        assert.strictEqual(versions[0].updated, Date.parse("2026-09-12T14:14:28Z"));
+        assert.strictEqual(versions[1].status, "not-installed");
+        assert.strictEqual(versions[1].updated, null);
+        assert.strictEqual(calls.fetch.length + calls.validate.length + calls.install.length, 0);
+        deps.getStyle = async id => {
+            if (id === SS_MAIN) throw new Error("lookup unavailable");
+            return { getXML: () => "<style/>" };
+        };
+        const unavailable = await BCF.styleSync.installedVersions(deps);
+        assert.strictEqual(unavailable[0].status, "unavailable");
+        assert.strictEqual(unavailable[1].status, "installed");
+        assert.strictEqual(unavailable[1].updated, null);
+    }
+
+    {
+        // Real incident: a successful install was reported unverified because
+        // 13:53 UTC became 18:53 UTC in America/Chicago. It must verify once,
+        // then report up-to-date without another install on the next check.
+        const stamp = "2026-09-12T13:53:44+00:00";
+        const styles = installedAt(SS_LOCAL);
+        for (const id of SS_IDS) styles[id].getXML = () => cslDoc(id, SS_LOCAL);
+        const { deps, calls } = syncDeps({ styles, csl: id => cslDoc(id, stamp),
+            afterInstall: (_id, text) => ({ updated: "2026-09-12 13:53:44", getXML: () => text }) });
+        const result = await BCF.styleSync.check(deps);
+        assert.strictEqual(result.counts.updated, 2);
+        assert.strictEqual(result.counts.unverified, 0);
+        assert.strictEqual((await BCF.styleSync.check(deps)).counts.upToDate, 2);
+        assert.strictEqual(calls.install.length, 2);
+        // An update within the former five-hour error window must not be skipped.
+        const newer = Date.parse("2026-09-12T14:00:00Z");
+        assert(BCF.styleSync.isRemoteNewer(newer, BCF.styleSync.localUpdated(styles[SS_MAIN])));
     }
 
     {
@@ -2622,7 +2688,7 @@ const NOID = String.fromCharCode(0x200B);
         // bad metadata and a dead network are operationally different.
         const { deps, calls } = syncDeps({
             styles: installedAt(SS_LOCAL),
-            csl: (id) => `<style><info><id>${id}</id></info></style>`
+            csl: (id) => cslDoc(id, "")
         });
         const res = await BCF.styleSync.check(deps);
         assert.strictEqual(res.counts.skipped, 2);
