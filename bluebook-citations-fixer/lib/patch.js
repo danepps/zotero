@@ -38,6 +38,7 @@ BCF.patch._unwrapInactive = function (fn) {
 };
 
 BCF.patch._release = function (record) {
+    if (record.released) return;
     record.handler = null;
     if (record.target[record.name] === record.wrapper) {
         record.target[record.name] = BCF.patch._unwrapInactive(record.original);
@@ -51,6 +52,7 @@ BCF.patch._release = function (record) {
             delete record.target[record.marker];
         }
     }
+    record.released = true;
 };
 
 BCF.patch._wrap = function (target, name, key, makeHandler) {

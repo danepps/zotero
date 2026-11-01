@@ -47,7 +47,50 @@ function fixture() {
     f.run = () => f.sync.check(f.deps, true);
     return f;
 }
+async function bootstrapFailureTests() {
+    for (const failure of ["load", "throw", "reject", "missing-style-api"]) {
+        const f = fixture(), context = f.context;
+        context.Zotero.initializationPromise = Promise.resolve();
+        context.Zotero.Styles = { init: async () => {}, get: id => f.styles[id] };
+        context.Zotero.Integration = { Field: function () {}, Session: function () {},
+            execCommand: async () => "ok", resetSessionStyles: async () => {} };
+        context.Zotero.Integration.Field.prototype.setText = text => text;
+        for (const name of ["updateDocument", "_updateDocument", "writeDelayedCitation"]) {
+            context.Zotero.Integration.Session.prototype[name] = async () => {};
+        }
+        const errors = [];
+        context.Services = { scriptloader: { loadSubScript(name, scope) {
+            if (name === "lib/diag.js") scope.BCF.diag = { init() {}, event() {}, err(_tag, e) { errors.push(e.message); } };
+            else if (name === "lib/dialog.js") scope.BCF.dialog = { install() {}, uninstall() {} };
+            else if (name === "lib/et-al-override.js" && failure !== "missing-style-api") {
+                if (failure === "load") throw new Error("et-al load failed");
+                scope.BCF.etAl = { install() {
+                    if (failure === "throw") throw new Error("et-al setup failed");
+                    return Promise.reject(new Error("et-al setup rejected"));
+                }, uninstall: async () => {} };
+            } else if (["lib/patch.js", "lib/style-change-gate.js", "lib/style-sync.js", "lib/et-al-override.js"].includes(name)) {
+                vm.runInNewContext(fs.readFileSync(path.join(root, name), "utf8"), scope);
+                if (name === "lib/style-sync.js") {
+                    const sync = scope.BCF.styleSync, defaults = sync._defaultDeps;
+                    const injected = { ...f.deps }; delete injected.withStyleChange;
+                    sync._defaultDeps = () => Object.assign(defaults(), injected);
+                }
+            }
+        } } };
+        vm.runInContext(fs.readFileSync(path.join(root, "bootstrap.js"), "utf8"), context);
+        await context.startup({ rootURI: "" });
+        await tick();
+        assert(f.timers.some(t => t.delay === 5000), failure + ": repair was not scheduled");
+        f.timers.find(t => t.delay === 5000).callback.notify();
+        await tick(); await tick();
+        assert(f.calls.some(c => c[0] === "install"), failure + ": repair did not install");
+        assert(context.Zotero.Integration.__bcfStyleGate, failure + ": independent gate absent");
+        assert(errors.length, failure + ": optional startup failure was not reported");
+        await context.shutdown({}, 2);
+    }
+}
 async function main() {
+    await bootstrapFailureTests();
     // Metadata must come from direct CSL info children, never comments or
     // lookalikes. Exercise the production parser with real XML.
     const metadata = fixture();

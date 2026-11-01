@@ -7,6 +7,18 @@ prefix in each section header identifies which plugin shipped.
 
 ### Unreleased — 2.0 branch
 
+- **Author-threshold consistency and status.** Subsequent citations cannot use
+  a higher threshold or retain more names than first citations when an override
+  is active. Settings disables higher options, preserves saved preferences,
+  and displays current override failures without keeping obsolete warnings.
+- **Independent style-change gate.** Main-style repair and updates continue
+  when optional author-override setup fails. The shared command barrier
+  preserves pending work across upgrades and cancels queued preference resets
+  during application shutdown.
+- **Engine performance and cleanup.** Reuse transformed XML for unchanged
+  Style instances and settings; reread after replacement or mode changes.
+  Repeated wrapper teardown no longer reports false foreign-patch warnings.
+
 - **Release scope.** The terminal-period Word macro is deferred from 2.0.
   Its source is retained for possible later work; it is not a release asset.
 

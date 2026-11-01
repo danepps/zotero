@@ -109,6 +109,7 @@
         } catch (e) { report(e); }
         if (versionsDisposed || request !== versionRead ||
                 document.getElementById("bcf-style-versions") !== container) return;
+        refreshEtAl();
         container.replaceChildren();
         BUILTINS.forEach(function (builtin) {
             var version = versions.find(function (v) { return v.id === builtin.id; });
@@ -148,7 +149,7 @@
     window.addEventListener("unload", function () {
         versionsDisposed = true;
         versionRead++;
-        [versionObserver, setupObserver].forEach(function (observer) {
+        [versionObserver, setupObserver].concat(etAlObservers).forEach(function (observer) {
             if (observer !== null) {
                 try { Zotero.Prefs.unregisterObserver(observer); } catch (e) { report(e); }
             }
@@ -188,26 +189,65 @@
         });
     }
 
+    var etAlObservers = [];
+    function effectiveFirstDefault() {
+        try {
+            var style = Zotero.Styles.get(BUILTINS[0].id);
+            if (!style || !window.DOMParser) return null;
+            var doc = new window.DOMParser().parseFromString(style.getXML(), "application/xml");
+            var root = doc.documentElement;
+            var citation = doc.getElementsByTagNameNS("http://purl.org/net/xbiblio/csl", "citation")[0];
+            var value = citation && (citation.getAttribute("et-al-min") || root.getAttribute("et-al-min"));
+            return /^\d+$/.test(value || "") && Number(value) > 0 ? Number(value) : null;
+        } catch (_) { return null; }
+    }
+    function refreshEtAl() {
+        if (versionsDisposed) return;
+        var first = document.getElementById("bcf-et-al-min");
+        var later = document.getElementById("bcf-et-al-subsequent-min");
+        if (!first || !later) return;
+        [[first, "min"], [later, "subsequentMin"]].forEach(function (setting) {
+            var value;
+            try { value = Zotero.Prefs.get("extensions.bluebook-citations-fixer.etAl." + setting[1], true); } catch (_) {}
+            setting[0].value = Number.isInteger(value) && value >= 3 && value <= 11 ? String(value) : "0";
+        });
+        var effective = Number(first.value) || effectiveFirstDefault();
+        Array.from(later.options || []).forEach(function (option) {
+            option.disabled = !!effective && Number(option.value) > effective;
+        });
+        var status = document.getElementById("bcf-et-al-status");
+        if (status) {
+            var failures = [];
+            try {
+                var api = Zotero.BluebookCitationsFixer;
+                if (api && typeof api.etAlStatus === "function") failures = api.etAlStatus();
+            } catch (e) { report(e); }
+            status.textContent = failures.map(function (failure) {
+                return "Override not applied to " + failure.title + ": " + failure.reason;
+            }).join("; ");
+        }
+        // Preserve a previously stored larger value; rendering clamps it. The
+        // disabled selected option remains visible, so the saved pref is honest.
+    }
     function wireEtAl() {
         [["bcf-et-al-min", "min"], ["bcf-et-al-subsequent-min", "subsequentMin"]].forEach(function (setting) {
             var input = document.getElementById(setting[0]);
             if (!input || input.getAttribute("data-bcf-wired") === "1") return;
             var pref = "extensions.bluebook-citations-fixer.etAl." + setting[1];
-            function valid(n) { return Number.isInteger(n) && n >= 3 && n <= 11; }
-            function read() {
-                var value = 0;
-                try { value = Zotero.Prefs.get(pref, true); } catch (_) {}
-                input.value = valid(value) ? String(value) : "0";
-            }
-            read();
             input.setAttribute("data-bcf-wired", "1");
             input.addEventListener("change", function () {
                 var value = Number(input.value);
-                if (value !== 0 && !valid(value)) { read(); return; }
-                try { Zotero.Prefs.set(pref, value, true); read(); }
-                catch (e) { report(e); read(); }
+                if (value === 0 || (Number.isInteger(value) && value >= 3 && value <= 11)) {
+                    try { Zotero.Prefs.set(pref, value, true); } catch (e) { report(e); }
+                }
+                refreshEtAl();
             });
+            try { etAlObservers.push(Zotero.Prefs.registerObserver(pref, refreshEtAl, true)); } catch (e) { report(e); }
         });
+        if (etAlObservers.length === 2) {
+            try { etAlObservers.push(Zotero.Prefs.registerObserver("extensions.bluebook-citations-fixer.etAl.statusRevision", refreshEtAl, true)); } catch (e) { report(e); }
+        }
+        refreshEtAl();
     }
 
     async function init() {

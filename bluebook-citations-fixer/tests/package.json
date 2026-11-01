@@ -2,7 +2,7 @@
   "name": "bluebook-citations-fixer-tests",
   "private": true,
   "scripts": {
-    "test": "node run-node-tests.js && node run-wrapper-tests.js && node run-build-tests.js && node run-pane-tests.js && node run-et-al-tests.js && node run-style-setup-tests.js"
+    "test": "node run-node-tests.js && node run-wrapper-tests.js && node run-build-tests.js && node run-pane-tests.js && node run-et-al-tests.js && node run-gate-tests.js && node run-style-setup-tests.js"
   },
   "devDependencies": {
     "@xmldom/xmldom": "0.9.12",

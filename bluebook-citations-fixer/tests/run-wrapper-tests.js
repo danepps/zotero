@@ -35,9 +35,9 @@ function fixture() {
 }
 
 function instance(f, timers = []) {
-    const count = { rewrite: 0, prepare: 0, clear: 0, inspect: 0, events: 0 };
+    const count = { messages: [], rewrite: 0, prepare: 0, clear: 0, inspect: 0, events: 0 };
     const context = { BCF: { diag: { enabled: true,
-        event() { count.events++; }, err() {} },
+        event(_tag, message) { count.events++; count.messages.push(message); }, err() {} },
         run: { clearSession() { count.clear++; } } },
         Zotero: { Integration: f.Integration }, Components: {
             classes: { "@mozilla.org/timer;1": { createInstance() { return {
@@ -235,6 +235,16 @@ async function main() {
         await exercise(f, true);
         assert.deepStrictEqual(first.count, before);
         second.patch.uninstall();
+    }
+    {
+        const f = fixture(), owner = instance(f);
+        const optional = { run() {} };
+        const record = owner.patch._wrap(optional, "run", "optional", original => original);
+        owner.patch._release(record);
+        owner.patch._release(record);
+        owner.patch.uninstall();
+        assert(record.released);
+        assert(!owner.count.messages.some(message => String(message).includes("changed by another patch")), "normal cleanup reported a foreign patch");
     }
     console.log("bluebook-citations-fixer wrapper tests passed");
 }

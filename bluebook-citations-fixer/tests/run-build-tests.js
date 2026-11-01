@@ -27,7 +27,7 @@ function inspect(version) {
     assert.strictEqual(listing.status, 0, listing.stderr);
     const entries = listing.stdout.trim().split("\n");
     for (const required of ["bootstrap.js", "prefs.js", "prefs.xhtml", "prefs-pane.js",
-        "chrome.manifest", "COPYING.txt", "lib/patch.js", "lib/style-sync.js"]) {
+        "chrome.manifest", "COPYING.txt", "lib/patch.js", "lib/style-sync.js", "lib/style-change-gate.js", "lib/et-al-override.js"]) {
         assert(entries.includes(required), "missing " + required);
     }
     assert(!entries.some(name => /^(macros|tests|releases)\//.test(name)));

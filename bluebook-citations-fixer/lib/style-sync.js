@@ -276,7 +276,7 @@ BCF.styleSync.summaryLabel = function (res) {
 // closures only — it touches no Zotero API — so merging it in is harness-safe.
 BCF.styleSync._defaultDeps = function () {
     var sync = BCF.styleSync;
-    var etAl = BCF.etAl;
+    var gate = BCF.styleGate;
     return {
         parse: sync._parseXML,
         getInstalledStyles: function () { return Zotero.Styles.getAll(); },
@@ -294,10 +294,10 @@ BCF.styleSync._defaultDeps = function () {
             return file ? target.equals(file) : false;
         },
         withStyleChange: function (task, current) {
-            if (!etAl || typeof etAl.withStyleChange !== "function") {
+            if (!gate || typeof gate.withStyleChange !== "function") {
                 return Promise.reject(new Error("Style-change command gate unavailable"));
             }
-            return etAl.withStyleChange(task, current);
+            return gate.withStyleChange(task, current);
         },
         setupNoticeDue: function (now) {
             var last = Number(Zotero.Prefs.get(sync.PREF_SETUP_ATTEMPT, true));

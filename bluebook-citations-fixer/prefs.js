@@ -28,6 +28,8 @@ pref("extensions.bluebook-citations-fixer.styleSync.lastCheck", "0");
 // The existing min preference now controls first citations and bibliographies.
 pref("extensions.bluebook-citations-fixer.etAl.min", 0);
 pref("extensions.bluebook-citations-fixer.etAl.subsequentMin", 0);
+// Wake-up token only; current transform failures remain in memory.
+pref("extensions.bluebook-citations-fixer.etAl.statusRevision", "");
 
 // Main-style startup repair status, separate from the routine update throttle.
 pref("extensions.bluebook-citations-fixer.styleSetup.lastAttempt", "0");

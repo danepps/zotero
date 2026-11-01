@@ -1,6 +1,6 @@
 # Style sync: implementation contract and remaining verification
 
-> **Status: built; live verification pending. Revised 2026-09-12.** This replaces
+> **Status: built; live verification pending. Revised 2026-10-31.** This replaces
 > superseded implementation sketches. The [roadmap](v2.0-roadmap.md) controls
 > remaining work; [the July review](2.0-plan-review.md) is historical rationale.
 
@@ -24,7 +24,7 @@ time in the future. The manual button bypasses automatic enable/throttle checks.
 
 `lib/style-sync.js` uses lazy Zotero access and injected dependencies.
 `bootstrap.js` loads it after `patch.js`, schedules startup, and cancels it first
-on shutdown. The pane receives only `{ checkStyleUpdates, styleUpdateSummary, installedStyleVersions, styleSetupStatus, installStyle }`
+on shutdown. The pane receives only `{ checkStyleUpdates, styleUpdateSummary, installedStyleVersions, styleSetupStatus, installStyle, etAlStatus }`
 through `Zotero.BluebookCitationsFixer`; remove that bridge only when it is still
 this instance's object. Never expose the entire BCF namespace.
 
@@ -60,7 +60,7 @@ metadata. Capture modules before awaits; cancellation prevents new installs.
 3. Equal/older timestamps mean `up-to-date`, with no installation.
 4. Explicitly validate the fetched text with `Zotero.Styles.validate(text)`.
    Rejection means `failed`, with no installation.
-5. Queue installation through `BCF.etAl.withStyleChange`, synchronously blocking
+5. Queue installation through `BCF.styleGate.withStyleChange`, synchronously blocking
    later integration commands. Wait for existing commands, rechecking activity
    and generation after each wait. Retain the gate through installation and
    verification. Re-read local state inside the gate: preserve independently
@@ -155,3 +155,9 @@ and automatic/Settings installations check title and destination-file collisions
 before touching styles. Success notices follow native-reset completion. Tests
 model Zotero’s detached reset instead of awaiting it inside the installer mock.
 See the roadmap for the final verification record and remaining live gates.
+
+October 31 memo hardening (1.3.3.11): the command gate is independent of the
+optional et-al feature, owns `Integration.__bcfStyleGate`, and migrates legacy
+Style-prototype coordinators synchronously. Bootstrap isolates et-al loading
+and synchronous/asynchronous setup errors; regression tests verify that missing
+main-style repair still runs. All detached-reset exclusion guarantees remain.

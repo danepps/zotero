@@ -123,9 +123,11 @@ The terminal-period Word macro is deferred and is not part of the 2.0 release.
   its installed style default. For example, 9 and 4 lists all eight authors on
   first appearance, then uses the first author plus et al. on subsequent cites.
   The September 12 style defaults are 5 and 4. The overrides apply to text, HTML,
-  and RTF engines; refresh your document after changing them. Native citeproc-js
-  can expand first-citation names if the subsequent threshold is higher than
-  the first. Hereinafter labels and Break id. short-form author names keep their
+  and RTF engines; refresh your document after changing them. Subsequent citations
+  follow the first-citation setting when it is lower. Previously saved higher
+  subsequent values are preserved but capped when rendering. Settings reports
+  when a style's name options prevent the override from applying.
+  Hereinafter labels and Break id. short-form author names keep their
   usual formatting; installed style files are unchanged by the overrides.
 - **Main-style setup and repair.** About five seconds after each startup, the
   plugin checks for the main Epps Bluebook style and installs it silently if

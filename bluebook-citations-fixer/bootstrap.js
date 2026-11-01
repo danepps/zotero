@@ -126,8 +126,12 @@ async function startup(data) {
         load("lib/patch.js");
         // After patch.js: style-sync reads BCF.patch.BUILTIN_STYLE_IDS as the
         // single source of truth for which styles it may update.
+        load("lib/style-change-gate.js");
         load("lib/style-sync.js");
-        load("lib/et-al-override.js");
+        // Author overrides are optional. A load failure must not prevent style
+        // repair, the command gate, or the rest of the plugin from starting.
+        try { load("lib/et-al-override.js"); }
+        catch (e) { BCF.diag.err("et-al load", e); }
 
         // Minimal bridge for the Settings pane script, which runs in its own
         // Cu.Sandbox and cannot see this BCF. Deliberately a few functions, not
@@ -135,8 +139,9 @@ async function startup(data) {
         try {
             // Capture the module: the pane can call this after a teardown has
             // already nulled BCF.
-            var sync = BCF.styleSync;
+            var sync = BCF.styleSync, override = BCF.etAl;
             BCF.paneAPI = {
+                etAlStatus: function () { return override && override.status ? override.status() : []; },
                 checkStyleUpdates: function () { return sync.check(); },
                 styleUpdateSummary: function (res) { return sync.summaryLabel(res); },
                 installedStyleVersions: function () { return sync.installedVersions(); },
@@ -149,7 +154,11 @@ async function startup(data) {
         BCF.diag.init();
         BCF.diag.event("startup", "loaded");
         BCF.patch.install();
-        BCF.etAl.install();
+        BCF.styleGate.install();
+        var etAl = BCF.etAl, startupDiag = BCF.diag;
+        try {
+            if (etAl) Promise.resolve(etAl.install()).catch(function (e) { startupDiag.err("et-al install", e); });
+        } catch (e) { startupDiag.err("et-al install", e); }
         BCF.dialog.install();
         _registerPrefsPane(Zot, rootURI);
         BCF.styleSync.scheduleStartupCheck();
@@ -194,6 +203,7 @@ async function shutdown(data, reason) {
     // Zotero awaits async shutdown. Disable/upgrade restores session engines
     // before removing the command barrier; application exit needs no rebuild.
     try { if (BCF && BCF.etAl) await BCF.etAl.uninstall(reason === 2); } catch (_) {}
+    try { if (BCF && BCF.styleGate) await BCF.styleGate.uninstall(reason === 2); } catch (_) {}
     try { if (BCF && BCF.patch) BCF.patch.uninstall(); } catch (_) {}
     try {
         if (BCF && BCF.prefsPaneID && BCF.Zotero && BCF.Zotero.PreferencePanes &&

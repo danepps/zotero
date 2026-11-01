@@ -4,6 +4,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
+const { DOMParser } = require("@xmldom/xmldom");
 const root = path.resolve(__dirname, "..");
 const MAIN = "https://danepps.github.io/bluebook/BluebookDSEStyle.csl";
 const EXP = "https://danepps.github.io/bluebook/BluebookDSEStyle-Experimental.csl";
@@ -21,22 +22,26 @@ class Element {
 async function main() {
     const elements = {};
     for (const id of ["bcf-prefpane", "bcf-style-all", "bcf-style-list", "bcf-style-manual",
-        "bcf-style-setup-status", "bcf-style-sync-check", "bcf-style-sync-status", "bcf-style-versions", "bcf-et-al-min", "bcf-et-al-subsequent-min"]) elements[id] = new Element();
+        "bcf-style-setup-status", "bcf-style-sync-check", "bcf-style-sync-status", "bcf-style-versions", "bcf-et-al-min", "bcf-et-al-subsequent-min", "bcf-et-al-status"]) elements[id] = new Element();
     // The existing style picker is already built; exercise the update section.
     elements["bcf-style-list"].setAttribute("data-bcf-built", "1");
     const link = new Element();
     link.style = {};
     link.setAttribute("href", NOTES);
     elements["bcf-prefpane"].querySelectorAll = () => [link];
+    for (const id of ["bcf-et-al-min", "bcf-et-al-subsequent-min"]) elements[id].options = [0,3,4,5,6,7,8,9,10,11].map(value => ({value: String(value)}));
     const windowListeners = {};
+    const etAlObservers = {};
+    let defaultMin = 5, failures = [];
     let observer, setupObserver, unregistered = [], launched, checks = 0, pendingRead, etAl = 4, subsequent = 0;
     let versions = [{ id: MAIN, status: "installed", updated: Date.parse("2026-09-12T14:14:28Z") },
         { id: EXP, status: "not-installed", updated: null }];
     const context = {
         document: { getElementById: id => elements[id], createXULElement: () => new Element(),
             addEventListener() {}, removeEventListener() {} },
-        window: { addEventListener: (name, fn) => { windowListeners[name] = fn; }, setTimeout },
+        window: { DOMParser, addEventListener: (name, fn) => { windowListeners[name] = fn; }, setTimeout },
         Zotero: {
+            Styles: { get: () => defaultMin ? { getXML: () => `<style xmlns="http://purl.org/net/xbiblio/csl"><citation et-al-min="${defaultMin}"/></style>` } : null },
             Prefs: {
                 get(name) { return name.endsWith("etAl.min") ? etAl : name.endsWith("etAl.subsequentMin") ? subsequent : undefined; },
                 set(name, value, global) {
@@ -46,6 +51,7 @@ async function main() {
                     if (name.endsWith("subsequentMin")) subsequent = value; else etAl = value;
                 },
                 registerObserver(name, fn, global) {
+                if (name.includes(".etAl.")) { etAlObservers[name] = fn; return name; }
                 assert(["extensions.bluebook-citations-fixer.styleSync.lastCheck", "extensions.bluebook-citations-fixer.styleSetup.lastAttempt"].includes(name));
                 assert.strictEqual(global, true);
                 if (name.endsWith("lastAttempt")) { setupObserver = fn; return "setup-token"; }
@@ -53,6 +59,7 @@ async function main() {
                 return "observer-token";
             }, unregisterObserver: token => { unregistered.push(token); } },
             BluebookCitationsFixer: {
+                etAlStatus: () => failures,
                 installedStyleVersions: () => pendingRead || Promise.resolve(versions),
                 checkStyleUpdates: async () => { checks++; return {}; },
                 styleUpdateSummary: () => "Updated 1 style",
@@ -75,6 +82,7 @@ async function main() {
     elements["bcf-et-al-min"].value = "3";
     elements["bcf-et-al-min"].listeners.change();
     assert.strictEqual(etAl, 3);
+    assert(elements["bcf-et-al-subsequent-min"].options.find(o => o.value === "4").disabled);
     elements["bcf-et-al-min"].value = "0";
     elements["bcf-et-al-min"].listeners.change();
     assert.strictEqual(etAl, 0);
@@ -82,6 +90,8 @@ async function main() {
     elements["bcf-et-al-subsequent-min"].value = "9";
     elements["bcf-et-al-subsequent-min"].listeners.change();
     assert.strictEqual(subsequent, 9);
+    assert(elements["bcf-et-al-subsequent-min"].options.find(o => o.value === "9").disabled);
+    assert.strictEqual(elements["bcf-et-al-subsequent-min"].value, "9");
     assert.strictEqual(etAl, 0);
     elements["bcf-et-al-subsequent-min"].value = "1.5";
     elements["bcf-et-al-subsequent-min"].listeners.change();
@@ -93,6 +103,20 @@ async function main() {
         assert.strictEqual(subsequent, value);
         assert.strictEqual(etAl, 0);
     }
+    defaultMin = null;
+    etAlObservers["extensions.bluebook-citations-fixer.etAl.min"]();
+    assert(elements["bcf-et-al-subsequent-min"].options.every(o => !o.disabled));
+    defaultMin = 6;
+    etAlObservers["extensions.bluebook-citations-fixer.etAl.min"]();
+    assert(!elements["bcf-et-al-subsequent-min"].options.find(o => o.value === "6").disabled);
+    assert(elements["bcf-et-al-subsequent-min"].options.find(o => o.value === "7").disabled);
+    assert(fs.readFileSync(path.join(root, "prefs.xhtml"), "utf8").includes('id="bcf-et-al-clamp-note"'));
+    failures = [{ title: "Epps Test", reason: "unsupported name options in this style version" }];
+    etAlObservers["extensions.bluebook-citations-fixer.etAl.statusRevision"]();
+    assert(elements["bcf-et-al-status"].textContent.includes("Override not applied to Epps Test"));
+    failures = [];
+    etAlObservers["extensions.bluebook-citations-fixer.etAl.statusRevision"]();
+    assert.strictEqual(elements["bcf-et-al-status"].textContent, "");
     link.listeners.click({ preventDefault() {} });
     assert.strictEqual(launched, NOTES);
     assert(fs.readFileSync(path.join(root, "prefs.xhtml"), "utf8").includes('href="' + NOTES + '"'));
@@ -116,7 +140,7 @@ async function main() {
     assert.strictEqual(elements["bcf-style-sync-status"].value, "Updated 1 style");
     assert.strictEqual(elements["bcf-style-sync-check"].disabled, false);
     windowListeners.unload();
-    assert.deepStrictEqual(unregistered, ["observer-token", "setup-token"]);
+    assert.deepStrictEqual(unregistered, ["observer-token", "setup-token", "extensions.bluebook-citations-fixer.etAl.min", "extensions.bluebook-citations-fixer.etAl.subsequentMin", "extensions.bluebook-citations-fixer.etAl.statusRevision"]);
     console.log("bluebook-citations-fixer pane tests passed");
 }
 
